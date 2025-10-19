@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>受注管理システム - クリーンデザイン</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* メインカラー */
+            --primary: #0066FF;
+            --primary-dark: #0052CC;
+            --primary-light: #4D94FF;
+            --primary-lighter: #E6F0FF;
+            
+            /* グレースケール */
+            --white: #FFFFFF;
+            --gray-50: #FAFAFA;
+            --gray-100: #F5F5F5;
+            --gray-200: #EEEEEE;
+            --gray-300: #E0E0E0;
+            --gray-400: #BDBDBD;
+            --gray-500: #9E9E9E;
+            --gray-600: #757575;
+            --gray-700: #616161;
+            --gray-800: #424242;
+            --gray-900: #212121;
+            
+            /* アクセントカラー */
+            --success: #00C853;
+            --warning: #FFB300;
+            --danger: #FF3D00;
+            --info: #00B0FF;
+            
+            /* シャドウ */
+            --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+            --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
+            --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* ヘッダー */
+        .header {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 24px 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 44px;
+            height: 44px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--gray-900);
+            letter-spacing: -0.3px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .month-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .month-nav-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--gray-300);
+            background: var(--white);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-size: 14px;
+            color: var(--gray-700);
+        }
+
+        .month-nav-btn:hover {
+            background: var(--gray-100);
+            border-color: var(--gray-400);
+        }
+
+        .month-badge {
+            background: var(--primary);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .today-date {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gray-900);
+            letter-spacing: -0.5px;
+        }
+
+        /* 統計カード */
+        .stats-section {
+            margin-bottom: 24px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 28px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .stat-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+        }
+
+        .stat-icon.blue {
+            background: var(--primary-lighter);
+            color: var(--primary);
+        }
+
+        .stat-icon.green {
+            background: #E8F5E9;
+            color: var(--success);
+        }
+
+        .stat-icon.orange {
+            background: #FFF3E0;
+            color: var(--warning);
+        }
+
+        .stat-icon.red {
+            background: #FFEBEE;
+            color: var(--danger);
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-label {
+            color: var(--gray-600);
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--gray-900);
+            line-height: 1;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+
+        .stat-sub {
+            color: var(--gray-500);
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .stat-trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .stat-trend.up {
+            background: #E8F5E9;
+            color: var(--success);
+        }
+
+        .stat-trend.down {
+            background: #FFEBEE;
+            color: var(--danger);
+        }
+
+        /* アクションバー */
+        .action-bar {
+            background: var(--white);
+            border-radius: 12px;
+            padding: 24px 28px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+        }
+
+        .action-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .action-row + .action-row {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        /* ボタン */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .btn-success:hover {
+            background: #00A344;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-secondary {
+            background: var(--white);
+            color: var(--gray-700);
+            border: 1px solid var(--gray-300);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-100);
+            border-color: var(--gray-400);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+            box-shadow: var(--shadow-xs);
+        }
+
+        .btn-warning:hover {
+            background: #FF9800;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* テーブル */
+        .table-container {
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-200);
+        }
+
+        .table-header {
+            padding: 24px 28px;
+            border-bottom: 1px solid var(--gray-200);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .table-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .search-input {
+            padding: 10px 16px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 14px;
+            width: 280px;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-lighter);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: var(--gray-50);
+        }
+
+        th {
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        td {
+            padding: 20px;
+            border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-700);
+            font-size: 14px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: var(--gray-50);
+        }
+
+        .order-number {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+
+        .amount {
+            font-weight: 700;
+            color: var(--gray-900);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.completed {
+            background: #E8F5E9;
+            color: var(--success);
+        }
+
+        .status-badge.pending {
+            background: #FFF3E0;
+            color: var(--warning);
+        }
+
+        .status-badge.in-progress {
+            background: #E3F2FD;
+            color: var(--info);
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 16px;
+            }
+
+            .header {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+
+            .today-date {
+                font-size: 24px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-value {
+                font-size: 28px;
+            }
+
+            .search-input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="logo">🚚</div>
+                    <h1>受注管理システム</h1>
+                </div>
+                <div class="header-right">
+                    <div class="month-selector">
+                        <button class="month-nav-btn">◀</button>
+                        <div class="month-badge">2025年10月</div>
+                        <button class="month-nav-btn">▶</button>
+                    </div>
+                    <div class="today-date">10/18</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 統計カード -->
+        <div class="stats-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-content">
+                            <div class="stat-label">今月の受注件数</div>
+                            <div class="stat-value">248</div>
+                            <div class="stat-sub">前月比 +12件</div>
+                            <div class="stat-trend up">↑ 5.1%</div>
+                        </div>
+                        <div class="stat-icon blue">📊</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-content">
+                            <div class="stat-label">今月の売上</div>
+                            <div class="stat-value">¥3.2M</div>
+                            <div class="stat-sub">前月比 +¥180K</div>
+                            <div class="stat-trend up">↑ 5.9%</div>
+                        </div>
+                        <div class="stat-icon green">💰</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-content">
+                            <div class="stat-label">完了済み</div>
+                            <div class="stat-value">186</div>
+                            <div class="stat-sub">進捗率 75%</div>
+                            <div class="stat-trend up">順調</div>
+                        </div>
+                        <div class="stat-icon green">✓</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <div class="stat-content">
+                            <div class="stat-label">未完了</div>
+                            <div class="stat-value">62</div>
+                            <div class="stat-sub">要対応 12件</div>
+                            <div class="stat-trend down">注意</div>
+                        </div>
+                        <div class="stat-icon red">⚠</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- アクションバー -->
+        <div class="action-bar">
+            <div class="action-row">
+                <button class="btn btn-primary">
+                    <span>➕</span>
+                    新規受注
+                </button>
+                <button class="btn btn-success">
+                    <span>📥</span>
+                    CSV取込
+                </button>
+                <button class="btn btn-secondary">
+                    <span>📤</span>
+                    CSV出力
+                </button>
+                <button class="btn btn-secondary">
+                    <span>🖨️</span>
+                    印刷
+                </button>
+                <button class="btn btn-secondary">
+                    <span>⚙️</span>
+                    設定
+                </button>
+            </div>
+            <div class="action-row">
+                <button class="btn btn-secondary">顧客マスタ</button>
+                <button class="btn btn-secondary">積荷マスタ</button>
+                <button class="btn btn-secondary">ドライバーマスタ</button>
+                <button class="btn btn-secondary">車両マスタ</button>
+                <button class="btn btn-warning">
+                    <span>☁️</span>
+                    クラウド設定
+                </button>
+            </div>
+        </div>
+
+        <!-- テーブル -->
+        <div class="table-container">
+            <div class="table-header">
+                <div class="table-title">受注一覧</div>
+                <div class="search-box">
+                    <input type="text" class="search-input" placeholder="検索...">
+                    <button class="btn btn-secondary">🔍 検索</button>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>受注番号</th>
+                        <th>日付</th>
+                        <th>顧客名</th>
+                        <th>積荷</th>
+                        <th>金額</th>
+                        <th>ドライバー</th>
+                        <th>ステータス</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="order-number">2025-001</span></td>
+                        <td>2025/10/18</td>
+                        <td>株式会社サンプル</td>
+                        <td>パレット 10個</td>
+                        <td><span class="amount">¥45,000</span></td>
+                        <td>山田太郎</td>
+                        <td><span class="status-badge completed">完了</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="order-number">2025-002</span></td>
+                        <td>2025/10/18</td>
+                        <td>テスト運送</td>
+                        <td>段ボール 50個</td>
+                        <td><span class="amount">¥32,000</span></td>
+                        <td>佐藤花子</td>
+                        <td><span class="status-badge in-progress">進行中</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="order-number">2025-003</span></td>
+                        <td>2025/10/17</td>
+                        <td>物流株式会社</td>
+                        <td>コンテナ 5個</td>
+                        <td><span class="amount">¥128,000</span></td>
+                        <td>鈴木一郎</td>
+                        <td><span class="status-badge pending">保留中</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="order-number">2025-004</span></td>
+                        <td>2025/10/17</td>
+                        <td>ABC物流</td>
+                        <td>段ボール 100個</td>
+                        <td><span class="amount">¥58,000</span></td>
+                        <td>田中次郎</td>
+                        <td><span class="status-badge completed">完了</span></td>
+                    </tr>
+                    <tr>
+                        <td><span class="order-number">2025-005</span></td>
+                        <td>2025/10/16</td>
+                        <td>XYZ運送</td>
+                        <td>パレット 20個</td>
+                        <td><span class="amount">¥92,000</span></td>
+                        <td>高橋三郎</td>
+                        <td><span class="status-badge completed">完了</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
+
