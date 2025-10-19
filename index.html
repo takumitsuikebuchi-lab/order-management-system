@@ -3338,6 +3338,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         }
         // 配車時間と順序を設定した運行指示書を印刷（完全版）
         function printInstructionsWithSettings(printOrders, dispatchTime) {
+            try {
+            console.log('printInstructionsWithSettings開始:', printOrders, dispatchTime);
             // データ正規化: スネークケースとキャメルケースの両方に対応
             printOrders = printOrders.map(order => ({
                 ...order,
@@ -3704,6 +3706,10 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             } catch(e) {}
             renderTable();
             updateStats();
+            } catch (error) {
+                console.error('printInstructionsWithSettingsエラー:', error);
+                alert('運行指示書の生成中にエラーが発生しました: ' + error.message);
+            }
         }
 
 
