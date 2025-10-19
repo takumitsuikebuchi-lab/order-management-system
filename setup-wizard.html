@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>受注管理システム - 初回セットアップ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .wizard-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .wizard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .wizard-header h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .wizard-header p {
+            opacity: 0.9;
+            font-size: 0.95rem;
+        }
+
+        .wizard-body {
+            padding: 2rem;
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .step-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #e2e8f0;
+            transition: all 0.3s;
+        }
+
+        .step-dot.active {
+            background: #667eea;
+            transform: scale(1.2);
+        }
+
+        .step-dot.completed {
+            background: #10b981;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #1e293b;
+        }
+
+        p {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #1e293b;
+        }
+
+        input[type="text"],
+        input[type="url"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #64748b;
+        }
+
+        .btn-secondary:hover {
+            background: #cbd5e1;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .wizard-footer {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 2rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .info-box {
+            background: #f1f5f9;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .info-box p {
+            margin: 0;
+            color: #475569;
+            font-size: 0.9rem;
+        }
+
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .warning-box p {
+            margin: 0;
+            color: #92400e;
+            font-size: 0.9rem;
+        }
+
+        .success-box {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .success-box p {
+            margin: 0;
+            color: #065f46;
+            font-size: 0.9rem;
+        }
+
+        .code-box {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+
+        .option-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .option-card:hover {
+            border-color: #667eea;
+            background: #f8fafc;
+        }
+
+        .option-card.selected {
+            border-color: #667eea;
+            background: #eef2ff;
+        }
+
+        .option-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: #1e293b;
+        }
+
+        .option-card p {
+            margin: 0;
+            font-size: 0.9rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-success {
+            background: #10b981;
+        }
+
+        .status-error {
+            background: #ef4444;
+        }
+
+        .status-pending {
+            background: #f59e0b;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        ol {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        ol li {
+            margin-bottom: 0.5rem;
+            color: #475569;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <div class="wizard-header">
+            <h1>🚚 受注管理システム</h1>
+            <p>初回セットアップウィザード</p>
+        </div>
+
+        <div class="wizard-body">
+            <div class="step-indicator">
+                <div class="step-dot active" data-step="1"></div>
+                <div class="step-dot" data-step="2"></div>
+                <div class="step-dot" data-step="3"></div>
+                <div class="step-dot" data-step="4"></div>
+                <div class="step-dot" data-step="5"></div>
+            </div>
+
+            <!-- Step 1: ようこそ -->
+            <div class="step active" id="step1">
+                <h2>ようこそ！</h2>
+                <p>受注管理システムのセットアップを開始します。このウィザードでは、システムの使用方法を選択し、必要な設定を行います。</p>
+                
+                <div class="info-box">
+                    <p><strong>所要時間:</strong> 約5〜10分</p>
+                </div>
+
+                <p>まず、どのように使用するかを選択してください。</p>
+
+                <div class="option-card" onclick="selectOption('local')">
+                    <h3>💻 このPCだけで使う（ローカル運用）</h3>
+                    <p>インターネット接続不要。データはこのPCのブラウザに保存されます。設定は不要で、すぐに使い始められます。</p>
+                </div>
+
+                <div class="option-card" onclick="selectOption('cloud')">
+                    <h3>☁️ 複数のPCで共有する（クラウド運用）</h3>
+                    <p>インターネット経由で複数のPCからデータを共有できます。Supabaseという無料サービスを使用します（設定が必要）。</p>
+                </div>
+
+                <div class="wizard-footer">
+                    <div></div>
+                    <button class="btn btn-primary" onclick="nextStep()" id="step1Next" disabled>次へ</button>
+                </div>
+            </div>
+
+            <!-- Step 2: ローカル運用の説明 -->
+            <div class="step" id="step2-local">
+                <h2>ローカル運用について</h2>
+                <p>ローカル運用では、データはこのPCのブラウザ内に保存されます。</p>
+
+                <div class="success-box">
+                    <p><strong>✅ メリット</strong></p>
+                    <p>• 設定不要ですぐに使える<br>
+                    • インターネット接続不要<br>
+                    • 完全にプライベート</p>
+                </div>
+
+                <div class="warning-box">
+                    <p><strong>⚠️ 注意点</strong></p>
+                    <p>• 他のPCからはアクセスできません<br>
+                    • ブラウザのデータを消すと受注データも消えます<br>
+                    • 定期的にCSV出力でバックアップを推奨</p>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>💡 推奨:</strong> 週に1回は「CSV出力」ボタンでデータをバックアップしましょう。</p>
+                </div>
+
+                <div class="wizard-footer">
+                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
+                    <button class="btn btn-success" onclick="completeLocalSetup()">完了して使い始める</button>
+                </div>
+            </div>
+
+            <!-- Step 2: クラウド運用の説明 -->
+            <div class="step" id="step2-cloud">
+                <h2>クラウド運用について</h2>
+                <p>クラウド運用では、Supabaseという無料サービスを使用してデータを保存します。</p>
+
+                <div class="success-box">
+                    <p><strong>✅ メリット</strong></p>
+                    <p>• 複数のPCから同じデータにアクセス可能<br>
+                    • 自動的にクラウドにバックアップ<br>
+                    • PCが壊れてもデータは安全</p>
+                </div>
+
+                <div class="warning-box">
+                    <p><strong>⚠️ 必要なもの</strong></p>
+                    <p>• インターネット接続<br>
+                    • Supabaseの無料アカウント（メールアドレスのみ）<br>
+                    • 約5分の初期設定</p>
+                </div>
+
+                <div class="wizard-footer">
+                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
+                    <button class="btn btn-primary" onclick="nextStep()">次へ（Supabase設定）</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Supabaseプロジェクト作成 -->
+            <div class="step" id="step3">
+                <h2>Supabaseプロジェクトの作成</h2>
+                <p>まず、Supabaseで無料アカウントを作成し、プロジェクトを作成します。</p>
+
+                <ol>
+                    <li><a href="https://supabase.com/" target="_blank" style="color: #667eea; font-weight: 600;">Supabase公式サイト</a>を開く</li>
+                    <li>「Start your project」をクリック</li>
+                    <li>GitHubアカウントでサインイン（または新規作成）</li>
+                    <li>「New project」をクリック</li>
+                    <li>以下を入力:
+                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li><strong>Name:</strong> order-system（任意の名前でOK）</li>
+                            <li><strong>Database Password:</strong> 強力なパスワードを設定（メモしておく）</li>
+                            <li><strong>Region:</strong> Northeast Asia (Tokyo)を選択</li>
+                        </ul>
+                    </li>
+                    <li>「Create new project」をクリック</li>
+                    <li>プロジェクトの作成完了を待つ（1〜2分）</li>
+                </ol>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="projectCreated" onchange="toggleNextButton()">
+                    <label for="projectCreated">Supabaseプロジェクトを作成しました</label>
+                </div>
+
+                <div class="wizard-footer">
+                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
+                    <button class="btn btn-primary" onclick="nextStep()" id="step3Next" disabled>次へ</button>
+                </div>
+            </div>
+
+            <!-- Step 4: テーブル作成 -->
+            <div class="step" id="step4">
+                <h2>データベーステーブルの作成</h2>
+                <p>Supabaseプロジェクトにデータを保存するためのテーブルを作成します。</p>
+
+                <ol>
+                    <li>Supabaseの左メニューから「SQL Editor」をクリック</li>
+                    <li>下のSQLコードをコピーして貼り付け</li>
+                    <li>右上の「Run」ボタンをクリック</li>
+                    <li>「Success. No rows returned」と表示されればOK</li>
+                </ol>
+
+                <div class="code-box">
+                    <button class="copy-btn" onclick="copySQL()">コピー</button>
+                    <pre id="sqlCode">-- 受注データテーブル作成
+create table if not exists public.orders (
+  id bigserial primary key,
+  order_no text not null unique,
+  date date not null,
+  customer_name text not null,
+  pickup_location text,
+  pickup_address text,
+  delivery_location text,
+  delivery_address text,
+  delivery_tel text,
+  cargo text not null,
+  quantity numeric,
+  unit text,
+  packaging text,
+  unit_price numeric,
+  amount_net numeric,
+  amount_gross numeric,
+  driver text,
+  vehicle text,
+  instructions text,
+  instruction_sheet boolean default false,
+  invoice_sent boolean default false,
+  payment_received boolean default false,
+  order_completed boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- アクセス権限の設定
+alter table public.orders enable row level security;
+
+create policy "誰でも閲覧可能" on public.orders for select using (true);
+create policy "誰でも追加可能" on public.orders for insert with check (true);
+create policy "誰でも更新可能" on public.orders for update using (true);
+create policy "誰でも削除可能" on public.orders for delete using (true);</pre>
+                </div>
+
+                <div class="checkbox-group">
+                    <input type="checkbox" id="tableCreated" onchange="toggleNextButton()">
+                    <label for="tableCreated">SQLを実行してテーブルを作成しました</label>
+                </div>
+
+                <div class="wizard-footer">
+                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
+                    <button class="btn btn-primary" onclick="nextStep()" id="step4Next" disabled>次へ</button>
+                </div>
+            </div>
+
+            <!-- Step 5: 接続情報の入力 -->
+            <div class="step" id="step5">
+                <h2>接続情報の設定</h2>
+                <p>Supabaseの接続情報を入力します。</p>
+
+                <ol>
+                    <li>Supabaseの左メニューから「Project Settings」→「API」を開く</li>
+                    <li>以下の情報をコピーして、下のフォームに貼り付け</li>
+                </ol>
+
+                <div class="form-group">
+                    <label>Project URL</label>
+                    <input type="url" id="projectUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" oninput="validateConnection()">
+                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">「Project URL」の欄からコピーしてください</p>
+                </div>
+
+                <div class="form-group">
+                    <label>anon public key</label>
+                    <input type="text" id="anonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." oninput="validateConnection()">
+                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">「anon public」の欄からコピーしてください</p>
+                </div>
+
+                <button class="btn btn-primary" onclick="testConnection()" id="testBtn" disabled>接続テスト</button>
+
+                <div id="connectionStatus" class="hidden"></div>
+
+                <div class="wizard-footer">
+                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
+                    <button class="btn btn-success" onclick="completeCloudSetup()" id="step5Complete" disabled>完了して使い始める</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 1;
+        let selectedOption = null;
+
+        function selectOption(option) {
+            selectedOption = option;
+            document.querySelectorAll('.option-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            document.getElementById('step1Next').disabled = false;
+        }
+
+        function nextStep() {
+            const dots = document.querySelectorAll('.step-dot');
+            dots[currentStep - 1].classList.remove('active');
+            dots[currentStep - 1].classList.add('completed');
+
+            document.getElementById(`step${currentStep}${currentStep === 1 ? '' : currentStep === 2 && selectedOption === 'local' ? '-local' : currentStep === 2 && selectedOption === 'cloud' ? '-cloud' : ''}`).classList.remove('active');
+
+            if (currentStep === 1 && selectedOption === 'local') {
+                document.getElementById('step2-local').classList.add('active');
+                currentStep = 2;
+            } else if (currentStep === 1 && selectedOption === 'cloud') {
+                document.getElementById('step2-cloud').classList.add('active');
+                currentStep = 2;
+            } else {
+                currentStep++;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+            }
+
+            dots[currentStep - 1].classList.add('active');
+        }
+
+        function prevStep() {
+            const dots = document.querySelectorAll('.step-dot');
+            dots[currentStep - 1].classList.remove('active');
+
+            const currentStepEl = document.querySelector('.step.active');
+            currentStepEl.classList.remove('active');
+
+            if (currentStep === 2 && (selectedOption === 'local' || selectedOption === 'cloud')) {
+                currentStep = 1;
+                document.getElementById('step1').classList.add('active');
+            } else {
+                currentStep--;
+                document.getElementById(`step${currentStep}`).classList.add('active');
+            }
+
+            dots[currentStep - 1].classList.remove('completed');
+            dots[currentStep - 1].classList.add('active');
+        }
+
+        function toggleNextButton() {
+            if (currentStep === 3) {
+                const checked = document.getElementById('projectCreated').checked;
+                document.getElementById('step3Next').disabled = !checked;
+            } else if (currentStep === 4) {
+                const checked = document.getElementById('tableCreated').checked;
+                document.getElementById('step4Next').disabled = !checked;
+            }
+        }
+
+        function copySQL() {
+            const sql = document.getElementById('sqlCode').textContent;
+            navigator.clipboard.writeText(sql).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = 'コピーしました！';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#667eea';
+                }, 2000);
+            });
+        }
+
+        function validateConnection() {
+            const url = document.getElementById('projectUrl').value.trim();
+            const key = document.getElementById('anonKey').value.trim();
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = !(url && key && url.includes('supabase.co') && key.length > 50);
+        }
+
+        async function testConnection() {
+            const url = document.getElementById('projectUrl').value.trim();
+            const key = document.getElementById('anonKey').value.trim();
+            const statusDiv = document.getElementById('connectionStatus');
+            const completeBtn = document.getElementById('step5Complete');
+
+            statusDiv.className = 'info-box';
+            statusDiv.innerHTML = '<p><span class="status-indicator status-pending"></span>接続をテスト中...</p>';
+            statusDiv.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${url}/rest/v1/orders?select=count`, {
+                    headers: {
+                        'apikey': key,
+                        'Authorization': `Bearer ${key}`
+                    }
+                });
+
+                if (response.ok) {
+                    statusDiv.className = 'success-box';
+                    statusDiv.innerHTML = '<p><span class="status-indicator status-success"></span>✅ 接続成功！Supabaseに正常に接続できました。</p>';
+                    completeBtn.disabled = false;
+                } else {
+                    throw new Error('接続失敗');
+                }
+            } catch (error) {
+                statusDiv.className = 'warning-box';
+                statusDiv.innerHTML = '<p><span class="status-indicator status-error"></span>❌ 接続に失敗しました。URLとキーを確認してください。</p>';
+                completeBtn.disabled = true;
+            }
+        }
+
+        function completeLocalSetup() {
+            localStorage.setItem('setupCompleted', 'true');
+            localStorage.setItem('setupMode', 'local');
+            window.location.href = 'index.html';
+        }
+
+        function completeCloudSetup() {
+            const url = document.getElementById('projectUrl').value.trim();
+            const key = document.getElementById('anonKey').value.trim();
+
+            const cloudConfig = {
+                url: url,
+                anonKey: key,
+                enabled: true
+            };
+
+            localStorage.setItem('cloudConfig', JSON.stringify(cloudConfig));
+            localStorage.setItem('setupCompleted', 'true');
+            localStorage.setItem('setupMode', 'cloud');
+
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
+
