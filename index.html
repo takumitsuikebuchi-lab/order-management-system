@@ -3330,11 +3330,14 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             
             dispatchTimeValue = dispatchTime;
             
+            // モーダルを閉じる前にinstructionOrdersのコピーを作成
+            const ordersToProcess = [...instructionOrders];
+            
             // モーダルを閉じる
             closeInstructionSettingsModal();
             
             // 運行指示書を印刷（修正版）
-            printInstructionsWithSettings(instructionOrders, dispatchTimeValue);
+            printInstructionsWithSettings(ordersToProcess, dispatchTimeValue);
         }
         // 配車時間と順序を設定した運行指示書を印刷（完全版）
         function printInstructionsWithSettings(printOrders, dispatchTime) {
