@@ -3565,11 +3565,12 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     const firstOrder = chunk[0];
                     const driverName = firstOrder.driver || '未定';
                     const vehicleName = firstOrder.vehicle || '未定';
-                    // 日付表示（西暦なし、月/日のみ）
+                    // 日付表示（西暦なし、月/日+曜日）
                     let orderDate = '';
                     if (firstOrder.date) {
                         const date = new Date(firstOrder.date);
-                        orderDate = `${date.getMonth() + 1}/${date.getDate()}`;
+                        const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][date.getDay()];
+                        orderDate = `${date.getMonth() + 1}/${date.getDate()}(${dayOfWeek})`;
                     }
                     
                     printContent += `
