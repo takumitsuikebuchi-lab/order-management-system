@@ -3259,8 +3259,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     <div class="drag-handle">≡</div>
                     <div class="order-number">${index + 1}.</div>
                     <div class="order-info">
-                        <strong>${order.customer_name || '（顧客名なし）'}</strong>
-                        <span style="color: #666; margin-left: 10px;">${order.order_no || ''}</span>
+                        <strong>${order.customerName || order.customer_name || '（顧客名なし）'}</strong>
+                        <span style="color: #666; margin-left: 10px;">${order.orderNo || order.order_no || ''}</span>
                     </div>
                 `;
                 
@@ -3338,6 +3338,25 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         }
         // 配車時間と順序を設定した運行指示書を印刷（完全版）
         function printInstructionsWithSettings(printOrders, dispatchTime) {
+            // データ正規化: スネークケースとキャメルケースの両方に対応
+            printOrders = printOrders.map(order => ({
+                ...order,
+                orderNo: order.orderNo || order.order_no || '',
+                customerName: order.customerName || order.customer_name || '',
+                pickupLocation: order.pickupLocation || order.pickup_location || '',
+                pickupAddress: order.pickupAddress || order.pickup_address || '',
+                deliveryLocation: order.deliveryLocation || order.delivery_location || '',
+                deliveryAddress: order.deliveryAddress || order.delivery_address || '',
+                deliveryTel: order.deliveryTel || order.delivery_tel || '',
+                cargo: order.cargo || '',
+                quantity: order.quantity || '',
+                unit: order.unit || '',
+                packaging: order.packaging || '',
+                instructions: order.instructions || '',
+                driver: order.driver || '',
+                vehicle: order.vehicle || ''
+            }));
+            
             // ドライバー整合性チェック（空欄は除外）
             if (printOrders.length > 1) {
                 const drivers = Array.from(new Set(
@@ -3547,23 +3566,23 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     
                     printContent += `
                         <div class="order-header-outside">
-                            ${globalIdx + 1}件目: ${order.customerName || order.customer_name || ''} (${orderDate})
+                            ${globalIdx + 1}件目: ${order.customerName || ''} (${orderDate})
                         </div>
                         <div class="order-section">
                             <table class="compact-table">
                                 <tr>
                                     <th>引取先</th>
-                                    <td>${order.pickupLocation || order.pickup_location || ''}</td>
+                                    <td>${order.pickupLocation || ''}</td>
                                     <th>配送先</th>
-                                    <td>${order.deliveryLocation || order.delivery_location || ''}</td>
+                                    <td>${order.deliveryLocation || ''}</td>
                                 </tr>
                                 <tr>
                                     <th>引取住所</th>
-                                    <td colspan="3">${order.pickupAddress || order.pickup_address || ''}</td>
+                                    <td colspan="3">${order.pickupAddress || ''}</td>
                                 </tr>
                                 <tr>
                                     <th>配送住所</th>
-                                    <td colspan="3">${order.deliveryAddress || order.delivery_address || ''}</td>
+                                    <td colspan="3">${order.deliveryAddress || ''}</td>
                                 </tr>
                                 <tr>
                                     <th>積荷</th>
