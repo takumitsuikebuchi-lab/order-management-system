@@ -3558,7 +3558,12 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     const firstOrder = chunk[0];
                     const driverName = firstOrder.driver || '未定';
                     const vehicleName = firstOrder.vehicle || '未定';
-                    const orderDate = firstOrder.date ? new Date(firstOrder.date).toLocaleDateString('ja-JP') : '';
+                    // 日付表示（西暦なし、月/日のみ）
+                    let orderDate = '';
+                    if (firstOrder.date) {
+                        const date = new Date(firstOrder.date);
+                        orderDate = `${date.getMonth() + 1}/${date.getDate()}`;
+                    }
                     
                     printContent += `
                         <div class="dispatch-time">
