@@ -3381,27 +3381,27 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 `;
                 
                 // ドラッグイベント
-                item.addEventListener('dragstart', handleDragStart);
-                item.addEventListener('dragover', handleDragOver);
-                item.addEventListener('drop', handleDrop);
-                item.addEventListener('dragend', handleDragEnd);
+                item.addEventListener('dragstart', handleInstructionDragStart);
+                item.addEventListener('dragover', handleInstructionDragOver);
+                item.addEventListener('drop', handleInstructionDrop);
+                item.addEventListener('dragend', handleInstructionDragEnd);
                 
                 listContainer.appendChild(item);
             });
         }
 
-        // ドラッグ開始
+        // 運行指示書用ドラッグ開始
         let draggedElement = null;
         let draggedIndex = null;
 
-        function handleDragStart(e) {
+        function handleInstructionDragStart(e) {
             draggedElement = e.currentTarget;
             draggedIndex = parseInt(e.currentTarget.dataset.index);
             e.currentTarget.style.opacity = '0.4';
         }
 
-        // ドラッグオーバー
-        function handleDragOver(e) {
+        // 運行指示書用ドラッグオーバー
+        function handleInstructionDragOver(e) {
             if (e.preventDefault) {
                 e.preventDefault();
             }
@@ -3409,8 +3409,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             return false;
         }
 
-        // ドロップ
-        function handleDrop(e) {
+        // 運行指示書用ドロップ
+        function handleInstructionDrop(e) {
             if (e.stopPropagation) {
                 e.stopPropagation();
             }
@@ -3430,8 +3430,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             return false;
         }
 
-        // ドラッグ終了
-        function handleDragEnd(e) {
+        // 運行指示書用ドラッグ終了
+        function handleInstructionDragEnd(e) {
             e.currentTarget.style.opacity = '1';
         }
 
