@@ -2678,15 +2678,19 @@ function updateStatsFromView() {
         // シンプルマスタ描画
         function renderSimpleMaster(masterData) {
             const list = document.getElementById('simpleMasterList');
-            list.innerHTML = masterData.map((item, index) => `
-                <div class="master-item" draggable="true" data-index="${index}">
-                    <span class="drag-handle">☰</span>
-                    <span class="master-item-content">${item}</span>
-                    <div class="master-item-actions">
-                        <button onclick="deleteSimpleMasterItem(${index})">×</button>
+            list.innerHTML = masterData.map((item, index) => {
+                // 文字列配列とオブジェクト配列の両方に対応
+                const name = typeof item === 'string' ? item : item.name;
+                return `
+                    <div class="master-item" draggable="true" data-index="${index}" data-name="${name}">
+                        <span class="drag-handle">☰</span>
+                        <span class="master-item-content">${name}</span>
+                        <div class="master-item-actions">
+                            <button onclick="deleteSimpleMasterItem(${index})">×</button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
             
             // ドラッグ&ドロップイベントを設定
             setupDragAndDrop();
@@ -2748,14 +2752,9 @@ function updateStatsFromView() {
             const newOrder = [];
             
             items.forEach(item => {
-                const index = parseInt(item.dataset.index);
-                switch(currentMasterType) {
-                    case 'cargo': newOrder.push(cargoMaster[index]); break;
-                    case 'packaging': newOrder.push(packagingMaster[index]); break;
-                    case 'unit': newOrder.push(unitMaster[index]); break;
-                    case 'driver': newOrder.push(driverMaster[index]); break;
-                    case 'vehicle': newOrder.push(vehicleMaster[index]); break;
-                }
+                // data-name属性から直接値を取得（文字列配列として保存）
+                const name = item.dataset.name;
+                newOrder.push(name);
             });
             
             switch(currentMasterType) {
