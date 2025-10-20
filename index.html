@@ -2715,11 +2715,12 @@ function updateStatsFromView() {
 
         function handleDragOver(e) {
             e.preventDefault();
-            const afterElement = getDragAfterElement(e.currentTarget.parentElement, e.clientY);
+            const container = document.getElementById('simpleMasterList');
+            const afterElement = getDragAfterElement(container, e.clientY);
             if (afterElement == null) {
-                e.currentTarget.parentElement.appendChild(draggedItem);
+                container.appendChild(draggedItem);
             } else {
-                e.currentTarget.parentElement.insertBefore(draggedItem, afterElement);
+                container.insertBefore(draggedItem, afterElement);
             }
         }
 
