@@ -2292,46 +2292,34 @@ textarea {
             try {
                 // 顧客マスタを取得
                 const cloudCustomers = await cloudFetchCustomers();
-                if (cloudCustomers.length > 0) {
-                    customerMaster = cloudCustomers.map(c => ({
-                        customerName: c.customer_name,
-                        pickupAddress: c.pickup_address || '',
-                        deliveryAddress: c.delivery_address || '',
-                        phoneNumber: c.phone_number || ''
-                    }));
-                    localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
-                }
+                customerMaster = cloudCustomers.map(c => ({
+                    customerName: c.customer_name,
+                    pickupAddress: c.pickup_address || '',
+                    deliveryAddress: c.delivery_address || '',
+                    phoneNumber: c.phone_number || ''
+                }));
+                localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
                 
                 // シンプルマスタを取得
                 const cloudCargo = await cloudFetchSimpleMaster('cargo');
-                if (cloudCargo.length > 0) {
-                    cargoMaster = cloudCargo;
-                    localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster));
-                }
+                cargoMaster = cloudCargo;
+                localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster));
                 
                 const cloudPackaging = await cloudFetchSimpleMaster('packaging');
-                if (cloudPackaging.length > 0) {
-                    packagingMaster = cloudPackaging;
-                    localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster));
-                }
+                packagingMaster = cloudPackaging;
+                localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster));
                 
                 const cloudUnit = await cloudFetchSimpleMaster('unit');
-                if (cloudUnit.length > 0) {
-                    unitMaster = cloudUnit;
-                    localStorage.setItem('unitMaster', JSON.stringify(unitMaster));
-                }
+                unitMaster = cloudUnit;
+                localStorage.setItem('unitMaster', JSON.stringify(unitMaster));
                 
                 const cloudDriver = await cloudFetchSimpleMaster('driver');
-                if (cloudDriver.length > 0) {
-                    driverMaster = cloudDriver;
-                    localStorage.setItem('driverMaster', JSON.stringify(driverMaster));
-                }
+                driverMaster = cloudDriver;
+                localStorage.setItem('driverMaster', JSON.stringify(driverMaster));
                 
                 const cloudVehicle = await cloudFetchSimpleMaster('vehicle');
-                if (cloudVehicle.length > 0) {
-                    vehicleMaster = cloudVehicle;
-                    localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster));
-                }
+                vehicleMaster = cloudVehicle;
+                localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster));
                 
                 logInfo('loadMastersFromCloud', 'All masters loaded from cloud');
                 updateSelectOptions();
