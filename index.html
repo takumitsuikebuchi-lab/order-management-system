@@ -4650,7 +4650,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             link.click();
         }
 
-        // CSVインポート（ヘッダーマッピング機能付き）
+        // CSVインポート（ヘッダーマッピング機能付き、Supabase自動同期）
         function importCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -4703,6 +4703,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 
                 // ヘッダーのマッピング
                 const mappedHeaders = csvHeaders.map(header => headerMapping[header] || null);
+                const importedOrders = [];
                 
                 for (let i = 1; i < lines.length; i++) {
                     if (!lines[i]) continue;
@@ -4759,13 +4760,33 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     }
                     
                     orders.push(order);
+                    importedOrders.push(order);
                 }
                 
                 saveData();
                 renderTable();
                 updateStats();
                 setupFilters();
-                alert(`CSVファイルをインポートしました（${lines.length - 1}件）`);
+                
+                // Supabase自動同期（クラウド有効の場合のみ）
+                if (cloudEnabled() && importedOrders.length > 0) {
+                    (async () => {
+                        try {
+                            for (const order of importedOrders) {
+                                try {
+                                    await cloudUpsertOrder(order);
+                                } catch(err) {
+                                    console.error('Cloud同期エラー:', err);
+                                }
+                            }
+                            showToast(`CSVインポート完了、Supabase同期完了（${importedOrders.length}件）`, 'success');
+                        } catch(err) {
+                            console.error('CSVインポート同期エラー:', err);
+                        }
+                    })();
+                } else {
+                    alert(`CSVファイルをインポートしました（${lines.length - 1}件）`);
+                }
             };
             
             reader.readAsText(file);
