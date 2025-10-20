@@ -2222,10 +2222,10 @@ textarea {
                         method: 'POST',
                         headers: { ...headers, 'Prefer': 'return=minimal' },
                         body: JSON.stringify(customers.map(c => ({
-                            customer_name: c.customerName,
-                            pickup_address: c.pickupAddress || '',
+                            customer_name: c.name || c.customerName,
+                            pickup_address: c.address || c.pickupAddress || '',
                             delivery_address: c.deliveryAddress || '',
-                            phone_number: c.phoneNumber || ''
+                            phone_number: c.tel || c.phoneNumber || ''
                         })))
                     });
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2293,10 +2293,9 @@ textarea {
                 // 顧客マスタを取得
                 const cloudCustomers = await cloudFetchCustomers();
                 customerMaster = cloudCustomers.map(c => ({
-                    customerName: c.customer_name,
-                    pickupAddress: c.pickup_address || '',
-                    deliveryAddress: c.delivery_address || '',
-                    phoneNumber: c.phone_number || ''
+                    name: c.customer_name,
+                    address: c.pickup_address || '',
+                    tel: c.phone_number || ''
                 }));
                 localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
                 
@@ -5213,7 +5212,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     
                     // Supabaseに保存
                     if (cloudEnabled()) {
-                        cloudSaveCustomers().then(() => {
+                        cloudSaveCustomers(customerMaster).then(() => {
                             logInfo('importCustomerCSV', 'Saved to Supabase');
                         }).catch(err => {
                             logError('importCustomerCSV', 'Failed to save to Supabase', err);
