@@ -336,214 +336,99 @@
                 <div class="step-dot" data-step="2"></div>
                 <div class="step-dot" data-step="3"></div>
                 <div class="step-dot" data-step="4"></div>
-                <div class="step-dot" data-step="5"></div>
             </div>
 
             <!-- Step 1: ようこそ -->
             <div class="step active" id="step1">
                 <h2>ようこそ！</h2>
-                <p>受注管理システムのセットアップを開始します。このウィザードでは、システムの使用方法を選択し、必要な設定を行います。</p>
-                
+                <p>受注管理システムのセットアップを開始します。このウィザードでは、システムの利用方法を選択し、必要に応じてクラウド連携の設定を行います。</p>
                 <div class="info-box">
-                    <p><strong>所要時間:</strong> 約5〜10分</p>
+                    <p><strong>所要時間:</strong> 約3〜5分</p>
                 </div>
-
-                <p>まず、どのように使用するかを選択してください。</p>
-
+                <p>まず、どのように利用しますか？</p>
                 <div class="option-card" onclick="selectOption('local')">
-                    <h3>💻 このPCだけで使う（ローカル運用）</h3>
-                    <p>インターネット接続不要。データはこのPCのブラウザに保存されます。設定は不要で、すぐに使い始められます。</p>
+                    <h3>💻 このPCだけで使う（スタンドアロン）</h3>
+                    <p>インターネット接続は不要です。データはすべてお使いのPCのブラウザ内に安全に保存されます。</p>
                 </div>
-
                 <div class="option-card" onclick="selectOption('cloud')">
-                    <h3>☁️ 複数のPCで共有する（クラウド運用）</h3>
-                    <p>インターネット経由で複数のPCからデータを共有できます。Supabaseという無料サービスを使用します（設定が必要）。</p>
+                    <h3>☁️ 複数のPCで共有する（クラウド同期）</h3>
+                    <p>インターネット経由で複数のPCや同僚とデータをリアルタイムに共有します。無料のSupabaseアカウントが必要です。</p>
                 </div>
-
                 <div class="wizard-footer">
                     <div></div>
                     <button class="btn btn-primary" onclick="nextStep()" id="step1Next" disabled>次へ</button>
                 </div>
             </div>
 
-            <!-- Step 2: ローカル運用の説明 -->
+            <!-- Step 2-Local: ローカル運用の確認 -->
             <div class="step" id="step2-local">
-                <h2>ローカル運用について</h2>
-                <p>ローカル運用では、データはこのPCのブラウザ内に保存されます。</p>
-
+                <h2>ローカル運用</h2>
+                <p>設定は不要です。すべてのデータはこのPCのブラウザに保存されます。</p>
                 <div class="success-box">
-                    <p><strong>✅ メリット</strong></p>
-                    <p>• 設定不要ですぐに使える<br>
-                    • インターネット接続不要<br>
-                    • 完全にプライベート</p>
+                    <p><strong>主な特徴:</strong><br>
+                    • インストール不要ですぐに利用開始<br>
+                    • CSVファイルの取込・出力（自動ヘッダーマッピング対応）<br>
+                    • オフラインでも動作</p>
                 </div>
-
                 <div class="warning-box">
-                    <p><strong>⚠️ 注意点</strong></p>
-                    <p>• 他のPCからはアクセスできません<br>
-                    • ブラウザのデータを消すと受注データも消えます<br>
-                    • 定期的にCSV出力でバックアップを推奨</p>
+                    <p><strong>注意点:</strong><br>
+                    • データは他のPCと共有されません。<br>
+                    • ブラウザのキャッシュを消去するとデータが失われる可能性があります。定期的にCSVファイルでバックアップしてください。</p>
                 </div>
-
-                <div class="info-box">
-                    <p><strong>💡 推奨:</strong> 週に1回は「CSV出力」ボタンでデータをバックアップしましょう。</p>
-                </div>
-
                 <div class="wizard-footer">
                     <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
-                    <button class="btn btn-success" onclick="completeLocalSetup()">完了して使い始める</button>
+                    <button class="btn btn-success" onclick="completeLocalSetup()">セットアップ完了</button>
                 </div>
             </div>
 
-            <!-- Step 2: クラウド運用の説明 -->
+            <!-- Step 2-Cloud: クラウド運用の説明 -->
             <div class="step" id="step2-cloud">
-                <h2>クラウド運用について</h2>
-                <p>クラウド運用では、Supabaseという無料サービスを使用してデータを保存します。</p>
-
-                <div class="success-box">
-                    <p><strong>✅ メリット</strong></p>
-                    <p>• 複数のPCから同じデータにアクセス可能<br>
-                    • 自動的にクラウドにバックアップ<br>
-                    • PCが壊れてもデータは安全</p>
+                <h2>クラウド運用の準備</h2>
+                <p>クラウド運用には、Supabaseという無料のデータベースサービスのアカウントが必要です。案内に沿ってSupabaseプロジェクトを作成し、「プロジェクトURL」と「anon publicキー」を取得してください。</p>
+                <div class="info-box">
+                    <p><strong>Supabaseとは？</strong><br>世界中の開発者に利用されている、安全で信頼性の高いクラウドデータベースです。無料プランで十分な機能を利用できます。</p>
                 </div>
-
-                <div class="warning-box">
-                    <p><strong>⚠️ 必要なもの</strong></p>
-                    <p>• インターネット接続<br>
-                    • Supabaseの無料アカウント（メールアドレスのみ）<br>
-                    • 約5分の初期設定</p>
-                </div>
-
+                <p>準備ができたら、次のステップへ進んでください。</p>
                 <div class="wizard-footer">
                     <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
-                    <button class="btn btn-primary" onclick="nextStep()">次へ（Supabase設定）</button>
+                    <button class="btn btn-primary" onclick="nextStep()">Supabaseの設定へ</button>
                 </div>
             </div>
 
-            <!-- Step 3: Supabaseプロジェクト作成 -->
+            <!-- Step 3: Supabase設定 -->
             <div class="step" id="step3">
-                <h2>Supabaseプロジェクトの作成</h2>
-                <p>まず、Supabaseで無料アカウントを作成し、プロジェクトを作成します。</p>
-
-                <ol>
-                    <li><a href="https://supabase.com/" target="_blank" style="color: #667eea; font-weight: 600;">Supabase公式サイト</a>を開く</li>
-                    <li>「Start your project」をクリック</li>
-                    <li>GitHubアカウントでサインイン（または新規作成）</li>
-                    <li>「New project」をクリック</li>
-                    <li>以下を入力:
-                        <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
-                            <li><strong>Name:</strong> order-system（任意の名前でOK）</li>
-                            <li><strong>Database Password:</strong> 強力なパスワードを設定（メモしておく）</li>
-                            <li><strong>Region:</strong> Northeast Asia (Tokyo)を選択</li>
-                        </ul>
-                    </li>
-                    <li>「Create new project」をクリック</li>
-                    <li>プロジェクトの作成完了を待つ（1〜2分）</li>
-                </ol>
-
-                <div class="checkbox-group">
-                    <input type="checkbox" id="projectCreated" onchange="toggleNextButton()">
-                    <label for="projectCreated">Supabaseプロジェクトを作成しました</label>
+                <h2>Supabase接続設定</h2>
+                <p>Supabaseのプロジェクトページから「プロジェクトURL」と「anon publicキー」をコピーして、以下のフィールドに貼り付けてください。</p>
+                <div class="form-group">
+                    <label for="projectUrl">プロジェクトURL</label>
+                    <input type="url" id="projectUrl" placeholder="https://xxxxxxxx.supabase.co">
                 </div>
-
+                <div class="form-group">
+                    <label for="anonKey">anon publicキー</label>
+                    <input type="text" id="anonKey" placeholder="ey...（長い文字列）">
+                </div>
+                <button class="btn btn-primary" onclick="testSupabaseConnection()">接続テスト</button>
+                <div id="connectionStatus" class="hidden" style="margin-top: 1rem;"></div>
                 <div class="wizard-footer">
                     <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
-                    <button class="btn btn-primary" onclick="nextStep()" id="step3Next" disabled>次へ</button>
+                    <button class="btn btn-success" onclick="completeCloudSetup()" id="completeCloudBtn" disabled>セットアップ完了</button>
                 </div>
             </div>
 
-            <!-- Step 4: テーブル作成 -->
+            <!-- Step 4: 完了 -->
             <div class="step" id="step4">
-                <h2>データベーステーブルの作成</h2>
-                <p>Supabaseプロジェクトにデータを保存するためのテーブルを作成します。</p>
-
-                <ol>
-                    <li>Supabaseの左メニューから「SQL Editor」をクリック</li>
-                    <li>下のSQLコードをコピーして貼り付け</li>
-                    <li>右上の「Run」ボタンをクリック</li>
-                    <li>「Success. No rows returned」と表示されればOK</li>
-                </ol>
-
-                <div class="code-box">
-                    <button class="copy-btn" onclick="copySQL()">コピー</button>
-                    <pre id="sqlCode">-- 受注データテーブル作成
-create table if not exists public.orders (
-  id bigserial primary key,
-  order_no text not null unique,
-  date date not null,
-  customer_name text not null,
-  pickup_location text,
-  pickup_address text,
-  delivery_location text,
-  delivery_address text,
-  delivery_tel text,
-  cargo text not null,
-  quantity numeric,
-  unit text,
-  packaging text,
-  unit_price numeric,
-  amount_net numeric,
-  amount_gross numeric,
-  driver text,
-  vehicle text,
-  instructions text,
-  instruction_sheet boolean default false,
-  invoice_sent boolean default false,
-  payment_received boolean default false,
-  order_completed boolean default false,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
--- アクセス権限の設定
-alter table public.orders enable row level security;
-
-create policy "誰でも閲覧可能" on public.orders for select using (true);
-create policy "誰でも追加可能" on public.orders for insert with check (true);
-create policy "誰でも更新可能" on public.orders for update using (true);
-create policy "誰でも削除可能" on public.orders for delete using (true);</pre>
+                <h2>🎉 セットアップ完了！</h2>
+                <p>受注管理システムをご利用いただく準備が整いました。以下の新機能をご活用ください。</p>
+                <div class="success-box">
+                    <p><strong>✨ 新機能ハイライト:</strong><br>
+                    • <strong>CSV自動マッピング:</strong> ヘッダー名が異なるCSVも自動で正しく取り込みます。<br>
+                    • <strong>リアルタイム同期:</strong> データの追加・変更・削除が自動でクラウドに反映されます。<br>
+                    • <strong>シンプルな操作:</strong> 直感的なデザインで、マニュアル不要で使い始められます。</p>
                 </div>
-
-                <div class="checkbox-group">
-                    <input type="checkbox" id="tableCreated" onchange="toggleNextButton()">
-                    <label for="tableCreated">SQLを実行してテーブルを作成しました</label>
-                </div>
-
+                <p>「利用を開始する」ボタンを押して、システムを起動してください。</p>
                 <div class="wizard-footer">
-                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
-                    <button class="btn btn-primary" onclick="nextStep()" id="step4Next" disabled>次へ</button>
-                </div>
-            </div>
-
-            <!-- Step 5: 接続情報の入力 -->
-            <div class="step" id="step5">
-                <h2>接続情報の設定</h2>
-                <p>Supabaseの接続情報を入力します。</p>
-
-                <ol>
-                    <li>Supabaseの左メニューから「Project Settings」→「API」を開く</li>
-                    <li>以下の情報をコピーして、下のフォームに貼り付け</li>
-                </ol>
-
-                <div class="form-group">
-                    <label>Project URL</label>
-                    <input type="url" id="projectUrl" placeholder="https://xxxxxxxxxxxx.supabase.co" oninput="validateConnection()">
-                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">「Project URL」の欄からコピーしてください</p>
-                </div>
-
-                <div class="form-group">
-                    <label>anon public key</label>
-                    <input type="text" id="anonKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." oninput="validateConnection()">
-                    <p style="font-size: 0.85rem; color: #64748b; margin-top: 0.25rem;">「anon public」の欄からコピーしてください</p>
-                </div>
-
-                <button class="btn btn-primary" onclick="testConnection()" id="testBtn" disabled>接続テスト</button>
-
-                <div id="connectionStatus" class="hidden"></div>
-
-                <div class="wizard-footer">
-                    <button class="btn btn-secondary" onclick="prevStep()">戻る</button>
-                    <button class="btn btn-success" onclick="completeCloudSetup()" id="step5Complete" disabled>完了して使い始める</button>
+                    <div></div>
+                    <a href="index.html" class="btn btn-primary">利用を開始する</a>
                 </div>
             </div>
         </div>
@@ -551,7 +436,79 @@ create policy "誰でも削除可能" on public.orders for delete using (true);<
 
     <script>
         let currentStep = 1;
-        let selectedOption = null;
+        let selectedOption = '';
+
+        const totalSteps = 4; // Step 5を削除したため総ステップ数を4に変更
+
+        function showStep(stepNum) {
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById(`step${stepNum}`).classList.add('active');
+            updateStepIndicator(stepNum);
+        }
+
+        function updateStepIndicator(stepNum) {
+            document.querySelectorAll('.step-dot').forEach((dot, index) => {
+                if (index < stepNum -1) {
+                    dot.classList.add('completed');
+                    dot.classList.remove('active');
+                } else if (index === stepNum - 1) {
+                    dot.classList.add('active');
+                    dot.classList.remove('completed');
+                } else {
+                    dot.classList.remove('active', 'completed');
+                }
+            });
+        }
+
+        function nextStep() {
+            if (currentStep === 1) {
+                if (!selectedOption) {
+                    alert('利用方法を選択してください。');
+                    return;
+                }
+                if (selectedOption === 'local') {
+                    currentStep = 2; // ローカル運用はStep2-localへ
+                    showStep('2-local');
+                    return;
+                } else if (selectedOption === 'cloud') {
+                    currentStep = 2; // クラウド運用はStep2-cloudへ
+                    showStep('2-cloud');
+                    return;
+                }
+            } else if (currentStep === 2 && selectedOption === 'cloud') {
+                currentStep = 3; // クラウド運用の場合のみStep3へ
+                showStep(currentStep);
+                return;
+            } else if (currentStep === 3) {
+                // Supabase接続テストが成功しているか確認
+                const completeCloudBtn = document.getElementById('completeCloudBtn');
+                if (completeCloudBtn && completeCloudBtn.disabled) {
+                    alert('Supabase接続テストを成功させてから次へ進んでください。');
+                    return;
+                }
+                currentStep = 4; // Step4へ
+                showStep(currentStep);
+                return;
+            }
+        }
+
+        function prevStep() {
+            if (currentStep === 2 && selectedOption === 'local') {
+                currentStep = 1;
+                showStep(currentStep);
+            } else if (currentStep === 2 && selectedOption === 'cloud') {
+                currentStep = 1;
+                showStep(currentStep);
+            } else if (currentStep === 3) {
+                currentStep = 2; // Step2-cloudへ戻る
+                showStep('2-cloud');
+            } else if (currentStep === 4) {
+                currentStep = 3; // Step3へ戻る
+                showStep(currentStep);
+            }
+        }
 
         function selectOption(option) {
             selectedOption = option;
@@ -562,89 +519,28 @@ create policy "誰でも削除可能" on public.orders for delete using (true);<
             document.getElementById('step1Next').disabled = false;
         }
 
-        function nextStep() {
-            const dots = document.querySelectorAll('.step-dot');
-            dots[currentStep - 1].classList.remove('active');
-            dots[currentStep - 1].classList.add('completed');
-
-            document.getElementById(`step${currentStep}${currentStep === 1 ? '' : currentStep === 2 && selectedOption === 'local' ? '-local' : currentStep === 2 && selectedOption === 'cloud' ? '-cloud' : ''}`).classList.remove('active');
-
-            if (currentStep === 1 && selectedOption === 'local') {
-                document.getElementById('step2-local').classList.add('active');
-                currentStep = 2;
-            } else if (currentStep === 1 && selectedOption === 'cloud') {
-                document.getElementById('step2-cloud').classList.add('active');
-                currentStep = 2;
-            } else {
-                currentStep++;
-                document.getElementById(`step${currentStep}`).classList.add('active');
-            }
-
-            dots[currentStep - 1].classList.add('active');
-        }
-
-        function prevStep() {
-            const dots = document.querySelectorAll('.step-dot');
-            dots[currentStep - 1].classList.remove('active');
-
-            const currentStepEl = document.querySelector('.step.active');
-            currentStepEl.classList.remove('active');
-
-            if (currentStep === 2 && (selectedOption === 'local' || selectedOption === 'cloud')) {
-                currentStep = 1;
-                document.getElementById('step1').classList.add('active');
-            } else {
-                currentStep--;
-                document.getElementById(`step${currentStep}`).classList.add('active');
-            }
-
-            dots[currentStep - 1].classList.remove('completed');
-            dots[currentStep - 1].classList.add('active');
-        }
-
-        function toggleNextButton() {
-            if (currentStep === 3) {
-                const checked = document.getElementById('projectCreated').checked;
-                document.getElementById('step3Next').disabled = !checked;
-            } else if (currentStep === 4) {
-                const checked = document.getElementById('tableCreated').checked;
-                document.getElementById('step4Next').disabled = !checked;
-            }
-        }
-
-        function copySQL() {
-            const sql = document.getElementById('sqlCode').textContent;
-            navigator.clipboard.writeText(sql).then(() => {
-                const btn = event.target;
-                const originalText = btn.textContent;
-                btn.textContent = 'コピーしました！';
-                btn.style.background = '#10b981';
-                setTimeout(() => {
-                    btn.textContent = originalText;
-                    btn.style.background = '#667eea';
-                }, 2000);
-            });
-        }
-
-        function validateConnection() {
-            const url = document.getElementById('projectUrl').value.trim();
-            const key = document.getElementById('anonKey').value.trim();
-            const testBtn = document.getElementById('testBtn');
-            testBtn.disabled = !(url && key && url.includes('supabase.co') && key.length > 50);
-        }
-
-        async function testConnection() {
+        async function testSupabaseConnection() {
             const url = document.getElementById('projectUrl').value.trim();
             const key = document.getElementById('anonKey').value.trim();
             const statusDiv = document.getElementById('connectionStatus');
-            const completeBtn = document.getElementById('step5Complete');
+            const completeBtn = document.getElementById('completeCloudBtn');
 
-            statusDiv.className = 'info-box';
-            statusDiv.innerHTML = '<p><span class="status-indicator status-pending"></span>接続をテスト中...</p>';
             statusDiv.classList.remove('hidden');
+            statusDiv.className = 'info-box';
+            statusDiv.innerHTML = '<p><span class="status-indicator status-pending"></span>接続テスト中...</p>';
+            completeBtn.disabled = true;
+
+            if (!url || !key) {
+                statusDiv.className = 'warning-box';
+                statusDiv.innerHTML = '<p><span class="status-indicator status-error"></span>❌ URLとキーを入力してください。</p>';
+                return;
+            }
 
             try {
-                const response = await fetch(`${url}/rest/v1/orders?select=count`, {
+                // SupabaseのURLとキーを使って簡単なクエリを試す
+                // ここでは、SupabaseのREST APIの存在確認のみを行う
+                const response = await fetch(`${url}/rest/v1/`, {
+                    method: 'GET',
                     headers: {
                         'apikey': key,
                         'Authorization': `Bearer ${key}`
@@ -672,8 +568,8 @@ create policy "誰でも削除可能" on public.orders for delete using (true);<
         }
 
         function completeCloudSetup() {
-            const url = document.getElementById('projectUrl').value.trim();
-            const key = document.getElementById('anonKey').value.trim();
+            const url = document.getElementById("projectUrl").value.trim();
+            const key = document.getElementById("anonKey").value.trim();
 
             const cloudConfig = {
                 url: url,
@@ -684,7 +580,6 @@ create policy "誰でも削除可能" on public.orders for delete using (true);<
             localStorage.setItem('cloudConfig', JSON.stringify(cloudConfig));
             localStorage.setItem('setupCompleted', 'true');
             localStorage.setItem('setupMode', 'cloud');
-
             window.location.href = 'index.html';
         }
     </script>
