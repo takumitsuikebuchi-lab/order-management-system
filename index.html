@@ -4573,31 +4573,71 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
 
         // 社内用CSVを当月受注から生成（BOM付、数値は正規化）
         async function exportCSV() {
+            // CSV形式の選択ダイアログを表示
+            const format = confirm('Supabase形式でエクスポートしますか？\n\n「OK」: Supabase形式（ヘッダーが自動変換）\n「キャンセル」: 社内用形式');
+            
             const monthOrders = getMonthOrders();
-            // CSV列定義（社内用）
-            const headers = ['日付', '顧客名', '引取先', '配送先', '積荷', '数量', '単位', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両'];
-
-            let csv = headers.join(',') + '\n';
-            monthOrders.forEach(order => {
-                const row = [
-                    order.date,
-                    order.customerName,
-                    order.pickupLocation,
-                    order.deliveryLocation,
-                    order.cargo,
-                    order.quantity,
-                    order.unit,
-                    toNumber(order.unitPrice),
-                    toNumber(order.amountNet),
-                    toNumber(order.amountGross),
-                    order.driver || '',
-                    order.vehicle || ''
-                ];
-                csv += row.map(v => `"${v}"`).join(',') + '\n';
-            });
+            let headers, csv, fname;
+            
+            if (format) {
+                // Supabase形式
+                headers = ['order_no', 'date', 'customer_name', 'pickup_location', 'pickup_address', 'delivery_location', 'delivery_address', 'delivery_tel', 'cargo', 'quantity', 'unit', 'packaging', 'unit_price', 'amount_net', 'amount_gross', 'driver', 'vehicle', 'instructions', 'instruction_sheet', 'invoice_sent', 'payment_received', 'order_completed'];
+                
+                csv = headers.join(',') + '\n';
+                monthOrders.forEach(order => {
+                    const row = [
+                        order.orderNo || '',
+                        order.date || '',
+                        order.customerName || '',
+                        order.pickupLocation || '',
+                        order.pickupAddress || '',
+                        order.deliveryLocation || '',
+                        order.deliveryAddress || '',
+                        order.deliveryTel || '',
+                        order.cargo || '',
+                        order.quantity || '',
+                        order.unit || '',
+                        order.packaging || '',
+                        toNumber(order.unitPrice) || '',
+                        toNumber(order.amountNet) || '',
+                        toNumber(order.amountGross) || '',
+                        order.driver || '',
+                        order.vehicle || '',
+                        order.instructions || '',
+                        order.instructionSheet ? 'true' : 'false',
+                        order.invoiceSent ? 'true' : 'false',
+                        order.paymentReceived ? 'true' : 'false',
+                        order.orderCompleted ? 'true' : 'false'
+                    ];
+                    csv += row.map(v => `"${v}"`).join(',') + '\n';
+                });
+                fname = `受注明細_Supabase形式_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
+            } else {
+                // 社内用形式
+                headers = ['日付', '顧客名', '引取先', '配送先', '積荷', '数量', '単位', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両'];
+                
+                csv = headers.join(',') + '\n';
+                monthOrders.forEach(order => {
+                    const row = [
+                        order.date,
+                        order.customerName,
+                        order.pickupLocation,
+                        order.deliveryLocation,
+                        order.cargo,
+                        order.quantity,
+                        order.unit,
+                        toNumber(order.unitPrice),
+                        toNumber(order.amountNet),
+                        toNumber(order.amountGross),
+                        order.driver || '',
+                        order.vehicle || ''
+                    ];
+                    csv += row.map(v => `"${v}"`).join(',') + '\n';
+                });
+                fname = `受注明細_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
+            }
 
             const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
-            const fname = `受注明細_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
             // 案件CSV フォルダへ保存（フォルダ設定済みなら）
             if (await saveCsvToDir(blob, fname)) {
                 alert('CSVを保存しました（設定フォルダ）');
