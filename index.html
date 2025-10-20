@@ -2191,7 +2191,7 @@ textarea {
             if (!cloudEnabled()) return [];
             try {
                 const base = getSupabaseBase();
-                const resp = await cloudFetchRetry(`${base}/customers?select=*&order=customer_name.asc`, {
+                const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc`, {
                     headers: supabaseHeaders()
                 });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2350,6 +2350,11 @@ textarea {
                 logInfo('loadMastersFromCloud', 'All masters loaded from cloud');
                 updateSelectOptions();
                 setupFilters();
+                
+                // 顧客マスタの表示を更新
+                if (typeof renderCustomerMaster === 'function') {
+                    renderCustomerMaster();
+                }
             } catch (err) {
                 logError('loadMastersFromCloud', err);
             }
