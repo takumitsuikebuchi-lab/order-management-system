@@ -2191,7 +2191,7 @@ textarea {
             if (!cloudEnabled()) return [];
             try {
                 const base = getSupabaseBase();
-                const resp = await cloudFetchRetry(`${base}/rest/v1/customers?select=*&order=customer_name.asc`, {
+                const resp = await cloudFetchRetry(`${base}/customers?select=*&order=customer_name.asc`, {
                     headers: supabaseHeaders()
                 });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2210,7 +2210,7 @@ textarea {
                 const headers = supabaseHeaders();
                 
                 // 既存データを全件削除
-                await cloudFetchRetry(`${base}/rest/v1/customers`, {
+                await cloudFetchRetry(`${base}/customers`, {
                     method: 'DELETE',
                     headers: { ...headers, 'Prefer': 'return=minimal' },
                     body: JSON.stringify({ id: { neq: '00000000-0000-0000-0000-000000000000' } })
@@ -2218,7 +2218,7 @@ textarea {
                 
                 // 新しいデータを挿入
                 if (customers.length > 0) {
-                    const resp = await cloudFetchRetry(`${base}/rest/v1/customers`, {
+                    const resp = await cloudFetchRetry(`${base}/customers`, {
                         method: 'POST',
                         headers: { ...headers, 'Prefer': 'return=minimal' },
                         body: JSON.stringify(customers.map(c => ({
@@ -2241,7 +2241,7 @@ textarea {
             if (!cloudEnabled()) return [];
             try {
                 const base = getSupabaseBase();
-                const resp = await cloudFetchRetry(`${base}/rest/v1/simple_masters?master_type=eq.${masterType}&select=*&order=sort_order.asc`, {
+                const resp = await cloudFetchRetry(`${base}/simple_masters?master_type=eq.${masterType}&select=*&order=sort_order.asc`, {
                     headers: supabaseHeaders()
                 });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2261,14 +2261,14 @@ textarea {
                 const headers = supabaseHeaders();
                 
                 // 既存データを削除
-                await cloudFetchRetry(`${base}/rest/v1/simple_masters?master_type=eq.${masterType}`, {
+                await cloudFetchRetry(`${base}/simple_masters?master_type=eq.${masterType}`, {
                     method: 'DELETE',
                     headers: { ...headers, 'Prefer': 'return=minimal' }
                 });
                 
                 // 新しいデータを挿入
                 if (items.length > 0) {
-                    const resp = await cloudFetchRetry(`${base}/rest/v1/simple_masters`, {
+                    const resp = await cloudFetchRetry(`${base}/simple_masters`, {
                         method: 'POST',
                         headers: { ...headers, 'Prefer': 'return=minimal' },
                         body: JSON.stringify(items.map((name, index) => ({
