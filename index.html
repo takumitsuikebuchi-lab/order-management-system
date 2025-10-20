@@ -3086,6 +3086,16 @@ function updateStatsFromView() {
                     }
                     
                     renderSimpleMaster(masterData);
+                    
+                    // Supabaseに保存
+                    if (cloudEnabled()) {
+                        cloudSaveSimpleMaster(currentMasterType, masterData).then(() => {
+                            logInfo('importSimpleMasterCSV', `${currentMasterType} saved to Supabase`);
+                        }).catch(err => {
+                            logError('importSimpleMasterCSV', `Failed to save ${currentMasterType} to Supabase`, err);
+                        });
+                    }
+                    
                     alert(`${masterName}CSV取込完了\n追加: ${importCount}件\nスキップ: ${skipCount}件（重複または空）`);
                 } catch (error) {
                     console.error('CSV取込エラー:', error);
@@ -5200,6 +5210,15 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
                     renderCustomerMaster();
                     setupFilters(); // フィルターを更新
+                    
+                    // Supabaseに保存
+                    if (cloudEnabled()) {
+                        cloudSaveCustomers().then(() => {
+                            logInfo('importCustomerCSV', 'Saved to Supabase');
+                        }).catch(err => {
+                            logError('importCustomerCSV', 'Failed to save to Supabase', err);
+                        });
+                    }
                     
                     // 結果を表示
                     let message = `CSVインポート完了\n`;
