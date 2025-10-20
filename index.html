@@ -1352,6 +1352,15 @@ textarea {
                         <input type="text" class="form-input-full jp-input" id="simpleMasterInput" placeholder="新規追加..." lang="ja" inputmode="text">
                         <button class="btn btn-primary" onclick="addSimpleMasterItem()">追加</button>
                     </div>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                        <input type="file" id="simpleMasterCsvImport" accept=".csv" style="display: none;" onchange="importSimpleMasterCSV(event)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('simpleMasterCsvImport').click()">
+                            📁 CSV取込
+                        </button>
+                        <button class="btn btn-success" onclick="exportSimpleMasterCSV()">
+                            📊CSV出力
+                        </button>
+                    </div>
                 </div>
                 <div class="master-list" id="simpleMasterList">
                     <!-- アイテムがここに挿入される -->
@@ -2806,6 +2815,113 @@ function updateStatsFromView() {
             setupFilters(); // フィルターを更新
             closeSimpleMaster();
             alert(`${document.getElementById('simpleMasterTitle').textContent.replace('管理', '')}を保存しました`);
+        }
+
+        // シンプルマスタCSV出力
+        async function exportSimpleMasterCSV() {
+            let masterData, masterName;
+            switch(currentMasterType) {
+                case 'cargo': masterData = cargoMaster; masterName = '積荷マスタ'; break;
+                case 'packaging': masterData = packagingMaster; masterName = '荷姿マスタ'; break;
+                case 'unit': masterData = unitMaster; masterName = '単位マスタ'; break;
+                case 'driver': masterData = driverMaster; masterName = 'ドライバーマスタ'; break;
+                case 'vehicle': masterData = vehicleMaster; masterName = '車両マスタ'; break;
+                default: alert('マスタタイプが不明です'); return;
+            }
+            
+            const headers = ['名称'];
+            let csv = headers.join(',') + '\n';
+            masterData.forEach(item => {
+                // 文字列配列とオブジェクト配列の両方に対応
+                const name = typeof item === 'string' ? item : item.name;
+                csv += `"${name}"\n`;
+            });
+            
+            const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            const date = new Date();
+            const dateStr = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+            const fname = `${masterName}_${dateStr}.csv`;
+            
+            if (await saveCsvToDir(blob, fname)) {
+                alert('CSVを保存しました（設定フォルダ）');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fname;
+            link.click();
+        }
+
+        // シンプルマスタCSV取込
+        function importSimpleMasterCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            let masterData, masterName;
+            switch(currentMasterType) {
+                case 'cargo': masterData = cargoMaster; masterName = '積荷マスタ'; break;
+                case 'packaging': masterData = packagingMaster; masterName = '荷姿マスタ'; break;
+                case 'unit': masterData = unitMaster; masterName = '単位マスタ'; break;
+                case 'driver': masterData = driverMaster; masterName = 'ドライバーマスタ'; break;
+                case 'vehicle': masterData = vehicleMaster; masterName = '車両マスタ'; break;
+                default: alert('マスタタイプが不明です'); return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const lines = text.split('\n');
+                    
+                    // ヘッダー行をスキップ
+                    const hasHeader = lines[0].includes('名称');
+                    const startIndex = hasHeader ? 1 : 0;
+                    
+                    let importCount = 0;
+                    let skipCount = 0;
+                    
+                    for (let i = startIndex; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+                        
+                        // CSVをパース（ダブルクォートに対応）
+                        const nameVal = line.replace(/^"|"$/g, '').trim();
+                        
+                        if (!nameVal) {
+                            skipCount++;
+                            continue;
+                        }
+                        
+                        // 重複チェック（文字列配列として扱う）
+                        const exists = masterData.includes(nameVal);
+                        if (!exists) {
+                            masterData.push(nameVal);
+                            importCount++;
+                        } else {
+                            skipCount++;
+                        }
+                    }
+                    
+                    // マスタデータを更新
+                    switch(currentMasterType) {
+                        case 'cargo': cargoMaster = masterData; break;
+                        case 'packaging': packagingMaster = masterData; break;
+                        case 'unit': unitMaster = masterData; break;
+                        case 'driver': driverMaster = masterData; break;
+                        case 'vehicle': vehicleMaster = masterData; break;
+                    }
+                    
+                    renderSimpleMaster(masterData);
+                    alert(`${masterName}CSV取込完了\n追加: ${importCount}件\nスキップ: ${skipCount}件（重複または空）`);
+                } catch (error) {
+                    console.error('CSV取込エラー:', error);
+                    alert('CSVファイルの読み込みに失敗しました');
+                }
+            };
+            
+            reader.readAsText(file);
+            event.target.value = '';
         }
 
         // 顧客新規追加モーダルを開く
@@ -4613,24 +4729,34 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 });
                 fname = `受注明細_Supabase形式_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
             } else {
-                // 社内用形式
-                headers = ['日付', '顧客名', '引取先', '配送先', '積荷', '数量', '単位', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両'];
+                // 社内用形式（全項目対応）
+                headers = ['受注番号', '日付', '顧客名', '引取先', '引取先住所', '配送先', '配送先住所', '配送先電話番号', '積荷', '数量', '単位', '荷姿', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両', '備考', '指示書', '請求済', '入金済', '完了'];
                 
                 csv = headers.join(',') + '\n';
                 monthOrders.forEach(order => {
                     const row = [
-                        order.date,
-                        order.customerName,
-                        order.pickupLocation,
-                        order.deliveryLocation,
-                        order.cargo,
-                        order.quantity,
-                        order.unit,
-                        toNumber(order.unitPrice),
-                        toNumber(order.amountNet),
-                        toNumber(order.amountGross),
+                        order.orderNo || '',
+                        order.date || '',
+                        order.customerName || '',
+                        order.pickupLocation || '',
+                        order.pickupAddress || '',
+                        order.deliveryLocation || '',
+                        order.deliveryAddress || '',
+                        order.deliveryTel || '',
+                        order.cargo || '',
+                        order.quantity || '',
+                        order.unit || '',
+                        order.packaging || '',
+                        toNumber(order.unitPrice) || '',
+                        toNumber(order.amountNet) || '',
+                        toNumber(order.amountGross) || '',
                         order.driver || '',
-                        order.vehicle || ''
+                        order.vehicle || '',
+                        order.instructions || '',
+                        order.instructionSheet ? 'true' : 'false',
+                        order.invoiceSent ? 'true' : 'false',
+                        order.paymentReceived ? 'true' : 'false',
+                        order.orderCompleted ? 'true' : 'false'
                     ];
                     csv += row.map(v => `"${v}"`).join(',') + '\n';
                 });
@@ -4686,19 +4812,29 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     'invoice_sent': 'invoiceSent',
                     'payment_received': 'paymentReceived',
                     'order_completed': 'orderCompleted',
-                    // 社内用形式
+                    // 社内用形式（全項目対応）
+                    '受注番号': 'orderNo',
                     '日付': 'date',
                     '顧客名': 'customerName',
                     '引取先': 'pickupLocation',
+                    '引取先住所': 'pickupAddress',
                     '配送先': 'deliveryLocation',
+                    '配送先住所': 'deliveryAddress',
+                    '配送先電話番号': 'deliveryTel',
                     '積荷': 'cargo',
                     '数量': 'quantity',
                     '単位': 'unit',
+                    '荷姿': 'packaging',
                     '単価': 'unitPrice',
                     '金額(税別)': 'amountNet',
                     '金額(税込)': 'amountGross',
                     'ドライバー': 'driver',
-                    '車両': 'vehicle'
+                    '車両': 'vehicle',
+                    '備考': 'instructions',
+                    '指示書': 'instructionSheet',
+                    '請求済': 'invoiceSent',
+                    '入金済': 'paymentReceived',
+                    '完了': 'orderCompleted'
                 };
                 
                 // ヘッダーのマッピング
