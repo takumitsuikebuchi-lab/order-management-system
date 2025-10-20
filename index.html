@@ -3366,6 +3366,12 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             listContainer.innerHTML = '';
             
             instructionOrders.forEach((order, index) => {
+                // undefinedチェック
+                if (!order) {
+                    console.warn(`instructionOrders[${index}] is undefined`);
+                    return;
+                }
+                
                 const item = document.createElement('div');
                 item.className = 'order-sequence-item';
                 item.draggable = true;
@@ -3417,14 +3423,21 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             
             const dropIndex = parseInt(e.currentTarget.dataset.index);
             
-            if (draggedIndex !== dropIndex) {
+            // バリデーション：draggedIndexが有効か確認
+            if (draggedIndex === null || draggedIndex === undefined || isNaN(draggedIndex)) {
+                return false;
+            }
+            
+            if (draggedIndex !== dropIndex && draggedIndex >= 0 && dropIndex >= 0) {
                 // 配列の要素を入れ替え
                 const draggedItem = instructionOrders[draggedIndex];
-                instructionOrders.splice(draggedIndex, 1);
-                instructionOrders.splice(dropIndex, 0, draggedItem);
-                
-                // リストを再描画
-                renderOrderSequenceList();
+                if (draggedItem) {
+                    instructionOrders.splice(draggedIndex, 1);
+                    instructionOrders.splice(dropIndex, 0, draggedItem);
+                    
+                    // リストを再描画
+                    renderOrderSequenceList();
+                }
             }
             
             return false;
