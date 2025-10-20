@@ -2209,11 +2209,10 @@ textarea {
                 const base = getSupabaseBase();
                 const headers = supabaseHeaders();
                 
-                // 既存データを全件削除
-                await cloudFetchRetry(`${base}/customers`, {
+                // 既存データを全件削除（idが0ではないものを全て削除）
+                await cloudFetchRetry(`${base}/customers?id=neq.0`, {
                     method: 'DELETE',
-                    headers: { ...headers, 'Prefer': 'return=minimal' },
-                    body: JSON.stringify({ id: { neq: '00000000-0000-0000-0000-000000000000' } })
+                    headers: { ...headers, 'Prefer': 'return=minimal' }
                 });
                 
                 // 新しいデータを挿入
