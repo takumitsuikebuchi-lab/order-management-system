@@ -4650,7 +4650,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             link.click();
         }
 
-        // CSVインポート
+        // CSVインポート（ヘッダーマッピング機能付き）
         function importCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -4659,7 +4659,50 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             reader.onload = function(e) {
                 const text = e.target.result;
                 const lines = text.split('\n');
-                const headers = lines[0].split(',');
+                const csvHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+                
+                // ヘッダーマッピング定義
+                const headerMapping = {
+                    // Supabase形式
+                    'order_no': 'orderNo',
+                    'date': 'date',
+                    'customer_name': 'customerName',
+                    'pickup_location': 'pickupLocation',
+                    'pickup_address': 'pickupAddress',
+                    'delivery_location': 'deliveryLocation',
+                    'delivery_address': 'deliveryAddress',
+                    'delivery_tel': 'deliveryTel',
+                    'cargo': 'cargo',
+                    'quantity': 'quantity',
+                    'unit': 'unit',
+                    'packaging': 'packaging',
+                    'unit_price': 'unitPrice',
+                    'amount_net': 'amountNet',
+                    'amount_gross': 'amountGross',
+                    'driver': 'driver',
+                    'vehicle': 'vehicle',
+                    'instructions': 'instructions',
+                    'instruction_sheet': 'instructionSheet',
+                    'invoice_sent': 'invoiceSent',
+                    'payment_received': 'paymentReceived',
+                    'order_completed': 'orderCompleted',
+                    // 社内用形式
+                    '日付': 'date',
+                    '顧客名': 'customerName',
+                    '引取先': 'pickupLocation',
+                    '配送先': 'deliveryLocation',
+                    '積荷': 'cargo',
+                    '数量': 'quantity',
+                    '単位': 'unit',
+                    '単価': 'unitPrice',
+                    '金額(税別)': 'amountNet',
+                    '金額(税込)': 'amountGross',
+                    'ドライバー': 'driver',
+                    '車両': 'vehicle'
+                };
+                
+                // ヘッダーのマッピング
+                const mappedHeaders = csvHeaders.map(header => headerMapping[header] || null);
                 
                 for (let i = 1; i < lines.length; i++) {
                     if (!lines[i]) continue;
@@ -4667,30 +4710,53 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     const values = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
                     if (!values) continue;
                     
-                    const cleanValues = values.map(v => v.replace(/^"|"$/g, ''));
+                    const cleanValues = values.map(v => v.replace(/^"|"$/g, '').trim());
                     
+                    // マッピングされたデータオブジェクトを作成
                     const order = {
                         id: Date.now() + i,
-                        orderNo: `R${new Date().getFullYear().toString().slice(2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${(orders.length + i).toString().padStart(3, '0')}`,
-                        date: cleanValues[0],
-                        customerName: cleanValues[1],
-                        pickupLocation: cleanValues[2],
+                        orderNo: '',
+                        date: '',
+                        customerName: '',
+                        pickupLocation: '',
                         pickupAddress: '',
-                        cargo: cleanValues[4],
-                        quantity: parseFloat(cleanValues[5]) || 0,
-                        unit: cleanValues[6],
-                        packaging: cleanValues[7] || '',
-                        unitPrice: parseFloat(cleanValues[8]) || 0,
-                        amountNet: parseFloat(cleanValues[9]) || 0,
-                        amountGross: parseFloat(cleanValues[10]) || 0,
-                        driver: cleanValues[11] || '',
-                        vehicle: cleanValues[12] || '',
-                        instructions: cleanValues[13] || '',
+                        deliveryLocation: '',
+                        deliveryAddress: '',
+                        deliveryTel: '',
+                        cargo: '',
+                        quantity: 0,
+                        unit: '',
+                        packaging: '',
+                        unitPrice: 0,
+                        amountNet: 0,
+                        amountGross: 0,
+                        driver: '',
+                        vehicle: '',
+                        instructions: '',
                         instructionSheet: false,
                         invoiceSent: false,
                         paymentReceived: false,
                         orderCompleted: false
                     };
+                    
+                    // マッピングに従ってデータを割り当て
+                    mappedHeaders.forEach((mappedHeader, index) => {
+                        if (mappedHeader && cleanValues[index]) {
+                            const value = cleanValues[index];
+                            if (mappedHeader === 'quantity' || mappedHeader === 'unitPrice' || mappedHeader === 'amountNet' || mappedHeader === 'amountGross') {
+                                order[mappedHeader] = parseFloat(value) || 0;
+                            } else if (mappedHeader === 'instructionSheet' || mappedHeader === 'invoiceSent' || mappedHeader === 'paymentReceived' || mappedHeader === 'orderCompleted') {
+                                order[mappedHeader] = value === 'true' || value === '1' || value === 'TRUE';
+                            } else {
+                                order[mappedHeader] = value;
+                            }
+                        }
+                    });
+                    
+                    // orderNoが空の場合は自動生成
+                    if (!order.orderNo) {
+                        order.orderNo = `R${new Date().getFullYear().toString().slice(2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${(orders.length + i).toString().padStart(3, '0')}`;
+                    }
                     
                     orders.push(order);
                 }
@@ -4699,7 +4765,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 renderTable();
                 updateStats();
                 setupFilters();
-                alert('CSVファイルをインポートしました');
+                alert(`CSVファイルをインポートしました（${lines.length - 1}件）`);
             };
             
             reader.readAsText(file);
