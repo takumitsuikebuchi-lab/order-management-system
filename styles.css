@@ -1,0 +1,1023 @@
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1e40af;
+            --secondary: #64748b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg-main: #e5e7eb;
+            --bg-card: #ffffff;
+            --border: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans JP', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        /* ヘッダー */
+        .header {
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.025em;
+        }
+
+        .month-navigation {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .month-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .today-date {
+            color: var(--text-primary);
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        /* コンテナ */
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        /* 統計カード */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            transition: all 0.2s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: var(--shadow);
+            border-color: var(--primary);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .stat-sub {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.25rem;
+        }
+
+        /* アクションバー */
+        .action-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+            max-width: 100%;
+        }
+
+        .action-row + .action-row {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ボタン */
+        .btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            white-space: nowrap;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-primary);
+            border-color: var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-main);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+        }
+
+        .btn-nav {
+            padding: 0.375rem 0.625rem;
+            font-size: 0.8rem;
+            background: white;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-nav:hover {
+            background: var(--bg-main);
+        }
+
+        /* 入力フィールド */
+        .form-input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: white;
+            transition: all 0.15s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-select {
+            padding: 0.5rem 2rem 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: white;
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            appearance: none;
+        }
+
+        /* テーブル */
+        .table-wrapper {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+/* === 受注一覧の横幅を“強制”で戻す（勝てる指定） === */
+.container .table-wrapper {
+  max-width: 1200px !important;  /* ここで上限を決める：お好みで 1100/1300 に調整OK */
+  width: 100% !important;        /* ラッパー自体はコンテナ幅に対して100% */
+  margin-left: auto !important;  /* 中央寄せ */
+  margin-right: auto !important;
+}
+
+/* 横スクロールは維持 */
+.container .table-wrapper .table-scroll {
+  overflow-x: auto !important;
+}
+
+/* テーブル本体はラッパーの中で100%に収める */
+#orderTable {
+  width: 100% !important;
+  border-collapse: collapse;
+}
+
+
+/* 受注一覧の横幅を戻して中央寄せにする */
+.table-wrapper {
+  max-width: 1400px;   /* 画面いっぱいに広がらない上限。好みで調整可（例: 1100, 1300） */
+  margin: 0 auto;      /* 中央寄せ */
+}
+
+.table-scroll {
+  overflow-x: auto;    /* 横スクロール維持 */
+}
+
+#orderTable {          /* ＝ .data-table と同義で、この画面ではこちらが確実 */
+  width: 100%;         /* ラッパーの中でフィット */
+  border-collapse: collapse;
+}
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: var(--bg-main);
+            color: var(--text-primary);
+            padding: 0.5rem 0.4rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            border-bottom: 2px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        .data-table td {
+            padding: 0.35rem 0.4rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            line-height: 1.2;
+            vertical-align: middle;
+        }
+
+        /* 受注一覧：行の縞模様（白／薄い青） */
+        .data-table tbody tr:nth-child(odd) {
+            background: #ffffff;
+        }
+        .data-table tbody tr:nth-child(even) {
+            background: #f0f7ff; /* 薄い青（元の設定） */
+        }
+
+        .data-table tr:hover {
+            background: var(--bg-main);
+        }
+
+        .data-table tr.row-selected {
+            background: #fed7aa !important; /* 指示書「未」と同色（薄いオレンジ） */
+        }
+        .data-table tr.row-selected:hover {
+            background: #fdba74 !important; /* ホバー時は少し濃いオレンジ */
+        }
+
+        /* チェックボックス */
+        .checkbox {
+            width: 0.9rem;
+            height: 0.9rem;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .checkbox-small {
+            width: 0.8rem;
+            height: 0.8rem;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        /* バッジ */
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.45rem;
+            border-radius: 3px;
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.025em;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fed7aa;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-primary {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        /* 積荷カラー */
+        .cargo-tomato { background: #fee2e2; color: #991b1b; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-potato { background: #fef3c7; color: #92400e; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-onion { background: #f3e8ff; color: #6b21a8; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-cabbage { background: #dcfce7; color: #166534; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-carrot { background: #fed7aa; color: #7c2d12; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-melon { background: #fce7f3; color: #9f1239; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-corn { background: #fef9c3; color: #713f12; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-pumpkin { background: #ffedd5; color: #9a3412; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-squid { background: #dbeafe; color: #1e40af; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-salmon { background: #ffe4e6; color: #881337; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-scallop { background: #e0e7ff; color: #3730a3; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-fish { background: #cffafe; color: #155e75; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-frozen { background: #ede9fe; color: #5b21b6; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+        .cargo-other { background: #f3f4f6; color: #374151; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
+
+        /* ドライバーカラー */
+        .driver-1 {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .driver-2 {
+            background: #fce7f3;
+            color: #9f1239;
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .driver-3 {
+            background: #e9d5ff;
+            color: #6b21a8;
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .driver-4 {
+            background: #ccfbf1;
+            color: #134e4a;
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        .driver-5 {
+            background: #fed7aa;
+            color: #7c2d12;
+            padding: 0.05rem 0.35rem;
+            border-radius: 3px;
+            font-weight: 500;
+            font-size: 0.75rem;
+        }
+
+        /* オートコンプリート */
+        .autocomplete-wrapper {
+            position: relative;
+        }
+
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: var(--shadow);
+            display: none;
+        }
+
+        .autocomplete-list.active {
+            display: block;
+        }
+
+        .autocomplete-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .autocomplete-item:hover {
+            background: var(--bg-main);
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            position: relative;
+            background: white;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            margin: 3rem auto;
+            border-radius: 12px;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: slideUp 0.3s ease;
+        }
+
+        .modal-content.small {
+            max-width: 500px;
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+.modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #fff;}
+
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            background: var(--bg-main);
+        }
+
+        .close-button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: transparent;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+        }
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.close-button {
+    position: static;
+    width: 48px;
+    height: 48px;
+    font-size: 1.75rem;
+    line-height: 1;
+    margin-left: auto;
+    border-radius: 10px;
+}
+
+@media (pointer: coarse) {
+    .close-button {
+        width: 56px;
+        height: 56px;
+        font-size: 2rem;
+    }
+}
+
+
+        .close-button:hover {
+            background: var(--bg-main);
+            color: var(--text-primary);
+        }
+
+        /* フォーム */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.375rem;
+        }
+
+        .form-label::before {
+            content: '■ ';
+            color: var(--primary);
+        }
+
+        .form-input-full {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            background: #fff;
+            transition: all 0.15s ease;
+            min-height: 40px;
+        }
+
+        .form-input-full:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            background: #fff;
+        }
+
+        .form-input-full::placeholder {
+            color: #94a3b8;
+        }
+
+        /* IME/入力モードのヒント */
+        .jp-input {
+            ime-mode: active; /* 一部ブラウザで日本語IMEを優先（非標準） */
+        }
+        .numeric-input {
+            ime-mode: disabled; /* 数値欄ではIMEをオフ（非標準） */
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            resize: vertical;
+            min-height: 80px;
+            background: #fff;
+        }
+
+        /* マスタテーブル */
+        .master-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1rem;
+        }
+
+        .master-table th {
+            background: var(--bg-main);
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .master-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.875rem;
+        }
+
+        .master-table tr:hover {
+            background: var(--bg-main);
+        }
+
+        .master-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .master-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .master-item {
+            background: var(--bg-main);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: move;
+            transition: all 0.2s ease;
+        }
+
+        .master-item:hover {
+            background: #e2e8f0;
+        }
+
+        .master-item.dragging {
+            opacity: 0.5;
+        }
+
+        .master-item-content {
+            flex: 1;
+        }
+
+        .master-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .drag-handle {
+            cursor: move;
+            color: var(--text-secondary);
+            margin-right: 0.5rem;
+        }
+
+        .master-item button {
+            background: transparent;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        /* 日付選択 */
+        .date-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* アニメーション */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 印刷用スタイル */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-content, .print-content * {
+                visibility: visible;
+            }
+            .print-content {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+/* ===== フォント統一修正（input[type=date]・textarea用） ===== */
+input[type="date"],
+textarea {
+    font-family: inherit !important;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+/* ===== 一覧タグのベース（styleで色だけ上書き） ===== */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  line-height: 1.8;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+/* ====== 受注一覧をレスポンシブで画面幅にフィットさせる ====== */
+
+/* ページ全体を液体レイアウトに（中央固定の上限を解除） */
+.container {
+  max-width: 100% !important;
+}
+
+/* 一覧のラッパーは常に画面幅いっぱい */
+.table-wrapper,
+.table-scroll {
+  width: 100% !important;
+}
+
+/* テーブル本体は常にラッパーいっぱいに広がる */
+.data-table,
+#orderTable {
+  width: 100% !important;
+  table-layout: auto;         /* 内容に応じて列幅を調整（必要なら fixed に変更） */
+}
+
+/* 列が多いときはスマホ等で横スクロールできるように */
+.table-scroll {
+  overflow-x: auto !important;
+}
+
+/* 文字がはみ出してガタつくのを抑える（お好みで） */
+.data-table th,
+.data-table td {
+  white-space: nowrap;        /* 折り返し防止（要らなければ外す） */
+  overflow: hidden;
+  text-overflow: ellipsis;    /* 収まりきらない文字は…省略表示 */
+}
+
+/* 余白の均一化：画面端にベタ付きしすぎる時は適度にパディング */
+.container,
+.action-bar,
+.table-wrapper {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* 大画面で字が詰まりすぎる場合の微調整（任意） */
+@media (min-width: 1440px) {
+  .data-table th { font-size: 0.8rem; }
+  .data-table td { font-size: 0.8rem; }
+}
+/* ===== 受注一覧を上部コンテナと同じ幅で中央寄せ ===== */
+.table-wrapper {
+  max-width: 1800px !important;  /* 上部の .container と同じ幅 */
+  width: 100%;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+/* ===== 上部アクションバーと受注一覧の白枠幅を統一 ===== */
+
+/* 上部ボタン群（action-bar）と受注一覧（table-wrapper）の横幅を同一に */
+.action-bar,
+.table-wrapper {
+  max-width: 1800px;          /* 上限を統一。必要に応じて 1600px などに調整 */
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+/* スマホ対応：画面が狭い時はパディングを減らして余白を詰める */
+@media (max-width: 1024px) {
+  .action-bar,
+  .table-wrapper {
+    max-width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+/* === 顧客名列の幅を固定して、長いときは下に折り返す（隣列に被らない） === */
+
+/* 顧客名のセル幅固定＋折り返し許可 */
+#orderTable th:nth-child(3),
+#orderTable td:nth-child(3) {
+  width: 200px;              /* ★顧客名の最大幅（お好みで調整 180〜250px） */
+  min-width: 200px;
+  white-space: normal !important;
+  word-break: break-word;
+  line-height: 1.3;
+  vertical-align: top;       /* 折り返したときに上寄せ */
+}
+
+/* 表全体の自動調整をONにして、横スクロールを避ける */
+#orderTable {
+  table-layout: auto;
+}
+
+/* 引取先・配送先などは自動幅に */
+#orderTable td:nth-child(4),
+#orderTable td:nth-child(5) {
+  white-space: nowrap;
+}
+
+/* テーブルセルが段差になっても行境界を目立たせない（好み） */
+#orderTable td {
+  vertical-align: top;
+}
+/* === 顧客名・引取先・配送先の列幅を固定して折り返し表示 === */
+#orderTable th:nth-child(3),
+#orderTable td:nth-child(3),   /* 顧客名 */
+#orderTable th:nth-child(4),
+#orderTable td:nth-child(4),   /* 引取先 */
+#orderTable th:nth-child(5),
+#orderTable td:nth-child(5) {  /* 配送先 */
+  width: 150px;                /* ★列の基本幅（お好みで調整 200〜250px） */
+  min-width: 150px;
+  white-space: normal !important;  /* 折り返し許可 */
+  word-break: break-word;          /* 日本語でも自然に改行 */
+  line-height: 1.3;
+  vertical-align: top;             /* 上寄せ表示 */
+}
+
+/* 表全体を自動調整モードに（列幅を柔軟に） */
+#orderTable {
+  table-layout: auto;
+}
+
+/* 保存直後に行を一時ハイライト */
+#tableBody tr { transition: background-color 450ms ease; }
+#tableBody tr.row-highlight { background-color: #fff3cd; }
+
+        /* 運行指示書設定モーダル用のスタイル */
+        .order-sequence-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: move;
+            transition: all 0.2s;
+        }
+        
+        .order-sequence-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .order-sequence-item.dragging {
+            opacity: 0.4;
+        }
+        
+        .drag-handle {
+            font-size: 20px;
+            color: #94a3b8;
+            margin-right: 12px;
+            cursor: grab;
+        }
+        
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .order-number {
+            font-size: 16px;
+            font-weight: bold;
+            color: var(--primary);
+            margin-right: 12px;
+            min-width: 30px;
+        }
+        
+        .order-info {
+            flex: 1;
+            font-size: 14px;
+        }
+
