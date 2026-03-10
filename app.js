@@ -63,6 +63,8 @@
                 await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
                 db.close();
             } catch(e) {}
+            // フォルダ名だけ localStorage に保存してページ読み込み時のチラつきを防ぐ
+            try { localStorage.setItem('lastCsvDirName', handle.name); } catch(_) {}
         }
         async function _loadDirHandle() {
             try {
@@ -213,16 +215,26 @@
             setInterval(updateTodayDate, 60000);
 
             // CSV保存先フォルダをIndexedDBから復元してボタンに反映
+            // ① localStorage のフォルダ名ヒントで即時表示（チラつき防止）
+            try {
+                const hint = localStorage.getItem('lastCsvDirName');
+                if (hint) { const b = document.getElementById('csvDirBtn'); if (b) b.textContent = `💾 ${hint}`; }
+            } catch(_) {}
+            // ② IndexedDB からハンドルを非同期復元して正式更新
             _loadDirHandle().then(h => { if (h) { exportBaseDirHandle = h; _updateCsvDirBtn(); } }).catch(()=>{});
 
-            // バックアップリマインダー（7日以上未出力なら警告）
-            try {
-                const lastBackup = localStorage.getItem('lastBackupAt');
-                const daysSince = lastBackup
-                    ? Math.floor((Date.now() - Number(lastBackup)) / (1000 * 60 * 60 * 24))
-                    : 999;
-                if (daysSince >= 7) showBackupWarningBanner(daysSince);
-            } catch(_){}
+            // バックアップリマインダー（ローカル + Supabase の新しい方を基準に7日判定）
+            (async () => {
+                try {
+                    const localTs  = Number(localStorage.getItem('lastBackupAt') || 0);
+                    const cloudTs  = await fetchCloudLastBackupAt().catch(() => 0) || 0;
+                    const lastTs   = Math.max(localTs, cloudTs);
+                    // ローカルが古ければSupabaseの値で上書き保存
+                    if (cloudTs > localTs) { try { localStorage.setItem('lastBackupAt', cloudTs); } catch(_){} }
+                    const daysSince = lastTs ? Math.floor((Date.now() - lastTs) / (1000 * 60 * 60 * 24)) : 999;
+                    if (daysSince >= 7) showBackupWarningBanner(daysSince);
+                } catch(_){}
+            })();
 
             // クリックイベントでオートコンプリートを閉じる
             document.addEventListener('click', function(e) {
@@ -247,6 +259,49 @@
         function hideBackupWarningBanner() {
             const b = document.getElementById('backupWarningBanner');
             if (b) b.remove();
+        }
+
+        // ────── CSVバックアップ日時 Supabase同期 ──────
+        // simple_mastersの master_type='_settings_lastBackupAt' 行を利用
+        // display_order は small INT なのでタイムスタンプには使えないため name フィールドに文字列として保存
+        async function saveCloudLastBackupAt(ts) {
+            if (!cloudEnabled()) return;
+            const base = getSupabaseBase();
+            const hdrs = { 'Content-Type': 'application/json', apikey: cloudConfig.anonKey, Authorization: 'Bearer ' + cloudConfig.anonKey, Prefer: 'return=minimal' };
+            try {
+                await cloudFetchRetry(`${base}/simple_masters?master_type=eq._settings_lastBackupAt`, { method: 'DELETE', headers: hdrs });
+                await cloudFetchRetry(`${base}/simple_masters`, { method: 'POST', headers: hdrs, body: JSON.stringify([{ master_type: '_settings_lastBackupAt', name: String(ts), display_order: 0 }]) });
+            } catch(e) { try { logError('CLOUD_SETTINGS_SAVE', e); } catch(_){} }
+        }
+        async function fetchCloudLastBackupAt() {
+            if (!cloudEnabled()) return null;
+            const base = getSupabaseBase();
+            const hdrs = { apikey: cloudConfig.anonKey, Authorization: 'Bearer ' + cloudConfig.anonKey, Accept: 'application/json' };
+            try {
+                const res = await cloudFetchRetry(`${base}/simple_masters?master_type=eq._settings_lastBackupAt&select=name&limit=1`, { headers: hdrs });
+                const data = await res.json();
+                return data[0]?.name ? Number(data[0].name) : null;
+            } catch(e) { return null; }
+        }
+
+        // CSV形式選択モーダル（confirm()の代替 — OKが社内用になる誤解を防ぐ）
+        function showCsvFormatDialog() {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+                overlay.innerHTML = `
+                    <div style="background:#fff;border-radius:10px;padding:28px 24px;min-width:300px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+                        <h3 style="margin:0 0 18px;font-size:16px;font-weight:bold;">📊 CSV形式を選択</h3>
+                        <button id="_csvFmt_internal" style="display:block;width:100%;padding:12px;margin-bottom:10px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;">📋 社内用形式（通常使用）</button>
+                        <button id="_csvFmt_supabase" style="display:block;width:100%;padding:12px;margin-bottom:10px;background:#10b981;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;">☁️ Supabase形式（インポート用）</button>
+                        <button id="_csvFmt_cancel" style="display:block;width:100%;padding:10px;background:#f3f4f6;color:#6b7280;border:none;border-radius:6px;cursor:pointer;font-size:14px;">キャンセル</button>
+                    </div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector('#_csvFmt_internal').onclick  = () => { overlay.remove(); resolve('internal'); };
+                overlay.querySelector('#_csvFmt_supabase').onclick  = () => { overlay.remove(); resolve('supabase'); };
+                overlay.querySelector('#_csvFmt_cancel').onclick    = () => { overlay.remove(); resolve(null); };
+                overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); resolve(null); } });
+            });
         }
 
         // 今日の日付を更新
@@ -3572,13 +3627,14 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
 
         // 社内用CSVを当月受注から生成（BOM付、数値は正規化）
         async function exportCSV() {
-            // CSV形式の選択ダイアログを表示
-            const format = confirm('Supabase形式でエクスポートしますか？\n\n「OK」: Supabase形式（ヘッダーが自動変換）\n「キャンセル」: 社内用形式');
-            
+            // CSV形式の選択ダイアログを表示（モーダルUI）
+            const fmt = await showCsvFormatDialog();
+            if (fmt === null) return; // キャンセル
+
             const monthOrders = getMonthOrders();
             let headers, csv, fname;
-            
-            if (format) {
+
+            if (fmt === 'supabase') {
                 // Supabase形式
                 headers = ['order_no', 'date', 'customer_name', 'pickup_location', 'pickup_address', 'delivery_location', 'delivery_address', 'delivery_tel', 'cargo', 'quantity', 'unit', 'packaging', 'unit_price', 'amount_net', 'amount_gross', 'driver', 'vehicle', 'instructions', 'instruction_sheet', 'invoice_sent', 'payment_received', 'order_completed'];
                 
@@ -3611,7 +3667,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     csv += row.map(v => `"${v}"`).join(',') + '\n';
                 });
                 fname = `受注明細_Supabase形式_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
-            } else {
+            } else { // fmt === 'internal'
                 // 社内用形式（全項目対応）
                 headers = ['受注番号', '日付', '顧客名', '引取先', '引取先住所', '配送先', '配送先住所', '配送先電話番号', '積荷', '数量', '単位', '荷姿', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両', '備考', '指示書', '請求済', '入金済', '完了'];
                 
@@ -3647,9 +3703,11 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             }
 
             const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            const nowTs = Date.now();
             // 案件CSV フォルダへ保存（フォルダ設定済みなら）
             if (await saveCsvToDir(blob, fname)) {
-                try { localStorage.setItem('lastBackupAt', Date.now()); } catch(_){}
+                try { localStorage.setItem('lastBackupAt', nowTs); } catch(_){}
+                saveCloudLastBackupAt(nowTs); // fire-and-forget（2台PC間の日時共有）
                 hideBackupWarningBanner();
                 alert('CSVを保存しました（設定フォルダ）');
                 return;
@@ -3659,7 +3717,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             link.href = URL.createObjectURL(blob);
             link.download = fname;
             link.click();
-            try { localStorage.setItem('lastBackupAt', Date.now()); } catch(_){}
+            try { localStorage.setItem('lastBackupAt', nowTs); } catch(_){}
+            saveCloudLastBackupAt(nowTs); // fire-and-forget
             hideBackupWarningBanner();
         }
 
@@ -4072,7 +4131,11 @@ async function exportInvoiceCSV() {
   const csvText = rows.map(r => r.join(',')).join(CSV_CRLF);
   const blob = new Blob([CSV_BOM + csvText], { type: 'text/csv;charset=utf-8;' });
   const fname = `請求書_${y}年${String(m).padStart(2,'0')}月分_マネーフォワード.csv`;
+  const mfNowTs = Date.now();
   if (await saveCsvToDir(blob, fname)) {
+    try { localStorage.setItem('lastBackupAt', mfNowTs); } catch(_){}
+    saveCloudLastBackupAt(mfNowTs);
+    hideBackupWarningBanner();
     alert(`請求書CSVを保存しました（設定フォルダ、明細 ${detailCount} 行）。`);
     return;
   }
@@ -4080,7 +4143,9 @@ async function exportInvoiceCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = fname;
   a.click();
-
+  try { localStorage.setItem('lastBackupAt', mfNowTs); } catch(_){}
+  saveCloudLastBackupAt(mfNowTs);
+  hideBackupWarningBanner();
   alert(`請求書CSVを出力しました（明細 ${detailCount} 行）。MFへインポートしてください。`);
 }
        // （仕様変更）モーダル外クリックでは閉じない
