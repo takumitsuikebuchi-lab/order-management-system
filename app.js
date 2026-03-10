@@ -45,13 +45,54 @@
         // CSV保存先（File System Access API で選択されたフォルダ）
         let exportBaseDirHandle = null;
 
+        // IndexedDB helpers（ディレクトリハンドルをページ間で永続化）
+        const _IDB_NAME = 'csv_settings', _IDB_STORE = 'handles', _IDB_KEY = 'exportBaseDir';
+        function _openHandleIDB() {
+            return new Promise((res, rej) => {
+                const r = indexedDB.open(_IDB_NAME, 1);
+                r.onupgradeneeded = e => e.target.result.createObjectStore(_IDB_STORE);
+                r.onsuccess = e => res(e.target.result);
+                r.onerror = e => rej(e.target.error);
+            });
+        }
+        async function _saveDirHandle(handle) {
+            try {
+                const db = await _openHandleIDB();
+                const tx = db.transaction(_IDB_STORE, 'readwrite');
+                tx.objectStore(_IDB_STORE).put(handle, _IDB_KEY);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+                db.close();
+            } catch(e) {}
+        }
+        async function _loadDirHandle() {
+            try {
+                const db = await _openHandleIDB();
+                const handle = await new Promise((res, rej) => {
+                    const r = db.transaction(_IDB_STORE, 'readonly').objectStore(_IDB_STORE).get(_IDB_KEY);
+                    r.onsuccess = e => res(e.target.result || null);
+                    r.onerror = e => rej(e.target.error);
+                });
+                db.close();
+                return handle;
+            } catch(e) { return null; }
+        }
+        function _updateCsvDirBtn() {
+            const btn = document.getElementById('csvDirBtn');
+            if (!btn) return;
+            btn.textContent = exportBaseDirHandle
+                ? `💾 ${exportBaseDirHandle.name}`
+                : '💾 CSV保存先フォルダ設定';
+        }
+
         async function chooseExportDir() {
             if (!window.showDirectoryPicker) {
                 alert('このブラウザはフォルダ保存に未対応です。Chrome/Edge等をご利用ください。\n（未対応の場合は通常のダウンロードで保存します）');
                 return;
             }
             try {
-                exportBaseDirHandle = await window.showDirectoryPicker();
+                exportBaseDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                await _saveDirHandle(exportBaseDirHandle);
+                _updateCsvDirBtn();
                 alert('CSV保存先フォルダを設定しました。今後はサブフォルダへ自動保存します。');
             } catch (e) {
                 // キャンセル時は何もしない
@@ -59,7 +100,24 @@
         }
 
         async function saveCsvToDir(blob, filename, subfolderName) {
+            // ハンドルが未設定なら IndexedDB から復元
+            if (!exportBaseDirHandle) {
+                exportBaseDirHandle = await _loadDirHandle();
+                _updateCsvDirBtn();
+            }
             if (!exportBaseDirHandle) return false;
+            // パーミッションを確認・再取得（ユーザー操作後なのでダイアログ不要）
+            try {
+                const perm = await exportBaseDirHandle.queryPermission({ mode: 'readwrite' });
+                if (perm !== 'granted') {
+                    const req = await exportBaseDirHandle.requestPermission({ mode: 'readwrite' });
+                    if (req !== 'granted') return false;
+                }
+            } catch(e) {
+                exportBaseDirHandle = null;
+                _updateCsvDirBtn();
+                return false;
+            }
             try {
                 const targetDir = subfolderName ? await exportBaseDirHandle.getDirectoryHandle(subfolderName, { create: true }) : exportBaseDirHandle;
                 const fileHandle = await targetDir.getFileHandle(filename, { create: true });
@@ -149,6 +207,9 @@
             
             // 1分ごとに日付を更新
             setInterval(updateTodayDate, 60000);
+
+            // CSV保存先フォルダをIndexedDBから復元してボタンに反映
+            _loadDirHandle().then(h => { if (h) { exportBaseDirHandle = h; _updateCsvDirBtn(); } }).catch(()=>{});
 
             // バックアップリマインダー（7日以上未出力なら警告）
             try {
