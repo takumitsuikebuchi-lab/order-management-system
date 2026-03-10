@@ -89,8 +89,12 @@
                 alert('このブラウザはフォルダ保存に未対応です。Chrome/Edge等をご利用ください。\n（未対応の場合は通常のダウンロードで保存します）');
                 return;
             }
+            // 既存ハンドルを復元して startIn に渡す（前回のフォルダが選択済み状態で開く）
+            if (!exportBaseDirHandle) exportBaseDirHandle = await _loadDirHandle();
             try {
-                exportBaseDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                const opts = { mode: 'readwrite' };
+                if (exportBaseDirHandle) opts.startIn = exportBaseDirHandle;
+                exportBaseDirHandle = await window.showDirectoryPicker(opts);
                 await _saveDirHandle(exportBaseDirHandle);
                 _updateCsvDirBtn();
                 alert('CSV保存先フォルダを設定しました。今後はサブフォルダへ自動保存します。');
