@@ -233,19 +233,6 @@
             // ② IndexedDB からハンドルを非同期復元して正式更新
             _loadDirHandle().then(h => { if (h) { exportBaseDirHandle = h; _updateCsvDirBtn(); } }).catch(()=>{});
 
-            // バックアップリマインダー（ローカル + Supabase の新しい方を基準に7日判定）
-            (async () => {
-                try {
-                    const localTs  = Number(localStorage.getItem('lastBackupAt') || 0);
-                    const cloudTs  = await fetchCloudLastBackupAt().catch(() => 0) || 0;
-                    const lastTs   = Math.max(localTs, cloudTs);
-                    // ローカルが古ければSupabaseの値で上書き保存
-                    if (cloudTs > localTs) { try { localStorage.setItem('lastBackupAt', cloudTs); } catch(_){} }
-                    const daysSince = lastTs ? Math.floor((Date.now() - lastTs) / (1000 * 60 * 60 * 24)) : 999;
-                    if (daysSince >= 7) showBackupWarningBanner(daysSince);
-                } catch(_){}
-            })();
-
             // クリックイベントでオートコンプリートを閉じる
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('.autocomplete-wrapper')) {
@@ -255,44 +242,6 @@
                 }
             });
         });
-
-        // バックアップ警告バナー
-        function showBackupWarningBanner(days) {
-            if (document.getElementById('backupWarningBanner')) return;
-            const label = days >= 999 ? '一度もCSVバックアップが行われていません' : `最終CSVバックアップから${days}日経過しています`;
-            const banner = document.createElement('div');
-            banner.id = 'backupWarningBanner';
-            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#f59e0b;color:#000;padding:8px 16px;display:flex;align-items:center;gap:12px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.2);';
-            banner.innerHTML = `<span style="flex:1">⚠️ ${label}。定期的なバックアップをお勧めします。</span><button onclick="exportCSV()" style="background:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-weight:bold;">今すぐCSV出力</button><button onclick="hideBackupWarningBanner()" style="background:transparent;border:none;font-size:18px;cursor:pointer;line-height:1;">×</button>`;
-            document.body.prepend(banner);
-        }
-        function hideBackupWarningBanner() {
-            const b = document.getElementById('backupWarningBanner');
-            if (b) b.remove();
-        }
-
-        // ────── CSVバックアップ日時 Supabase同期 ──────
-        // simple_mastersの master_type='_settings_lastBackupAt' 行を利用
-        // display_order は small INT なのでタイムスタンプには使えないため name フィールドに文字列として保存
-        async function saveCloudLastBackupAt(ts) {
-            if (!cloudEnabled()) return;
-            const base = getSupabaseBase();
-            const hdrs = { 'Content-Type': 'application/json', apikey: cloudConfig.anonKey, Authorization: 'Bearer ' + cloudConfig.anonKey, Prefer: 'return=minimal' };
-            try {
-                await cloudFetchRetry(`${base}/simple_masters?master_type=eq._settings_lastBackupAt`, { method: 'DELETE', headers: hdrs });
-                await cloudFetchRetry(`${base}/simple_masters`, { method: 'POST', headers: hdrs, body: JSON.stringify([{ master_type: '_settings_lastBackupAt', name: String(ts), display_order: 0 }]) });
-            } catch(e) { try { logError('CLOUD_SETTINGS_SAVE', e); } catch(_){} }
-        }
-        async function fetchCloudLastBackupAt() {
-            if (!cloudEnabled()) return null;
-            const base = getSupabaseBase();
-            const hdrs = { apikey: cloudConfig.anonKey, Authorization: 'Bearer ' + cloudConfig.anonKey, Accept: 'application/json' };
-            try {
-                const res = await cloudFetchRetry(`${base}/simple_masters?master_type=eq._settings_lastBackupAt&select=name&limit=1`, { headers: hdrs });
-                const data = await res.json();
-                return data[0]?.name ? Number(data[0].name) : null;
-            } catch(e) { return null; }
-        }
 
         // CSV形式選択モーダル（confirm()の代替 — OKが社内用になる誤解を防ぐ）
         function showCsvFormatDialog() {
@@ -3220,12 +3169,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             }
 
             const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
-            const nowTs = Date.now();
             // 案件CSV フォルダへ保存（フォルダ設定済みなら）
             if (await saveCsvToDir(blob, fname)) {
-                try { localStorage.setItem('lastBackupAt', nowTs); } catch(_){}
-                saveCloudLastBackupAt(nowTs); // fire-and-forget（2台PC間の日時共有）
-                hideBackupWarningBanner();
                 alert('CSVを保存しました（設定フォルダ）');
                 return;
             }
@@ -3234,9 +3179,6 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             link.href = URL.createObjectURL(blob);
             link.download = fname;
             link.click();
-            try { localStorage.setItem('lastBackupAt', nowTs); } catch(_){}
-            saveCloudLastBackupAt(nowTs); // fire-and-forget
-            hideBackupWarningBanner();
         }
 
         // CSVインポート（ヘッダーマッピング機能付き、Supabase自動同期）
@@ -3648,11 +3590,7 @@ async function exportInvoiceCSV() {
   const csvText = rows.map(r => r.join(',')).join(CSV_CRLF);
   const blob = new Blob([CSV_BOM + csvText], { type: 'text/csv;charset=utf-8;' });
   const fname = `請求書_${y}年${String(m).padStart(2,'0')}月分_マネーフォワード.csv`;
-  const mfNowTs = Date.now();
   if (await saveCsvToDir(blob, fname)) {
-    try { localStorage.setItem('lastBackupAt', mfNowTs); } catch(_){}
-    saveCloudLastBackupAt(mfNowTs);
-    hideBackupWarningBanner();
     alert(`請求書CSVを保存しました（設定フォルダ、明細 ${detailCount} 行）。`);
     return;
   }
@@ -3660,9 +3598,6 @@ async function exportInvoiceCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = fname;
   a.click();
-  try { localStorage.setItem('lastBackupAt', mfNowTs); } catch(_){}
-  saveCloudLastBackupAt(mfNowTs);
-  hideBackupWarningBanner();
   alert(`請求書CSVを出力しました（明細 ${detailCount} 行）。MFへインポートしてください。`);
 }
        // （仕様変更）モーダル外クリックでは閉じない
