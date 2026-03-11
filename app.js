@@ -137,6 +137,16 @@
             }
         }
 
+        // HTML特殊文字エスケープ（XSS防止）
+        function escHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function toNumber(v) {
             if (v === null || v === undefined) return 0;
             const s = String(v).replace(/[^\d.-]/g, '');
@@ -330,9 +340,14 @@
             );
             
             if (filtered.length > 0) {
-                list.innerHTML = filtered.map(item => 
-                    `<div class="autocomplete-item" onclick="selectMasterItem('${item.name}', '${type}')">${item.name}</div>`
-                ).join('');
+                list.innerHTML = '';
+                filtered.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'autocomplete-item';
+                    div.textContent = item.name;
+                    div.addEventListener('click', () => selectMasterItem(item.name, type));
+                    list.appendChild(div);
+                });
                 list.classList.add('active');
             } else {
                 list.classList.remove('active');
@@ -1293,9 +1308,9 @@ function getTagStyle(ns, name) {
             
 tbody.innerHTML = monthOrders.map(function(o) {
     // タグ色: 既存の getTagStyle を利用
-    var cargoHtml  = '<span class="tag" style="' + getTagStyle('cargo',  o.cargo)  + '">' + (o.cargo || '-') + '</span>';
+    var cargoHtml  = '<span class="tag" style="' + getTagStyle('cargo',  o.cargo)  + '">' + escHtml(o.cargo  || '-') + '</span>';
     var driverHtml = o.driver
-        ? '<span class="tag" style="' + getTagStyle('driver', o.driver) + '">' + o.driver + '</span>'
+        ? '<span class="tag" style="' + getTagStyle('driver', o.driver) + '">' + escHtml(o.driver) + '</span>'
         : '-';
 
     var qty = (o.quantity !== null && o.quantity !== undefined) ? o.quantity : '';
@@ -1305,17 +1320,17 @@ tbody.innerHTML = monthOrders.map(function(o) {
       '<tr data-order-id="' + o.id + '">' +
         '<td><input type="checkbox" class="checkbox order-checkbox" data-id="' + o.id + '" onchange="updateRowSelection()"></td>' +
         '<td style="white-space: nowrap;">' + formatDate(o.date) + '</td>' +
-        '<td>' + (o.customerName || '-') + '</td>' +
-        '<td>' + (o.pickupLocation || '-') + '</td>' +
-        '<td>' + (o.deliveryLocation || '-') + '</td>' +
+        '<td>' + escHtml(o.customerName   || '-') + '</td>' +
+        '<td>' + escHtml(o.pickupLocation  || '-') + '</td>' +
+        '<td>' + escHtml(o.deliveryLocation|| '-') + '</td>' +
         '<td>' + cargoHtml + '</td>' +
-        '<td style="white-space: nowrap;">' + qty + ' ' + unit + '</td>' +
-        '<td>' + (o.packaging || '-') + '</td>' +
+        '<td style="white-space: nowrap;">' + escHtml(qty) + ' ' + escHtml(unit) + '</td>' +
+        '<td>' + escHtml(o.packaging || '-') + '</td>' +
         '<td style="text-align: right;">¥' + ((o.unitPrice || 0).toLocaleString()) + '</td>' +
         '<td style="text-align: right;">¥' + ((o.amountNet || 0).toLocaleString()) + '</td>' +
         '<td style="text-align: right;">¥' + ((o.amountGross || 0).toLocaleString()) + '</td>' +
         '<td>' + driverHtml + '</td>' +
-        '<td style="font-size: 0.7rem;">' + (o.vehicle || '-') + '</td>' +
+        '<td style="font-size: 0.7rem;">' + escHtml(o.vehicle || '-') + '</td>' +
         '<td style="text-align: center;">' + (o.instructionSheet ? '<span class="badge badge-success">済</span>' : '<span class="badge badge-warning">未</span>') + '</td>' +
         '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.invoiceSent ? 'checked' : '') + ' onchange="toggleInvoice(' + o.id + ')"></td>' +
         '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.paymentReceived ? 'checked' : '') + ' onchange="togglePayment(' + o.id + ')"></td>' +
@@ -1493,9 +1508,9 @@ function updateStatsFromView() {
             const tbody = document.getElementById('customerMasterBody');
             tbody.innerHTML = customerMaster.map((customer, index) => `
                 <tr>
-                    <td><input type="text" class="form-input-full jp-input" value="${customer.name}" data-field="name" data-index="${index}" lang="ja" inputmode="text"></td>
-                    <td><input type="text" class="form-input-full jp-input" value="${customer.address}" data-field="address" data-index="${index}" lang="ja" inputmode="text"></td>
-                    <td><input type="tel" class="form-input-full numeric-input" value="${customer.tel}" data-field="tel" data-index="${index}" inputmode="tel"></td>
+                    <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.name)}" data-field="name" data-index="${index}" lang="ja" inputmode="text"></td>
+                    <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.address)}" data-field="address" data-index="${index}" lang="ja" inputmode="text"></td>
+                    <td><input type="tel" class="form-input-full numeric-input" value="${escHtml(customer.tel)}" data-field="tel" data-index="${index}" inputmode="tel"></td>
                     <td>
                         <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${index})">削除</button>
                     </td>
@@ -2776,504 +2791,6 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             } catch (error) {
                 console.error('printInstructionsWithSettingsエラー:', error);
                 alert('運行指示書の生成中にエラーが発生しました: ' + error.message);
-            }
-        }
-
-
-        function printInstructions() {
-            const checkboxes = document.querySelectorAll('#tableBody .order-checkbox:checked');
-            
-            const selected = [];
-            checkboxes.forEach(cb => {
-                const id = parseInt(cb.getAttribute('data-id'));
-                if (!isNaN(id)) {
-                    selected.push(id);
-                }
-            });
-            
-            if (selected.length === 0) {
-                alert('印刷する受注を選択してください');
-                return;
-            }
-            
-            const printOrders = orders.filter(o => selected.includes(o.id));
-
-            // モーダルを開く
-            openInstructionSettingsModal(printOrders);
-            return;
-
-            // 複数選択時のドライバー整合性チェック（空欄は除外）
-            if (printOrders.length > 1) {
-                const drivers = Array.from(new Set(
-                    printOrders
-                        .map(o => (o.driver || '').trim())
-                        .filter(d => d.length > 0)
-                ));
-                if (drivers.length > 1) {
-                    alert('複数選択時は同一ドライバーで印刷してください（空欄は除外）');
-                    return;
-                }
-            }
-            
-            // 運行指示書の生成
-            let printContent = `
-                <!DOCTYPE html>
-                <html lang="ja">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>運行指示書</title>
-                    <style>
-                        @page { 
-                            size: A4; 
-                            margin: 10mm 15mm;
-                        }
-                        body { 
-                            font-family: 'MS Gothic', 'ＭＳ ゴシック', monospace; 
-                            font-size: 10pt;
-                            line-height: 1.3;
-                            color: #000;
-                        }
-                        .page { 
-                            page-break-after: always;
-                            position: relative;
-                            width: 100%;
-                        }
-                        .header {
-                            text-align: center;
-                            margin-bottom: 8px;
-                        }
-                        .title {
-                            font-size: 14pt;
-                            font-weight: bold;
-                            margin-bottom: 2px;
-                        }
-                        .company-info {
-                            font-size: 9pt;
-                            line-height: 1.2;
-                        }
-                        
-                        /* 複数案件用のスタイル */
-                        .multi-orders {
-                            margin-top: 10px;
-                        }
-                        .order-section {
-                            margin-bottom: 15px;
-                            border: 2px solid #000;
-                            padding: 5px;
-                        }
-                        /* 各案件の見出しは枠外上部に独立表示（強調表示） */
-                        .order-header-outside {
-                            font-size: 12pt; /* より大きくして視認性向上 */
-                            font-weight: bold;
-                            margin: 6px 0 6px 0; /* 前後に余白を追加 */
-                            line-height: 1.4;
-                        }
-                        .compact-table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            margin-bottom: 5px;
-                            font-size: 9pt;
-                        }
-                        .compact-table th {
-                            background: #eeeeee;
-                            border: 1px solid #000;
-                            padding: 2px 4px;
-                            text-align: left;
-                            width: 20%;
-                            font-weight: normal;
-                        }
-                        .compact-table td {
-                            border: 1px solid #000;
-                            padding: 2px 4px;
-                        }
-                        .instructions-compact {
-                            border: 1px solid #000;
-                            padding: 3px 5px;
-                            font-size: 8pt;
-                            min-height: 25px;
-                            margin-bottom: 5px;
-                        }
-                        
-                        /* 単一案件用のスタイル */
-                        .info-table {
-                            width: 100%;
-                            margin: 15px 0;
-                        }
-                        .info-table td {
-                            padding: 3px 5px;
-                            font-size: 10pt;
-                        }
-                        .main-table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            border: 2px solid #000;
-                            margin-bottom: 10px;
-                        }
-                        .main-table th {
-                            background: #d8d8d8;
-                            border: 1px solid #000;
-                            padding: 4px;
-                            font-size: 10pt;
-                            font-weight: normal;
-                            text-align: left;
-                            width: 25%;
-                        }
-                        .main-table td {
-                            border: 1px solid #000;
-                            padding: 4px;
-                            font-size: 10pt;
-                        }
-                        .cargo-table {
-                            width: 100%;
-                            border-collapse: collapse;
-                            border: 2px solid #000;
-                            margin-bottom: 10px;
-                        }
-                        .cargo-table th {
-                            background: #d8d8d8;
-                            border: 1px solid #000;
-                            padding: 4px;
-                            font-size: 9pt;
-                            font-weight: normal;
-                            text-align: center;
-                        }
-                        .cargo-table td {
-                            border: 1px solid #000;
-                            padding: 4px 6px;
-                            font-size: 10pt;
-                            text-align: center;
-                        }
-                        .instructions-box {
-                            font-size: 9pt;
-                            line-height: 1.6;
-                            vertical-align: top;
-                            text-align: left !important;
-                        }
-                        .individual-box {
-                            border: 1px solid #000;
-                            padding: 5px;
-                            margin-bottom: 10px;
-                            min-height: 40px;
-                            font-size: 10pt;
-                        }
-                        .individual-box-title {
-                            font-size: 9pt;
-                            margin-bottom: 3px;
-                        }
-                        .operation-plan {
-                            border: 1px solid #000;
-                            padding: 8px;
-                            font-size: 9pt;
-                        }
-                        .operation-plan-title {
-                            font-size: 9pt;
-                            font-weight: bold;
-                            margin-bottom: 5px;
-                        }
-                        .plan-table {
-                            width: 100%;
-                        }
-                        .plan-table td {
-                            padding: 2px 0;
-                            font-size: 7pt;
-                            vertical-align: bottom;
-                        }
-                        .plan-label {
-                            width: 30%;
-                        }
-                        .plan-value {
-                            border-bottom: 1px solid #000;
-                            width: 70%;
-                        }
-                        .signature-area {
-                            margin-top: 10px;
-                            text-align: right;
-                        }
-                        .signature-box {
-                            display: inline-block;
-                            text-align: center;
-                        }
-                        .signature-label {
-                            font-size: 9pt;
-                            margin-bottom: 3px;
-                        }
-                        .signature-stamp {
-                            border: 1px solid #000;
-                            width: 60px;
-                            height: 60px;
-                            display: inline-block;
-                        }
-                        .footer-note {
-                            font-size: 8pt;
-                            margin-top: 10px;
-                            line-height: 1.3;
-                        }
-                        .standard-instructions {
-                            font-size: 8pt;
-                            line-height: 1.3;
-                            margin-top: 5px;
-                            padding: 3px;
-                            background: #f5f5f5;
-                        }
-                    </style>
-                </head>
-                <body>
-            `;
-            
-            // 複数案件を1枚にまとめる場合
-            if (printOrders.length > 1) {
-                // 選択案件をそのまま4件ずつページ分割（日付で分けない）
-                for (let startIdx = 0; startIdx < printOrders.length; startIdx += MULTI_ORDERS_PER_PAGE) {
-                    const chunk = printOrders.slice(startIdx, startIdx + MULTI_ORDERS_PER_PAGE);
-
-                    const isLastPage = (startIdx + MULTI_ORDERS_PER_PAGE) >= printOrders.length;
-
-                    printContent += `
-                        <div class="page">
-                            <div class="header">
-                                <div class="title">運行指示書（貨物）</div>
-                                <div class="company-info">
-                                    ${companyInfo.name}<br>
-                                    ${companyInfo.address}<br>
-                                    TEL・FAX ${companyInfo.tel}
-                                </div>
-                            </div>
-
-                            <div class="multi-orders">
-                    `;
-
-                    // このページに載せる案件を表示
-                    chunk.forEach((order, index) => {
-                        const orderDate = new Date(order.date);
-                        const formattedDate = `${orderDate.getFullYear()}/${(orderDate.getMonth() + 1).toString().padStart(2, '0')}/${orderDate.getDate().toString().padStart(2, '0')}`;
-                        const displayIndex = startIdx + index + 1; // 選択全体の通し番号
-
-                        printContent += `
-                                <div class="order-header-outside">
-                                    【${displayIndex}】運行日: ${formattedDate} / 運転者: ${order.driver || '未定'} / 車両: ${order.vehicle || '未定'}
-                                </div>
-                                <div class="order-section">
-
-                                <table class="compact-table">
-                                    <tr>
-                                        <th>引取先</th>
-                                        <td colspan="3">${order.pickupLocation} 様 ${order.pickupAddress ? `(${order.pickupAddress})` : ''}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>荷渡先</th>
-                                        <td colspan="3">${order.deliveryLocation} 様 ${order.deliveryAddress ? `(${order.deliveryAddress})` : ''}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>連絡先</th>
-                                        <td>${order.deliveryTel || '-'}</td>
-                                        <th style="width: 15%; background: #eeeeee;">積荷</th>
-                                        <td>${order.cargo}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>数量</th>
-                                        <td>${order.quantity} ${order.unit}</td>
-                                        <th style="background: #eeeeee;">荷姿</th>
-                                        <td>${order.packaging || '-'}</td>
-                                    </tr>
-                                </table>
-
-                                ${order.instructions ? `
-                                <div class="instructions-compact">
-                                    <strong>個別指示事項:</strong> ${order.instructions.replace(/\n/g, ' / ')}
-                                </div>
-                                ` : ''}
-                                </div>
-                        `;
-                    });
-
-                    printContent += `
-                            </div>
-
-                            <div class="standard-instructions">
-                                <strong>標準指示事項:</strong>
-                                法定速度・車間距離・シートベルト徹底 /
-                                連続運転4時間以内ごとに30分以上の休憩（分割可） /
-                                荷崩れ防止／固縛確認、危険予測運転の徹底 /
-                                出発／帰庫時の点呼、酒気帯び無・体調良好を確認 /
-                                異常／事故／渋滞等は速やかに配車へ連絡
-                            </div>
-
-                            <div class="operation-plan" style="margin-top: 10px;">
-                                <div style="font-size: 9pt; font-weight: bold; margin-bottom: 5px;">法令遵守に基づく運行計画（現場記入可）</div>
-                                <table class="plan-table">
-                                    <tr>
-                                        <td style="width: 25%;">出発予定:</td>
-                                        <td style="border-bottom: 1px solid #000;">&nbsp;</td>
-                                        <td style="width: 25%; padding-left: 10px;">到着予定:</td>
-                                        <td style="border-bottom: 1px solid #000;">&nbsp;</td>
-                                    </tr>
-                                    <tr>
-                                        <td>運行経路:</td>
-                                        <td colspan="3" style="border-bottom: 1px solid #000;">&nbsp;</td>
-                                    </tr>
-                                    <tr>
-                                        <td>休憩地点:</td>
-                                        <td style="border-bottom: 1px solid #000;">&nbsp;</td>
-                                        <td style="padding-left: 10px;">注意箇所:</td>
-                                        <td style="border-bottom: 1px solid #000;">&nbsp;</td>
-                                    </tr>
-                                </table>
-                            </div>
-
-                            ${isLastPage ? `
-                            <div class="signature-area">
-                                <div class="signature-box">
-                                    <div class="signature-label">運行管理者　押印</div>
-                                    <div class="signature-stamp"></div>
-                                </div>
-                            </div>
-
-                            <div class="footer-note">
-                                ※本指示書は輸送安全規則に沿った記載項目を含みます。点呼簿・運転日報と併せて保管してください。
-                            </div>
-                            ` : ''}
-                        </div>
-                    `;
-                }
-            } else {
-                // 単一案件の場合は従来の形式
-                const order = printOrders[0];
-                const orderDate = new Date(order.date);
-                const formattedDate = `${orderDate.getFullYear()}/${(orderDate.getMonth() + 1).toString().padStart(2, '0')}/${orderDate.getDate().toString().padStart(2, '0')}`;
-                
-                printContent += `
-                    <div class="page">
-                        <div class="header">
-                            <div class="title">運行指示書（貨物）</div>
-                            <div class="company-info">
-                                ${companyInfo.name}<br>
-                                ${companyInfo.address}<br>
-                                TEL・FAX ${companyInfo.tel}
-                            </div>
-                        </div>
-                        
-                        <table class="info-table">
-                            <tr>
-                                <td style="width: 25%;">指示日/運行日</td>
-                                <td colspan="3"><strong>${formattedDate}</strong></td>
-                            </tr>
-                            <tr>
-                                <td>運転者</td>
-                                <td><strong>${order.driver || '未定'}</strong></td>
-                                <td>車両</td>
-                                <td><strong>${order.vehicle || '未定'}</strong></td>
-                            </tr>
-                        </table>
-                        
-                        <table class="main-table">
-                            <tr>
-                                <th>出発地（引取先）</th>
-                                <td colspan="3">${order.pickupLocation} 様<br>${order.pickupAddress || ''}</td>
-                            </tr>
-                            <tr>
-                                <th>到着地（荷渡先）</th>
-                                <td colspan="3">${order.deliveryLocation} 様<br>${order.deliveryAddress || ''}</td>
-                            </tr>
-                            <tr>
-                                <th>連絡先（納品先）</th>
-                                <td colspan="3">${order.deliveryTel || ''}</td>
-                            </tr>
-                        </table>
-                        
-                        <table class="cargo-table">
-                            <tr>
-                                <th style="width: 20%;">積載物</th>
-                                <th style="width: 15%;">荷姿</th>
-                                <th style="width: 15%;">数量</th>
-                                <th style="width: 50%;">標準指示事項</th>
-                            </tr>
-                            <tr>
-                                <td>${order.cargo}</td>
-                                <td>${order.packaging || ''}</td>
-                                <td>${order.quantity}<br>${order.unit}</td>
-                                <td rowspan="2" class="instructions-box">
-                                    ・法定速度・車間距離・シートベルト徹底<br>
-                                    ・連続運転4時間以内ごとに30分以上の休憩（分割可）<br>
-                                    ・荷崩れ防止／固縛確認、危険予測運転の徹底<br>
-                                    ・出発／帰庫時の点呼、酒気帯び無・体調良好を確認<br>
-                                    ・異常／事故／渋滞等は速やかに配車へ連絡
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                                <td>&nbsp;</td>
-                            </tr>
-                        </table>
-                        
-                        <div class="individual-box">
-                            <div class="individual-box-title">個別指示事項（レコード「指示事項」を反映）</div>
-                            ${order.instructions ? order.instructions.replace(/\n/g, '<br>') : '&nbsp;'}
-                        </div>
-                        
-                        <div class="operation-plan">
-                            <div class="operation-plan-title">法令遵守に基づく運行計画（現場記入可）</div>
-                            <table class="plan-table">
-                                <tr>
-                                    <td class="plan-label">出発予定</td>
-                                    <td class="plan-value">&nbsp;</td>
-                                </tr>
-                                <tr>
-                                    <td class="plan-label">到着予定</td>
-                                    <td class="plan-value">&nbsp;</td>
-                                </tr>
-                                <tr>
-                                    <td class="plan-label">運行経路・主な経由地（日時）</td>
-                                    <td class="plan-value">&nbsp;</td>
-                                </tr>
-                                <tr>
-                                    <td class="plan-label">注意が必要な箇所の位置</td>
-                                    <td class="plan-value">&nbsp;</td>
-                                </tr>
-                                <tr>
-                                    <td class="plan-label">休憩地点と時間</td>
-                                    <td class="plan-value">&nbsp;</td>
-                                </tr>
-                                <tr>
-                                    <td class="plan-label">交代地点</td>
-                                    <td class="plan-value">&nbsp;</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" style="padding-top: 5px;">その他 安全確保に必要な事項</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" class="plan-value">&nbsp;</td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            printContent += '</body></html>';
-            
-            const printWindow = window.open('', '_blank', 'width=800,height=600');
-            if (printWindow) {
-                printWindow.document.write(printContent);
-                printWindow.document.close();
-                setTimeout(() => {
-                    printWindow.print();
-                }, PRINT_DELAY_MS);
-                
-                // 指示書発行フラグ更新
-                printOrders.forEach(order => {
-                    order.instructionSheet = true;
-                });
-                saveData();
-                // クラウド一括更新
-                try {
-                    if (cloudEnabled()) {
-                        const ids = printOrders.map(o => o.id).filter(id => id != null);
-                        cloudBatchUpdate(ids, { instructionSheet: true });
-                    }
-                } catch(e) {}
-                renderTable();
-                updateStats();
             }
         }
 
