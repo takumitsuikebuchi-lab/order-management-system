@@ -1973,22 +1973,22 @@ function updateStatsFromView() {
                 amountGross: parseFloat(document.getElementById('amountGross').value) || 0,
                 instructions: document.getElementById('instructions').value,
                 driver: document.getElementById('driver').value,
-                vehicle: document.getElementById('vehicle').value,
-                instructionSheet: false,
-                invoiceSent: false,
-                paymentReceived: false,
-                orderCompleted: false
+                vehicle: document.getElementById('vehicle').value
             };
-            
+
             if (editingId) {
-                // 既存データの更新
+                // 既存データの更新（instructionSheet/invoiceSent/paymentReceived/orderCompleted は保持）
                 const index = orders.findIndex(o => o.id === editingId);
                 if (index !== -1) {
                     orders[index] = { ...orders[index], ...formData, id: editingId };
                 }
             } else {
-                // 新規データの追加
+                // 新規データの追加（フラグは初期値false）
                 formData.id = Date.now();
+                formData.instructionSheet = false;
+                formData.invoiceSent = false;
+                formData.paymentReceived = false;
+                formData.orderCompleted = false;
                 orders.push(formData);
             }
             
@@ -2732,9 +2732,13 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             `;
 
             const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('ポップアップがブロックされました。\nブラウザのアドレスバー付近に表示される「ポップアップを許可」をクリックしてください。');
+                return;
+            }
             printWindow.document.write(printContent);
             printWindow.document.close();
-            
+
             setTimeout(() => {
                 printWindow.print();
             }, 500);
