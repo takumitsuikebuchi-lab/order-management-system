@@ -162,6 +162,36 @@
             const dd = String(d.getDate()).padStart(2, '0');
             return `${d.getFullYear()}/${mm}/${dd}`;
         }
+        // RFC 4180準拠 CSVパーサー（空フィールド・クォートエスケープ対応）
+        function parseCsvLine(line) {
+            const result = [];
+            let i = 0, len = line.length;
+            while (i <= len) {
+                if (i === len) { result.push(''); break; }
+                if (line[i] === '"') {
+                    let val = '';
+                    i++; // skip opening quote
+                    while (i < len) {
+                        if (line[i] === '"') {
+                            if (i + 1 < len && line[i + 1] === '"') { val += '"'; i += 2; }
+                            else { i++; break; }
+                        } else { val += line[i]; i++; }
+                    }
+                    result.push(val);
+                    if (i < len && line[i] === ',') i++; // skip comma
+                } else {
+                    const next = line.indexOf(',', i);
+                    if (next === -1) { result.push(line.substring(i)); break; }
+                    result.push(line.substring(i, next));
+                    i = next + 1;
+                }
+            }
+            return result;
+        }
+
+        // CSVフィールドクォート（ダブルクォートをエスケープ）
+        function csvQ(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
 
@@ -199,7 +229,7 @@
                     // 案件データを読み込む
                     return cloudFetchOrders();
                 }).then(fetched => {
-                    if (Array.isArray(fetched) && fetched.length >= 0) {
+                    if (Array.isArray(fetched) && fetched.length > 0) {
                         orders = fetched.map(row => normalizeOrderRow(row));
                         // ID欠損の受注に一意なIDを補完
                         const base = Date.now();
@@ -483,7 +513,7 @@
                     return res;
                 } catch(e) {
                     clearTimeout(timer);
-                    if ((e && e.name === 'AbortError') || (e && e.code === 'OFFLINE') || attempt < retries) {
+                    if (attempt < retries) {
                         const delay = backoffBaseMs * Math.pow(backoffFactor, attempt);
                         await new Promise(r => setTimeout(r, delay + Math.floor(Math.random()*100)));
                         attempt++;
@@ -992,35 +1022,32 @@
             if (!cloudEnabled()) return;
             
             try {
-                // 顧客マスタを取得
+                // 顧客マスタを取得（空配列ならローカルデータを保持）
                 const cloudCustomers = await cloudFetchCustomers();
-                customerMaster = cloudCustomers.map(c => ({
-                    name: c.customer_name,
-                    address: c.pickup_address || '',
-                    tel: c.phone_number || ''
-                }));
-                localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
-                
-                // シンプルマスタを取得
+                if (cloudCustomers.length > 0) {
+                    customerMaster = cloudCustomers.map(c => ({
+                        name: c.customer_name,
+                        address: c.pickup_address || '',
+                        tel: c.phone_number || ''
+                    }));
+                    localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
+                }
+
+                // シンプルマスタを取得（空配列ならローカルデータを保持）
                 const cloudCargo = await cloudFetchSimpleMaster('cargo');
-                cargoMaster = cloudCargo;
-                localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster));
-                
+                if (cloudCargo.length > 0) { cargoMaster = cloudCargo; localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster)); }
+
                 const cloudPackaging = await cloudFetchSimpleMaster('packaging');
-                packagingMaster = cloudPackaging;
-                localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster));
-                
+                if (cloudPackaging.length > 0) { packagingMaster = cloudPackaging; localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster)); }
+
                 const cloudUnit = await cloudFetchSimpleMaster('unit');
-                unitMaster = cloudUnit;
-                localStorage.setItem('unitMaster', JSON.stringify(unitMaster));
-                
+                if (cloudUnit.length > 0) { unitMaster = cloudUnit; localStorage.setItem('unitMaster', JSON.stringify(unitMaster)); }
+
                 const cloudDriver = await cloudFetchSimpleMaster('driver');
-                driverMaster = cloudDriver;
-                localStorage.setItem('driverMaster', JSON.stringify(driverMaster));
-                
+                if (cloudDriver.length > 0) { driverMaster = cloudDriver; localStorage.setItem('driverMaster', JSON.stringify(driverMaster)); }
+
                 const cloudVehicle = await cloudFetchSimpleMaster('vehicle');
-                vehicleMaster = cloudVehicle;
-                localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster));
+                if (cloudVehicle.length > 0) { vehicleMaster = cloudVehicle; localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster)); }
                 
                 logInfo('loadMastersFromCloud', 'All masters loaded from cloud');
                 updateSelectOptions();
@@ -1198,7 +1225,9 @@ function rebuildColorMapFor(ns, namesArray) {
 
 // ★ 置き換え版：色の最小距離を確保して割当
 function nameToColor(ns, nameRaw) {
-// ★追加：個別上書きがあればそれを即返す
+  var name = (nameRaw || '').trim();
+
+// ★個別上書きがあればそれを即返す
 var ovr = (COLOR_OVERRIDES[ns] || {});
 if (ovr[name]) {
   var map0 = getColorMap(ns) || {};
@@ -1206,8 +1235,6 @@ if (ovr[name]) {
   setColorMap(ns, map0);
   return ovr[name];
 }
-
-  var name = (nameRaw || '').trim();
   if (!name) return { bg:'#e5e7eb', fg:'#111827' };
 
   var map = getColorMap(ns) || {};
@@ -1541,9 +1568,9 @@ function updateStatsFromView() {
                 // 文字列配列とオブジェクト配列の両方に対応
                 const name = typeof item === 'string' ? item : item.name;
                 return `
-                    <div class="master-item" draggable="true" data-index="${index}" data-name="${name}">
+                    <div class="master-item" draggable="true" data-index="${index}" data-name="${escHtml(name)}">
                         <span class="drag-handle">☰</span>
-                        <span class="master-item-content">${name}</span>
+                        <span class="master-item-content">${escHtml(name)}</span>
                         <div class="master-item-actions">
                             <button onclick="deleteSimpleMasterItem(${index})">×</button>
                         </div>
@@ -1709,7 +1736,7 @@ function updateStatsFromView() {
             }
             
             const headers = ['名称'];
-            let csv = headers.join(',') + '\n';
+            let csv = headers.join(',') + CSV_CRLF;
             masterData.forEach(item => {
                 // 文字列配列とオブジェクト配列の両方に対応
                 const name = typeof item === 'string' ? item : item.name;
@@ -1730,6 +1757,7 @@ function updateStatsFromView() {
             link.href = URL.createObjectURL(blob);
             link.download = fname;
             link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
         }
 
         // シンプルマスタCSV取込
@@ -1849,6 +1877,8 @@ function updateStatsFromView() {
             localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
             renderCustomerMaster();
             setupFilters();
+            // クラウド同期
+            try { if (cloudEnabled()) cloudSaveCustomers(customerMaster).catch(e => logError('CLOUD_SAVE_CUSTOMERS', e)); } catch(_) {}
             closeCustomerAddModal();
             alert('顧客を追加しました');
         }
@@ -1858,27 +1888,27 @@ function updateStatsFromView() {
             // 積荷
             const cargoSelect = document.getElementById('cargo');
             cargoSelect.innerHTML = '<option value="">選択してください</option>' +
-                cargoMaster.map(c => `<option value="${c}">${c}</option>`).join('');
-            
+                cargoMaster.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+
             // 荷姿
             const packagingSelect = document.getElementById('packaging');
             packagingSelect.innerHTML = '<option value="">選択してください</option>' +
-                packagingMaster.map(p => `<option value="${p}">${p}</option>`).join('');
-            
+                packagingMaster.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+
             // 単位
             const unitSelect = document.getElementById('unit');
             unitSelect.innerHTML = '<option value="">選択してください</option>' +
-                unitMaster.map(u => `<option value="${u}">${u}</option>`).join('');
-            
+                unitMaster.map(u => `<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('');
+
             // ドライバー
             const driverSelect = document.getElementById('driver');
             driverSelect.innerHTML = '<option value="">選択してください</option>' +
-                driverMaster.map(d => `<option value="${d}">${d}</option>`).join('');
-            
+                driverMaster.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+
             // 車両
             const vehicleSelect = document.getElementById('vehicle');
             vehicleSelect.innerHTML = '<option value="">選択してください</option>' +
-                vehicleMaster.map(v => `<option value="${v}">${v}</option>`).join('');
+                vehicleMaster.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
         }
 
         // 受注番号生成（同日・同プレフィックスの最大番号+1）
@@ -2172,14 +2202,12 @@ function duplicateOrder(id, el) {
         function setupFilters() {
             // ドライバーフィルターをマスタデータから生成
             document.getElementById('driverFilter').innerHTML = '<option value="">全ドライバー</option>' +
-                driverMaster.map(d => `<option value="${d}">${d}</option>`).join('');
-            
-            // 顧客フィルター（プルダウン）は廃止。キーワード検索候補のみ生成
+                driverMaster.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
 
             // 顧客キーワード検索候補（datalist）を生成
             const customerList = document.getElementById('customerFilterList');
             if (customerList) {
-                customerList.innerHTML = customerMaster.map(c => `<option value="${c.name}"></option>`).join('');
+                customerList.innerHTML = customerMaster.map(c => `<option value="${escHtml(c.name)}"></option>`).join('');
             }
         }
 
@@ -2286,8 +2314,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     <div class="drag-handle">≡</div>
                     <div class="order-number">${index + 1}.</div>
                     <div class="order-info">
-                        <strong>${order.customerName || order.customer_name || '（顧客名なし）'}</strong>
-                        <span style="color: #666; margin-left: 10px;">${order.orderNo || order.order_no || ''}</span>
+                        <strong>${escHtml(order.customerName || order.customer_name || '（顧客名なし）')}</strong>
+                        <span style="color: #666; margin-left: 10px;">${escHtml(order.orderNo || order.order_no || '')}</span>
                     </div>
                 `;
                 
@@ -2628,33 +2656,33 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     
                     printContent += `
                         <div class="order-header-outside">
-                            ${globalIdx + 1}件目: ${order.customerName || ''} (${orderDate})
+                            ${globalIdx + 1}件目: ${escHtml(order.customerName || '')} (${orderDate})
                         </div>
                         <div class="order-section">
                             <table class="compact-table">
                                 <tr>
                                     <th>引取先</th>
-                                    <td>${order.pickupLocation || ''}</td>
+                                    <td>${escHtml(order.pickupLocation || '')}</td>
                                     <th>配送先</th>
-                                    <td>${order.deliveryLocation || ''}</td>
+                                    <td>${escHtml(order.deliveryLocation || '')}</td>
                                 </tr>
                                 <tr>
                                     <th>引取住所</th>
-                                    <td colspan="3">${order.pickupAddress || ''}</td>
+                                    <td colspan="3">${escHtml(order.pickupAddress || '')}</td>
                                 </tr>
                                 <tr>
                                     <th>配送住所</th>
-                                    <td colspan="3">${order.deliveryAddress || ''}</td>
+                                    <td colspan="3">${escHtml(order.deliveryAddress || '')}</td>
                                 </tr>
                                 <tr>
                                     <th>積荷</th>
-                                    <td>${order.cargo || ''}</td>
+                                    <td>${escHtml(order.cargo || '')}</td>
                                     <th>数量</th>
-                                    <td>${order.quantity || ''} ${order.unit || ''}</td>
+                                    <td>${escHtml(order.quantity || '')} ${escHtml(order.unit || '')}</td>
                                 </tr>
                             </table>
                             <div class="instructions-compact">
-                                <strong>指示事項:</strong> ${(order.instructions || '').replace(/\n/g, '<br>')}
+                                <strong>指示事項:</strong> ${escHtml(order.instructions || '').replace(/\n/g, '<br>')}
                             </div>
                         </div>
                     `;
@@ -2945,21 +2973,21 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">引取先</td>
-                                    <td>${order.pickupLocation} 様<br><span style="font-size: 8pt;">${order.pickupAddress || ''}</span></td>
+                                    <td>${escHtml(order.pickupLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.pickupAddress || '')}</span></td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">荷渡先</td>
-                                    <td>${order.deliveryLocation} 様<br><span style="font-size: 8pt;">${order.deliveryAddress || ''}</span></td>
+                                    <td>${escHtml(order.deliveryLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.deliveryAddress || '')}</span></td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 8px;">
                                 <tr>
                                     <td class="address-label">ご依頼主</td>
-                                    <td>${order.customerName} 様</td>
+                                    <td>${escHtml(order.customerName)} 様</td>
                                 </tr>
                             </table>
                             
@@ -2973,12 +3001,12 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                                     <th style="width: 14%;">単位</th>
                                 </tr>
                                 <tr>
-                                    <td>${order.cargo}</td>
+                                    <td>${escHtml(order.cargo)}</td>
                                     <td></td>
                                     <td></td>
-                                    <td>${order.packaging || ''}</td>
-                                    <td>${order.quantity}</td>
-                                    <td>${order.unit}</td>
+                                    <td>${escHtml(order.packaging || '')}</td>
+                                    <td>${escHtml(order.quantity)}</td>
+                                    <td>${escHtml(order.unit)}</td>
                                 </tr>
                                 <tr style="height: 20px;">
                                     <td>&nbsp;</td>
@@ -3024,21 +3052,21 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">引取先</td>
-                                    <td>${order.pickupLocation} 様<br><span style="font-size: 8pt;">${order.pickupAddress || ''}</span></td>
+                                    <td>${escHtml(order.pickupLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.pickupAddress || '')}</span></td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">荷渡先</td>
-                                    <td>${order.deliveryLocation} 様<br><span style="font-size: 8pt;">${order.deliveryAddress || ''}</span></td>
+                                    <td>${escHtml(order.deliveryLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.deliveryAddress || '')}</span></td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 8px;">
                                 <tr>
                                     <td class="address-label">ご依頼主</td>
-                                    <td>${order.customerName} 様</td>
+                                    <td>${escHtml(order.customerName)} 様</td>
                                 </tr>
                             </table>
                             
@@ -3052,12 +3080,12 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                                     <th style="width: 14%;">単位</th>
                                 </tr>
                                 <tr>
-                                    <td>${order.cargo}</td>
+                                    <td>${escHtml(order.cargo)}</td>
                                     <td></td>
                                     <td></td>
-                                    <td>${order.packaging || ''}</td>
-                                    <td>${order.quantity}</td>
-                                    <td>${order.unit}</td>
+                                    <td>${escHtml(order.packaging || '')}</td>
+                                    <td>${escHtml(order.quantity)}</td>
+                                    <td>${escHtml(order.unit)}</td>
                                 </tr>
                                 <tr style="height: 20px;">
                                     <td>&nbsp;</td>
@@ -3102,13 +3130,15 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             printContent += '</body></html>';
             
             const printWindow = window.open('', '_blank', 'width=800,height=600');
-            if (printWindow) {
-                printWindow.document.write(printContent);
-                printWindow.document.close();
-                setTimeout(() => {
-                    printWindow.print();
-                }, PRINT_DELAY_MS);
+            if (!printWindow) {
+                alert('ポップアップがブロックされました。\nブラウザのアドレスバー付近に表示される「ポップアップを許可」をクリックしてください。');
+                return;
             }
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+            }, PRINT_DELAY_MS);
         }
 
         // 社内用CSVを当月受注から生成（BOM付、数値は正規化）
@@ -3124,7 +3154,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 // Supabase形式
                 headers = ['order_no', 'date', 'customer_name', 'pickup_location', 'pickup_address', 'delivery_location', 'delivery_address', 'delivery_tel', 'cargo', 'quantity', 'unit', 'packaging', 'unit_price', 'amount_net', 'amount_gross', 'driver', 'vehicle', 'instructions', 'instruction_sheet', 'invoice_sent', 'payment_received', 'order_completed'];
                 
-                csv = headers.join(',') + '\n';
+                csv = headers.join(',') + CSV_CRLF;
                 monthOrders.forEach(order => {
                     const row = [
                         order.orderNo || '',
@@ -3150,14 +3180,14 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                         order.paymentReceived ? 'true' : 'false',
                         order.orderCompleted ? 'true' : 'false'
                     ];
-                    csv += row.map(v => `"${v}"`).join(',') + '\n';
+                    csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
                 });
                 fname = `受注明細_Supabase形式_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
             } else { // fmt === 'internal'
                 // 社内用形式（全項目対応）
                 headers = ['受注番号', '日付', '顧客名', '引取先', '引取先住所', '配送先', '配送先住所', '配送先電話番号', '積荷', '数量', '単位', '荷姿', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両', '備考', '指示書', '請求済', '入金済', '完了'];
                 
-                csv = headers.join(',') + '\n';
+                csv = headers.join(',') + CSV_CRLF;
                 monthOrders.forEach(order => {
                     const row = [
                         order.orderNo || '',
@@ -3183,7 +3213,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                         order.paymentReceived ? 'true' : 'false',
                         order.orderCompleted ? 'true' : 'false'
                     ];
-                    csv += row.map(v => `"${v}"`).join(',') + '\n';
+                    csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
                 });
                 fname = `受注明細_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
             }
@@ -3199,6 +3229,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             link.href = URL.createObjectURL(blob);
             link.download = fname;
             link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
         }
 
         // CSVインポート（ヘッダーマッピング機能付き、Supabase自動同期）
@@ -3269,10 +3300,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 for (let i = 1; i < lines.length; i++) {
                     if (!lines[i]) continue;
                     
-                    const values = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-                    if (!values) continue;
-                    
-                    const cleanValues = values.map(v => v.replace(/^"|"$/g, '').trim());
+                    const cleanValues = parseCsvLine(lines[i]).map(v => v.trim());
                     
                     // マッピングされたデータオブジェクトを作成
                     const order = {
@@ -3320,7 +3348,13 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                         order.orderNo = `R${new Date().getFullYear().toString().slice(2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${(orders.length + i).toString().padStart(3, '0')}`;
                     }
                     
-                    orders.push(order);
+                    // 受注No重複チェック（既存データを上書き更新）
+                    const dupIdx = orders.findIndex(o => String(o.orderNo) === String(order.orderNo));
+                    if (dupIdx !== -1) {
+                        orders[dupIdx] = { ...orders[dupIdx], ...order, id: orders[dupIdx].id };
+                    } else {
+                        orders.push(order);
+                    }
                     importedOrders.push(order);
                 }
                 
@@ -3358,14 +3392,14 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         async function exportCustomerCSV() {
             const headers = ['顧客名', '住所', '電話番号'];
             
-            let csv = headers.join(',') + '\n';
+            let csv = headers.join(',') + CSV_CRLF;
             customerMaster.forEach(customer => {
                 const row = [
                     customer.name,
                     customer.address,
                     customer.tel
                 ];
-                csv += row.map(v => `"${v}"`).join(',') + '\n';
+                csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
             });
             
             const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
@@ -3380,6 +3414,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             link.href = URL.createObjectURL(blob);
             link.download = fname;
             link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
         }
 
         // 顧客マスタCSVインポート
@@ -3404,15 +3439,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                         const line = lines[i].trim();
                         if (!line) continue;
                         
-                        // CSVをパース（カンマ区切りで、ダブルクォートに対応）
-                        const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g);
-                        if (!values) {
-                            skipCount++;
-                            continue;
-                        }
-                        
-                        // ダブルクォートを除去
-                        const cleanValues = values.map(v => v.replace(/^"|"$/g, '').trim());
+                        // CSVをパース（RFC 4180準拠）
+                        const cleanValues = parseCsvLine(line).map(v => v.trim());
                         
                         // 列不足は空文字で補完（住所・電話が空でも取り込む）
                         const nameVal = cleanValues[0] ?? '';
