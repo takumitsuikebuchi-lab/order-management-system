@@ -2223,6 +2223,22 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         }
 
         // 運行指示書印刷
+        // 選択受注を取得して設定モーダルを開くエントリーポイント
+        function printInstructions() {
+            const checkboxes = document.querySelectorAll('#tableBody .order-checkbox:checked');
+            const selected = [];
+            checkboxes.forEach(cb => {
+                const id = parseInt(cb.getAttribute('data-id'));
+                if (!isNaN(id)) selected.push(id);
+            });
+            if (selected.length === 0) {
+                alert('印刷する受注を選択してください');
+                return;
+            }
+            const selectedOrders = orders.filter(o => selected.includes(o.id));
+            openInstructionSettingsModal(selectedOrders);
+        }
+
         // 運行指示書設定モーダル関連の変数
         let instructionOrders = [];
         let dispatchTimeValue = '';
