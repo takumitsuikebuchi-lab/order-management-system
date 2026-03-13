@@ -2150,12 +2150,12 @@ textarea {
                 deliveryAddress: row.delivery_address || row.deliveryAddress || '',
                 deliveryTel: row.delivery_tel || row.deliveryTel || '',
                 cargo: row.cargo,
-                quantity: Number(row.quantity ?? 0),
+                quantity: Number(row.quantity != null ? row.quantity : 0),
                 unit: row.unit || '',
                 packaging: row.packaging || '',
-                unitPrice: Number(row.unit_price ?? row.unitPrice ?? 0),
-                amountNet: Number(row.amount_net ?? row.amountNet ?? 0),
-                amountGross: Number(row.amount_gross ?? row.amountGross ?? 0),
+                unitPrice: Number(row.unit_price || row.unitPrice || 0),
+                amountNet: Number(row.amount_net || row.amountNet || 0),
+                amountGross: Number(row.amount_gross || row.amountGross || 0),
                 instructions: row.instructions || '',
                 driver: row.driver || '',
                 vehicle: row.vehicle || '',
@@ -2232,7 +2232,7 @@ textarea {
             if (!cloudEnabled()) return;
             updateCloudStatusUI();
             const base = getSupabaseBase();
-            const o = orders.find(x => x.id === localId);
+            const o = orders.find(x => String(x.id) === String(localId));
             if (!o) return;
             const body = serializeOrderForCloud({ ...o, ...patch });
             delete body.id;
@@ -2255,7 +2255,7 @@ textarea {
             updateCloudStatusUI();
             const base = getSupabaseBase();
             const orderNos = localIds.map(id => {
-                const o = orders.find(x => x.id === id);
+                const o = orders.find(x => String(x.id) === String(id));
                 return o ? o.orderNo : null;
             }).filter(v => v);
             if (orderNos.length === 0) return;
@@ -2743,12 +2743,12 @@ tbody.innerHTML = monthOrders.map(function(o) {
         '<td>' + driverHtml + '</td>' +
         '<td style="font-size: 0.7rem;">' + escHtml(o.vehicle || '-') + '</td>' +
         '<td style="text-align: center;">' + (o.instructionSheet ? '<span class="badge badge-success">済</span>' : '<span class="badge badge-warning">未</span>') + '</td>' +
-        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.invoiceSent ? 'checked' : '') + ' onchange="toggleInvoice(' + o.id + ')"></td>' +
-        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.paymentReceived ? 'checked' : '') + ' onchange="togglePayment(' + o.id + ')"></td>' +
+        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.invoiceSent ? 'checked' : '') + ' onchange="toggleInvoice(\'' + o.id + '\')"></td>' +
+        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.paymentReceived ? 'checked' : '') + ' onchange="togglePayment(\'' + o.id + '\')"></td>' +
 '<td style="white-space: nowrap;">' +
-  '<button class="btn btn-sm btn-primary" style="margin-right: 2px;" onclick="editOrder(' + o.id + ', this)">編集</button>' +
-  '<button class="btn btn-sm btn-warning" style="margin-right: 2px;" onclick="duplicateOrder(' + o.id + ', this)">複製</button>' +
-  '<button class="btn btn-sm btn-danger" onclick="deleteOrder(' + o.id + ')">削除</button>' +
+  '<button class="btn btn-sm btn-primary" style="margin-right: 2px;" onclick="editOrder(\'' + o.id + '\', this)">編集</button>' +
+  '<button class="btn btn-sm btn-warning" style="margin-right: 2px;" onclick="duplicateOrder(\'' + o.id + '\', this)">複製</button>' +
+  '<button class="btn btn-sm btn-danger" onclick="deleteOrder(\'' + o.id + '\')">削除</button>' +
 '</td>' +
 
       '</tr>';
@@ -2765,7 +2765,7 @@ updateStatsFromView();
 
         // 請求書チェック切り替え
         function toggleInvoice(id) {
-            const order = orders.find(o => o.id === id);
+            const order = orders.find(o => String(o.id) === String(id));
             if (order) {
                 order.invoiceSent = !order.invoiceSent;
                 saveData();
@@ -2776,7 +2776,7 @@ updateStatsFromView();
 
         // 入金チェック切り替え
         function togglePayment(id) {
-            const order = orders.find(o => o.id === id);
+            const order = orders.find(o => String(o.id) === String(id));
             if (order) {
                 order.paymentReceived = !order.paymentReceived;
                 saveData();
@@ -2834,8 +2834,8 @@ function updateStatsFromView() {
     let visibleIds = [];
     rows.forEach(tr => {
         if (tr.style.display !== 'none') {
-            const id = parseInt(tr.getAttribute('data-order-id'));
-            if (!isNaN(id)) visibleIds.push(id);
+            const id = tr.getAttribute('data-order-id');
+            if (id) visibleIds.push(id);
         }
     });
 
@@ -3442,7 +3442,7 @@ function updateStatsFromView() {
 
             if (editingId) {
                 // 既存データの更新（instructionSheet/invoiceSent/paymentReceived/orderCompleted は保持）
-                const index = orders.findIndex(o => o.id === editingId);
+                const index = orders.findIndex(o => String(o.id) === String(editingId));
                 if (index !== -1) {
                     orders[index] = { ...orders[index], ...formData, id: editingId };
                 }
@@ -3461,7 +3461,7 @@ function updateStatsFromView() {
             try { saveData(); } catch(e) { savedOk = false; logError('LOCAL_SAVE', e); }
             // クラウド保存（有効時）
             try {
-                const target = editingId ? orders.find(o => o.id === editingId) : formData;
+                const target = editingId ? orders.find(o => String(o.id) === String(editingId)) : formData;
                 if (cloudEnabled() && target) {
                     cloudUpsertOrder(target)
                         .then(() => { logInfo('CLOUD_SYNC', 'upsert ok', target.orderNo); showToast('Cloud同期完了'); try { flushCloudQueue(2); } catch(_){} })
@@ -3476,10 +3476,11 @@ function updateStatsFromView() {
             
             const prevScrollY = window.scrollY;
             renderTable();
-            const prevSearch = document.getElementById('searchInput')?.value || '';
-            const prevDateFilter = document.getElementById('dateFilter')?.value || '';
-            const prevDriverFilter = document.getElementById('driverFilter')?.value || '';
-            const prevCustomerFilterSearch = document.getElementById('customerFilterSearch')?.value || '';
+            var _el;
+            _el = document.getElementById('searchInput'); var prevSearch = _el ? _el.value : '';
+            _el = document.getElementById('dateFilter'); var prevDateFilter = _el ? _el.value : '';
+            _el = document.getElementById('driverFilter'); var prevDriverFilter = _el ? _el.value : '';
+            _el = document.getElementById('customerFilterSearch'); var prevCustomerFilterSearch = _el ? _el.value : '';
             
             updateStats();
             setupFilters();
@@ -3520,7 +3521,7 @@ function updateStatsFromView() {
 
         // 受注編集（idが取れない場合は行のdata-order-idからフォールバック）
         function editOrder(id, el) {
-            let order = orders.find(o => o.id === id);
+            let order = orders.find(o => String(o.id) === String(id));
             if (!order) {
                 const btn = el || document.activeElement;
                 const tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
@@ -3562,7 +3563,7 @@ function updateStatsFromView() {
         }
 // === 受注複製機能（idが取れない場合は行のdata-order-idからフォールバック） ===
 function duplicateOrder(id, el) {
-    let o = orders.find(x => x.id === id);
+    let o = orders.find(x => String(x.id) === String(id));
     if (!o) {
         const btn = el || document.activeElement;
         const tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
@@ -3615,7 +3616,7 @@ function duplicateOrder(id, el) {
         // 受注削除
         function deleteOrder(id) {
             if (!confirm('この受注を削除しますか？')) return;
-            const target = orders.find(o => o.id === id);
+            const target = orders.find(o => String(o.id) === String(id));
             orders = orders.filter(o => o.id !== id);
             saveData();
             renderTable();
@@ -3653,7 +3654,8 @@ function duplicateOrder(id, el) {
             const search = document.getElementById('searchInput').value.toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
             const driverFilter = document.getElementById('driverFilter').value;
-            const customerFilterSearch = (document.getElementById('customerFilterSearch')?.value || '').toLowerCase();
+            var _cEl = document.getElementById('customerFilterSearch');
+            const customerFilterSearch = (_cEl ? _cEl.value : '').toLowerCase();
             
             const rows = document.querySelectorAll('#tableBody tr');
             rows.forEach(row => {
@@ -3693,14 +3695,14 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             const checkboxes = document.querySelectorAll('#tableBody .order-checkbox:checked');
             const selected = [];
             checkboxes.forEach(cb => {
-                const id = parseInt(cb.getAttribute('data-id'));
-                if (!isNaN(id)) selected.push(id);
+                const id = cb.getAttribute('data-id');
+                if (id) selected.push(String(id));
             });
             if (selected.length === 0) {
                 showToast('印刷する受注を選択してください（行左端のチェックボックスにチェックを入れてください）', 'error');
                 return;
             }
-            const selectedOrders = orders.filter(o => selected.includes(o.id));
+            const selectedOrders = orders.filter(o => selected.includes(String(o.id)));
             openInstructionSettingsModal(selectedOrders);
         }
 
@@ -4234,18 +4236,16 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             
             const selected = [];
             checkboxes.forEach(cb => {
-                const id = parseInt(cb.getAttribute('data-id'));
-                if (!isNaN(id)) {
-                    selected.push(id);
-                }
+                const id = cb.getAttribute('data-id');
+                if (id) selected.push(String(id));
             });
-            
+
             if (selected.length === 0) {
                 alert('印刷する受注を選択してください');
                 return;
             }
-            
-            const printOrders = orders.filter(o => selected.includes(o.id));
+
+            const printOrders = orders.filter(o => selected.includes(String(o.id)));
             
             // 貨物引取書・荷渡書の生成
             let printContent = `
@@ -4880,9 +4880,9 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                         const cleanValues = parseCsvLine(line).map(v => v.trim());
                         
                         // 列不足は空文字で補完（住所・電話が空でも取り込む）
-                        const nameVal = cleanValues[0] ?? '';
-                        const addressVal = cleanValues[1] ?? '';
-                        const telVal = cleanValues[2] ?? '';
+                        const nameVal = cleanValues[0] != null ? cleanValues[0] : '';
+                        const addressVal = cleanValues[1] != null ? cleanValues[1] : '';
+                        const telVal = cleanValues[2] != null ? cleanValues[2] : '';
 
                         const newCustomer = {
                             name: nameVal,
@@ -4953,7 +4953,7 @@ async function exportInvoiceCSV() {
   // 共有定数を使用（CSV改行・BOM・源泉徴収指定）
 
   // 常時クォート
-  const q = (v) => `"${String(v ?? '').replace(/"/g,'""')}"`;
+  const q = (v) => '"' + String(v != null ? v : '').replace(/"/g,'""') + '"';
 
   // 数値変換は共有ユーティリティ toNumber を使用
 
