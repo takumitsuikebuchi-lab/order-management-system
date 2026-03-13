@@ -97,6 +97,16 @@
     <datalist id="customerFilterList"></datalist>
 </div>
 
+<!-- 行操作バー：受注表の行にマウスを合わせると表示される（Chrome拡張がクリックをブロックする場合のバックアップ） -->
+<div class="action-row" id="rowActionBar" style="display:none; background:#e8f0fe; border-radius:6px; padding:4px 10px; align-items:center; gap:8px; flex-wrap:wrap;">
+    <span style="font-size:0.8rem; color:#555; white-space:nowrap; font-weight:600;">📍 操作対象:</span>
+    <span id="hoveredOrderLabel" style="font-size:0.85rem; color:#1a73e8; font-weight:600; min-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">-</span>
+    <button class="btn btn-sm btn-primary" onclick="editHoveredOrder()">✏️ 編集</button>
+    <button class="btn btn-sm btn-warning" onclick="duplicateHoveredOrder()">📋 複製</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteHoveredOrder()">🗑️ 削除</button>
+    <span style="font-size:0.75rem; color:#888;">← 受注表の行にマウスを合わせると操作対象が変わります</span>
+</div>
+
             </div>
         </div>
 

@@ -195,6 +195,9 @@
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
 
+        // ホバー追跡（Chrome拡張がクリックをブロックする場合のアクションバー操作用）
+        let hoveredOrderId = null;
+
         // 初期化
         // ============================================================
         // 拡張機能オーバーレイ対策: DOMContentLoaded より前に登録
@@ -203,14 +206,15 @@
         document.addEventListener('click', function(e) {
             // ▼▼▼ 診断ログ（編集ボタンを押したときコンソールに表示されるか確認）
             var tgt = e.target;
-            if (tgt && (tgt.tagName === 'BUTTON' || (tgt.parentElement && tgt.parentElement.tagName === 'BUTTON'))) {
-                console.warn('[DBG-CLICK] click on/near button. target=' + tgt.tagName + ' class=' + tgt.className);
+            if (tgt && (tgt.tagName === 'BUTTON' || tgt.tagName === 'A' ||
+                        (tgt.parentElement && (tgt.parentElement.tagName === 'BUTTON' || tgt.parentElement.tagName === 'A')))) {
+                console.warn('[DBG-CLICK] click on/near button/a. target=' + tgt.tagName + ' class=' + tgt.className);
             }
             var els = document.elementsFromPoint(e.clientX, e.clientY);
             for (var i = 0; i < els.length; i++) {
                 var el = els[i];
-                // テーブル行のボタン
-                if (el.tagName === 'BUTTON' && el.getAttribute('data-action')) {
+                // テーブル行のボタン（<button>または<a role="button">）
+                if ((el.tagName === 'BUTTON' || el.tagName === 'A') && el.getAttribute('data-action')) {
                     var action = el.getAttribute('data-action');
                     console.warn('[DBG-CLICK] data-action button found: action=' + action);
                     var tr = el.closest('tr[data-order-id]');
@@ -235,6 +239,47 @@
                 }
             }
         }, true); // CAPTURE フェーズで登録（拡張機能より先に実行）
+
+        // mousedown 診断ログ（click がブロックされても mousedown は届くか確認）
+        document.addEventListener('mousedown', function(e) {
+            var tgt = e.target;
+            if (tgt && (tgt.tagName === 'BUTTON' || tgt.tagName === 'A' ||
+                        (tgt.parentElement && (tgt.parentElement.tagName === 'BUTTON' || tgt.parentElement.tagName === 'A')))) {
+                console.warn('[DBG-MDOWN] mousedown target=' + tgt.tagName + ' class=' + tgt.className);
+            }
+            // mousedown でもボタン操作を試みる（<a>タグ対応）
+            var els = document.elementsFromPoint(e.clientX, e.clientY);
+            for (var i = 0; i < els.length; i++) {
+                var el = els[i];
+                if ((el.tagName === 'BUTTON' || el.tagName === 'A') && el.getAttribute('data-action')) {
+                    var action = el.getAttribute('data-action');
+                    var tr = el.closest('tr[data-order-id]');
+                    if (tr) {
+                        var rowId = Number(tr.getAttribute('data-order-id'));
+                        if (!isNaN(rowId)) {
+                            if (action === 'edit')      { e.preventDefault(); editOrder(rowId, el); break; }
+                            if (action === 'duplicate') { e.preventDefault(); duplicateOrder(rowId, el); break; }
+                            if (action === 'delete')    { e.preventDefault(); deleteOrder(rowId); break; }
+                        }
+                    }
+                }
+            }
+        }, true);
+
+        // mouseover でテーブル行のホバーを追跡（クリックがブロックされても動作する）
+        document.addEventListener('mouseover', function(e) {
+            var tgt = e.target;
+            var tr = tgt && typeof tgt.closest === 'function'
+                ? tgt.closest('#tableBody tr[data-order-id]')
+                : null;
+            if (tr) {
+                var newId = Number(tr.getAttribute('data-order-id'));
+                if (!isNaN(newId) && newId !== hoveredOrderId) {
+                    hoveredOrderId = newId;
+                    updateRowActionBar();
+                }
+            }
+        }, true);
 
         document.addEventListener('DOMContentLoaded', function() {
             // 初回起動チェック：セットアップ未完了ならウィザードへリダイレクト
@@ -319,8 +364,8 @@
             if (tableBody) {
                 // ボタンクリック（編集・複製・削除）
                 tableBody.addEventListener('click', function(e) {
-                    var btn = e.target.closest('button[data-action]');
-                    if (!btn) return;
+                    var btn = e.target.closest('[data-action]');
+                    if (!btn || btn.tagName === 'INPUT') return; // input は change で処理
                     var tr = btn.closest('tr');
                     if (!tr) return;
                     var orderId = Number(tr.getAttribute('data-order-id'));
@@ -465,6 +510,34 @@
                     row.classList.remove('row-selected');
                 }
             });
+        }
+
+        // アクションバーのホバー行操作パネルを更新
+        function updateRowActionBar() {
+            var bar   = document.getElementById('rowActionBar');
+            var label = document.getElementById('hoveredOrderLabel');
+            if (!bar || !label) return;
+            if (!hoveredOrderId) { bar.style.display = 'none'; return; }
+            var order = orders.find(function(o) { return o.id === hoveredOrderId; });
+            if (!order) { bar.style.display = 'none'; return; }
+            bar.style.display = 'flex';
+            var dateStr = '';
+            try { dateStr = ' (' + formatDate(order.date) + ')'; } catch(_) {}
+            label.textContent = (order.orderNo || '') + '　' + (order.customerName || '') + dateStr;
+        }
+
+        // アクションバー経由の操作（Chrome拡張がクリックをブロックする場合のバックアップ）
+        function editHoveredOrder() {
+            if (!hoveredOrderId) { showToast('受注表の行にマウスを合わせてから操作してください', 'error'); return; }
+            editOrder(hoveredOrderId, null);
+        }
+        function duplicateHoveredOrder() {
+            if (!hoveredOrderId) { showToast('受注表の行にマウスを合わせてから操作してください', 'error'); return; }
+            duplicateOrder(hoveredOrderId, null);
+        }
+        function deleteHoveredOrder() {
+            if (!hoveredOrderId) { showToast('受注表の行にマウスを合わせてから操作してください', 'error'); return; }
+            deleteOrder(hoveredOrderId);
         }
 
         // データ読み込み
@@ -1409,34 +1482,43 @@ tbody.innerHTML = monthOrders.map(function(o) {
         '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-invoice" ' + (o.invoiceSent ? 'checked' : '') + '></td>' +
         '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-payment" ' + (o.paymentReceived ? 'checked' : '') + '></td>' +
 '<td style="white-space: nowrap;">' +
-  '<button class="btn btn-sm btn-primary" data-action="edit" style="margin-right: 2px;">編集</button>' +
-  '<button class="btn btn-sm btn-warning" data-action="duplicate" style="margin-right: 2px;">複製</button>' +
-  '<button class="btn btn-sm btn-danger" data-action="delete">削除</button>' +
+  '<a href="javascript:void(0)" role="button" class="btn btn-sm btn-primary" data-action="edit" style="margin-right: 2px;">編集</a>' +
+  '<a href="javascript:void(0)" role="button" class="btn btn-sm btn-warning" data-action="duplicate" style="margin-right: 2px;">複製</a>' +
+  '<a href="javascript:void(0)" role="button" class="btn btn-sm btn-danger" data-action="delete">削除</a>' +
 '</td>' +
 
       '</tr>';
 }).join('');
 
-// innerHTML設定後に直接addEventListenerを設定
-// （Chrome拡張がイベントバブリングを妨害する場合のフォールバック）
+// innerHTML設定後に直接addEventListenerを設定（click + mousedown 両方）
 tbody.querySelectorAll('tr[data-order-id]').forEach(function(tr) {
     var rowId = Number(tr.getAttribute('data-order-id'));
     if (isNaN(rowId)) return;
-    var editBtn = tr.querySelector('button[data-action="edit"]');
-    var dupBtn  = tr.querySelector('button[data-action="duplicate"]');
-    var delBtn  = tr.querySelector('button[data-action="delete"]');
+    var editBtn = tr.querySelector('[data-action="edit"]');
+    var dupBtn  = tr.querySelector('[data-action="duplicate"]');
+    var delBtn  = tr.querySelector('[data-action="delete"]');
     var invCb   = tr.querySelector('input[data-action="toggle-invoice"]');
     var payyCb  = tr.querySelector('input[data-action="toggle-payment"]');
     var selCb   = tr.querySelector('input.order-checkbox');
-    if (editBtn) editBtn.addEventListener('click', function() { editOrder(rowId, editBtn); });
-    if (dupBtn)  dupBtn.addEventListener('click',  function() { duplicateOrder(rowId, dupBtn); });
-    if (delBtn)  delBtn.addEventListener('click',  function() { deleteOrder(rowId); });
-    if (invCb)   invCb.addEventListener('change',  function() { toggleInvoice(rowId); });
-    if (payyCb)  payyCb.addEventListener('change', function() { togglePayment(rowId); });
-    if (selCb)   selCb.addEventListener('change',  function() { updateRowSelection(); });
+    if (editBtn) {
+        editBtn.addEventListener('click',     function(e) { e.preventDefault(); editOrder(rowId, editBtn); });
+        editBtn.addEventListener('mousedown', function(e) { e.preventDefault(); editOrder(rowId, editBtn); });
+    }
+    if (dupBtn) {
+        dupBtn.addEventListener('click',     function(e) { e.preventDefault(); duplicateOrder(rowId, dupBtn); });
+        dupBtn.addEventListener('mousedown', function(e) { e.preventDefault(); duplicateOrder(rowId, dupBtn); });
+    }
+    if (delBtn) {
+        delBtn.addEventListener('click',     function(e) { e.preventDefault(); deleteOrder(rowId); });
+        delBtn.addEventListener('mousedown', function(e) { e.preventDefault(); deleteOrder(rowId); });
+    }
+    if (invCb)  invCb.addEventListener('change',  function() { toggleInvoice(rowId); });
+    if (payyCb) payyCb.addEventListener('change', function() { togglePayment(rowId); });
+    if (selCb)  selCb.addEventListener('change',  function() { updateRowSelection(); });
 });
 
 updateStatsFromView();
+updateRowActionBar();
         }
         
         // 並び替え処理
