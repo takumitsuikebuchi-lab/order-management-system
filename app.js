@@ -195,92 +195,7 @@
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
 
-        // ホバー追跡（Chrome拡張がクリックをブロックする場合のアクションバー操作用）
-        let hoveredOrderId = null;
-
         // 初期化
-        // ============================================================
-        // 拡張機能オーバーレイ対策: DOMContentLoaded より前に登録
-        // elementsFromPoint でオーバーレイを透かして下のボタンを探す
-        // ============================================================
-        document.addEventListener('click', function(e) {
-            // ▼▼▼ 診断ログ（編集ボタンを押したときコンソールに表示されるか確認）
-            var tgt = e.target;
-            if (tgt && (tgt.tagName === 'BUTTON' || tgt.tagName === 'A' ||
-                        (tgt.parentElement && (tgt.parentElement.tagName === 'BUTTON' || tgt.parentElement.tagName === 'A')))) {
-                console.warn('[DBG-CLICK] click on/near button/a. target=' + tgt.tagName + ' class=' + tgt.className);
-            }
-            var els = document.elementsFromPoint(e.clientX, e.clientY);
-            for (var i = 0; i < els.length; i++) {
-                var el = els[i];
-                // テーブル行のボタン（<button>または<a role="button">）
-                if ((el.tagName === 'BUTTON' || el.tagName === 'A') && el.getAttribute('data-action')) {
-                    var action = el.getAttribute('data-action');
-                    console.warn('[DBG-CLICK] data-action button found: action=' + action);
-                    var tr = el.closest('tr[data-order-id]');
-                    if (tr) {
-                        var rowId = Number(tr.getAttribute('data-order-id'));
-                        if (!isNaN(rowId)) {
-                            if (action === 'edit')      { editOrder(rowId, el); break; }
-                            if (action === 'duplicate') { duplicateOrder(rowId, el); break; }
-                            if (action === 'delete')    { deleteOrder(rowId); break; }
-                        }
-                    }
-                    // 顧客マスタ削除
-                    if (action === 'delete-customer') {
-                        var idx = parseInt(el.getAttribute('data-index'));
-                        if (!isNaN(idx)) { deleteCustomer(idx); break; }
-                    }
-                    // シンプルマスタ削除
-                    if (action === 'delete-master-item') {
-                        var idx2 = parseInt(el.getAttribute('data-index'));
-                        if (!isNaN(idx2)) { deleteSimpleMasterItem(idx2); break; }
-                    }
-                }
-            }
-        }, true); // CAPTURE フェーズで登録（拡張機能より先に実行）
-
-        // mousedown 診断ログ（click がブロックされても mousedown は届くか確認）
-        document.addEventListener('mousedown', function(e) {
-            var tgt = e.target;
-            if (tgt && (tgt.tagName === 'BUTTON' || tgt.tagName === 'A' ||
-                        (tgt.parentElement && (tgt.parentElement.tagName === 'BUTTON' || tgt.parentElement.tagName === 'A')))) {
-                console.warn('[DBG-MDOWN] mousedown target=' + tgt.tagName + ' class=' + tgt.className);
-            }
-            // mousedown でもボタン操作を試みる（<a>タグ対応）
-            var els = document.elementsFromPoint(e.clientX, e.clientY);
-            for (var i = 0; i < els.length; i++) {
-                var el = els[i];
-                if ((el.tagName === 'BUTTON' || el.tagName === 'A') && el.getAttribute('data-action')) {
-                    var action = el.getAttribute('data-action');
-                    var tr = el.closest('tr[data-order-id]');
-                    if (tr) {
-                        var rowId = Number(tr.getAttribute('data-order-id'));
-                        if (!isNaN(rowId)) {
-                            if (action === 'edit')      { e.preventDefault(); editOrder(rowId, el); break; }
-                            if (action === 'duplicate') { e.preventDefault(); duplicateOrder(rowId, el); break; }
-                            if (action === 'delete')    { e.preventDefault(); deleteOrder(rowId); break; }
-                        }
-                    }
-                }
-            }
-        }, true);
-
-        // mouseover でテーブル行のホバーを追跡（クリックがブロックされても動作する）
-        document.addEventListener('mouseover', function(e) {
-            var tgt = e.target;
-            var tr = tgt && typeof tgt.closest === 'function'
-                ? tgt.closest('#tableBody tr[data-order-id]')
-                : null;
-            if (tr) {
-                var newId = Number(tr.getAttribute('data-order-id'));
-                if (!isNaN(newId) && newId !== hoveredOrderId) {
-                    hoveredOrderId = newId;
-                    updateRowActionBar();
-                }
-            }
-        }, true);
-
         document.addEventListener('DOMContentLoaded', function() {
             // 初回起動チェック：セットアップ未完了ならウィザードへリダイレクト
             const setupCompleted = localStorage.getItem('setupCompleted');
@@ -357,63 +272,6 @@
                 }
             });
 
-            // === イベントデリゲーション: テーブル本体 ===
-            // inline onclick/onchange を使わず addEventListener で処理する
-            // （Chrome拡張やCSPによるinline handler無効化を回避）
-            var tableBody = document.getElementById('tableBody');
-            if (tableBody) {
-                // ボタンクリック（編集・複製・削除）
-                tableBody.addEventListener('click', function(e) {
-                    var btn = e.target.closest('[data-action]');
-                    if (!btn || btn.tagName === 'INPUT') return; // input は change で処理
-                    var tr = btn.closest('tr');
-                    if (!tr) return;
-                    var orderId = Number(tr.getAttribute('data-order-id'));
-                    if (isNaN(orderId)) return;
-                    var action = btn.getAttribute('data-action');
-                    if (action === 'edit') editOrder(orderId, btn);
-                    else if (action === 'duplicate') duplicateOrder(orderId, btn);
-                    else if (action === 'delete') deleteOrder(orderId);
-                });
-                // チェックボックス変更（選択・請求書・入金）
-                tableBody.addEventListener('change', function(e) {
-                    var el = e.target;
-                    if (el.classList.contains('order-checkbox')) {
-                        updateRowSelection();
-                        return;
-                    }
-                    var action = el.getAttribute('data-action');
-                    if (!action) return;
-                    var tr = el.closest('tr');
-                    if (!tr) return;
-                    var orderId = Number(tr.getAttribute('data-order-id'));
-                    if (isNaN(orderId)) return;
-                    if (action === 'toggle-invoice') toggleInvoice(orderId);
-                    else if (action === 'toggle-payment') togglePayment(orderId);
-                });
-            }
-
-            // === イベントデリゲーション: 顧客マスタモーダル ===
-            var customerBody = document.getElementById('customerMasterBody');
-            if (customerBody) {
-                customerBody.addEventListener('click', function(e) {
-                    var btn = e.target.closest('button[data-action="delete-customer"]');
-                    if (!btn) return;
-                    var idx = parseInt(btn.getAttribute('data-index'));
-                    if (!isNaN(idx)) deleteCustomer(idx);
-                });
-            }
-
-            // === イベントデリゲーション: シンプルマスタモーダル ===
-            var masterList = document.getElementById('simpleMasterList');
-            if (masterList) {
-                masterList.addEventListener('click', function(e) {
-                    var btn = e.target.closest('button[data-action="delete-master-item"]');
-                    if (!btn) return;
-                    var idx = parseInt(btn.getAttribute('data-index'));
-                    if (!isNaN(idx)) deleteSimpleMasterItem(idx);
-                });
-            }
         });
 
         // CSV形式選択モーダル（confirm()の代替 — OKが社内用になる誤解を防ぐ）
@@ -510,34 +368,6 @@
                     row.classList.remove('row-selected');
                 }
             });
-        }
-
-        // アクションバーのホバー行操作パネルを更新
-        function updateRowActionBar() {
-            var bar   = document.getElementById('rowActionBar');
-            var label = document.getElementById('hoveredOrderLabel');
-            if (!bar || !label) return;
-            if (!hoveredOrderId) { bar.style.display = 'none'; return; }
-            var order = orders.find(function(o) { return o.id === hoveredOrderId; });
-            if (!order) { bar.style.display = 'none'; return; }
-            bar.style.display = 'flex';
-            var dateStr = '';
-            try { dateStr = ' (' + formatDate(order.date) + ')'; } catch(_) {}
-            label.textContent = (order.orderNo || '') + '　' + (order.customerName || '') + dateStr;
-        }
-
-        // アクションバー経由の操作（Chrome拡張がクリックをブロックする場合のバックアップ）
-        function editHoveredOrder() {
-            if (!hoveredOrderId) { showToast('受注表の行にマウスを合わせてから操作してください', 'error'); return; }
-            editOrder(hoveredOrderId, null);
-        }
-        function duplicateHoveredOrder() {
-            if (!hoveredOrderId) { showToast('受注表の行にマウスを合わせてから操作してください', 'error'); return; }
-            duplicateOrder(hoveredOrderId, null);
-        }
-        function deleteHoveredOrder() {
-            if (!hoveredOrderId) { showToast('受注表の行にマウスを合わせてから操作してください', 'error'); return; }
-            deleteOrder(hoveredOrderId);
         }
 
         // データ読み込み
@@ -1465,7 +1295,7 @@ tbody.innerHTML = monthOrders.map(function(o) {
 
     return '' +
       '<tr data-order-id="' + o.id + '">' +
-        '<td><input type="checkbox" class="checkbox order-checkbox" data-id="' + o.id + '"></td>' +
+        '<td><input type="checkbox" class="checkbox order-checkbox" data-id="' + o.id + '" onchange="updateRowSelection()"></td>' +
         '<td style="white-space: nowrap;">' + formatDate(o.date) + '</td>' +
         '<td>' + escHtml(o.customerName   || '-') + '</td>' +
         '<td>' + escHtml(o.pickupLocation  || '-') + '</td>' +
@@ -1479,46 +1309,18 @@ tbody.innerHTML = monthOrders.map(function(o) {
         '<td>' + driverHtml + '</td>' +
         '<td style="font-size: 0.7rem;">' + escHtml(o.vehicle || '-') + '</td>' +
         '<td style="text-align: center;">' + (o.instructionSheet ? '<span class="badge badge-success">済</span>' : '<span class="badge badge-warning">未</span>') + '</td>' +
-        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-invoice" ' + (o.invoiceSent ? 'checked' : '') + '></td>' +
-        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-payment" ' + (o.paymentReceived ? 'checked' : '') + '></td>' +
+        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.invoiceSent ? 'checked' : '') + ' onchange="toggleInvoice(' + o.id + ')"></td>' +
+        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.paymentReceived ? 'checked' : '') + ' onchange="togglePayment(' + o.id + ')"></td>' +
 '<td style="white-space: nowrap;">' +
-  '<button class="btn btn-sm btn-primary" data-action="edit" style="margin-right: 2px;">編集</button>' +
-  '<button class="btn btn-sm btn-warning" data-action="duplicate" style="margin-right: 2px;">複製</button>' +
-  '<button class="btn btn-sm btn-danger" data-action="delete">削除</button>' +
+  '<button class="btn btn-sm btn-primary" style="margin-right: 2px;" onclick="editOrder(' + o.id + ', this)">編集</button>' +
+  '<button class="btn btn-sm btn-warning" style="margin-right: 2px;" onclick="duplicateOrder(' + o.id + ', this)">複製</button>' +
+  '<button class="btn btn-sm btn-danger" onclick="deleteOrder(' + o.id + ')">削除</button>' +
 '</td>' +
 
       '</tr>';
 }).join('');
 
-// innerHTML設定後に直接addEventListenerを設定（click + mousedown 両方）
-tbody.querySelectorAll('tr[data-order-id]').forEach(function(tr) {
-    var rowId = Number(tr.getAttribute('data-order-id'));
-    if (isNaN(rowId)) return;
-    var editBtn = tr.querySelector('[data-action="edit"]');
-    var dupBtn  = tr.querySelector('[data-action="duplicate"]');
-    var delBtn  = tr.querySelector('[data-action="delete"]');
-    var invCb   = tr.querySelector('input[data-action="toggle-invoice"]');
-    var payyCb  = tr.querySelector('input[data-action="toggle-payment"]');
-    var selCb   = tr.querySelector('input.order-checkbox');
-    if (editBtn) {
-        editBtn.addEventListener('click',     function(e) { e.preventDefault(); editOrder(rowId, editBtn); });
-        editBtn.addEventListener('mousedown', function(e) { e.preventDefault(); editOrder(rowId, editBtn); });
-    }
-    if (dupBtn) {
-        dupBtn.addEventListener('click',     function(e) { e.preventDefault(); duplicateOrder(rowId, dupBtn); });
-        dupBtn.addEventListener('mousedown', function(e) { e.preventDefault(); duplicateOrder(rowId, dupBtn); });
-    }
-    if (delBtn) {
-        delBtn.addEventListener('click',     function(e) { e.preventDefault(); deleteOrder(rowId); });
-        delBtn.addEventListener('mousedown', function(e) { e.preventDefault(); deleteOrder(rowId); });
-    }
-    if (invCb)  invCb.addEventListener('change',  function() { toggleInvoice(rowId); });
-    if (payyCb) payyCb.addEventListener('change', function() { togglePayment(rowId); });
-    if (selCb)  selCb.addEventListener('change',  function() { updateRowSelection(); });
-});
-
 updateStatsFromView();
-updateRowActionBar();
         }
         
         // 並び替え処理
@@ -1687,15 +1489,10 @@ function updateStatsFromView() {
                     <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.address)}" data-field="address" data-index="${index}" lang="ja" inputmode="text"></td>
                     <td><input type="tel" class="form-input-full numeric-input" value="${escHtml(customer.tel)}" data-field="tel" data-index="${index}" inputmode="tel"></td>
                     <td>
-                        <button class="btn btn-sm btn-danger" data-action="delete-customer" data-index="${index}">削除</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${index})">削除</button>
                     </td>
                 </tr>
             `).join('');
-            // 直接リスナーを設定（バブリング干渉対策）
-            tbody.querySelectorAll('button[data-action="delete-customer"]').forEach(function(btn) {
-                var idx = parseInt(btn.getAttribute('data-index'));
-                if (!isNaN(idx)) btn.addEventListener('click', function() { deleteCustomer(idx); });
-            });
         }
 
         // 顧客追加行
@@ -1776,16 +1573,11 @@ function updateStatsFromView() {
                         <span class="drag-handle">☰</span>
                         <span class="master-item-content">${escHtml(name)}</span>
                         <div class="master-item-actions">
-                            <button data-action="delete-master-item" data-index="${index}">×</button>
+                            <button onclick="deleteSimpleMasterItem(${index})">×</button>
                         </div>
                     </div>
                 `;
             }).join('');
-            // 直接リスナーを設定（バブリング干渉対策）
-            list.querySelectorAll('button[data-action="delete-master-item"]').forEach(function(btn) {
-                var idx = parseInt(btn.getAttribute('data-index'));
-                if (!isNaN(idx)) btn.addEventListener('click', function() { deleteSimpleMasterItem(idx); });
-            });
             // ドラッグ&ドロップイベントを設定
             setupDragAndDrop();
         }
@@ -2294,19 +2086,15 @@ function updateStatsFromView() {
 
         // 受注編集（idが取れない場合は行のdata-order-idからフォールバック）
         function editOrder(id, el) {
-            // ▼▼▼ 診断ログ
-            console.warn('[DBG-EDIT] editOrder called. id=' + id + ' type=' + typeof id + ' orders.length=' + orders.length);
             let order = orders.find(o => o.id === id);
             if (!order) {
                 const btn = el || document.activeElement;
                 const tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
                 const idAttr = tr ? tr.getAttribute('data-order-id') : null;
-                console.warn('[DBG-EDIT] fallback: idAttr=' + idAttr);
                 if (idAttr != null) {
                     order = orders.find(o => String(o.id) === String(idAttr));
                 }
             }
-            console.warn('[DBG-EDIT] order found=' + (!!order) + (order ? ' orderNo=' + order.orderNo : ''));
             if (!order) {
                 showToast('受注データが見つかりません（id:' + id + '）', 'error');
                 return;
@@ -2468,9 +2256,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         // 運行指示書印刷
         // 選択受注を取得して設定モーダルを開くエントリーポイント
         function printInstructions() {
-            console.warn('[DBG-PRINT] printInstructions called');
             const checkboxes = document.querySelectorAll('#tableBody .order-checkbox:checked');
-            console.warn('[DBG-PRINT] checked boxes count=' + checkboxes.length);
             const selected = [];
             checkboxes.forEach(cb => {
                 const id = parseInt(cb.getAttribute('data-id'));
@@ -2481,7 +2267,6 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 return;
             }
             const selectedOrders = orders.filter(o => selected.includes(o.id));
-            console.warn('[DBG-PRINT] selectedOrders count=' + selectedOrders.length);
             openInstructionSettingsModal(selectedOrders);
         }
 
