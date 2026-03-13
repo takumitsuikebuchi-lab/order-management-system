@@ -2839,7 +2839,7 @@ function updateStatsFromView() {
         }
     });
 
-    const visibleOrders = orders.filter(o => visibleIds.includes(o.id));
+    const visibleOrders = orders.filter(o => visibleIds.includes(String(o.id)));
 
     const totalGross = visibleOrders.reduce((sum, o) => sum + (o.amountGross || 0), 0);
     const totalNet   = visibleOrders.reduce((sum, o) => sum + (o.amountNet   || 0), 0);
@@ -3617,7 +3617,7 @@ function duplicateOrder(id, el) {
         function deleteOrder(id) {
             if (!confirm('この受注を削除しますか？')) return;
             const target = orders.find(o => String(o.id) === String(id));
-            orders = orders.filter(o => o.id !== id);
+            orders = orders.filter(o => String(o.id) !== String(id));
             saveData();
             renderTable();
             updateStats();
