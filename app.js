@@ -196,6 +196,40 @@
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
 
         // 初期化
+        // ============================================================
+        // 拡張機能オーバーレイ対策: DOMContentLoaded より前に登録
+        // elementsFromPoint でオーバーレイを透かして下のボタンを探す
+        // ============================================================
+        document.addEventListener('click', function(e) {
+            var els = document.elementsFromPoint(e.clientX, e.clientY);
+            for (var i = 0; i < els.length; i++) {
+                var el = els[i];
+                // テーブル行のボタン
+                if (el.tagName === 'BUTTON' && el.getAttribute('data-action')) {
+                    var action = el.getAttribute('data-action');
+                    var tr = el.closest('tr[data-order-id]');
+                    if (tr) {
+                        var rowId = Number(tr.getAttribute('data-order-id'));
+                        if (!isNaN(rowId)) {
+                            if (action === 'edit')      { editOrder(rowId, el); break; }
+                            if (action === 'duplicate') { duplicateOrder(rowId, el); break; }
+                            if (action === 'delete')    { deleteOrder(rowId); break; }
+                        }
+                    }
+                    // 顧客マスタ削除
+                    if (action === 'delete-customer') {
+                        var idx = parseInt(el.getAttribute('data-index'));
+                        if (!isNaN(idx)) { deleteCustomer(idx); break; }
+                    }
+                    // シンプルマスタ削除
+                    if (action === 'delete-master-item') {
+                        var idx2 = parseInt(el.getAttribute('data-index'));
+                        if (!isNaN(idx2)) { deleteSimpleMasterItem(idx2); break; }
+                    }
+                }
+            }
+        }, true); // CAPTURE フェーズで登録（拡張機能より先に実行）
+
         document.addEventListener('DOMContentLoaded', function() {
             // 初回起動チェック：セットアップ未完了ならウィザードへリダイレクト
             const setupCompleted = localStorage.getItem('setupCompleted');
