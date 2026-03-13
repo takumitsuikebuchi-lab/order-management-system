@@ -1482,9 +1482,9 @@ tbody.innerHTML = monthOrders.map(function(o) {
         '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-invoice" ' + (o.invoiceSent ? 'checked' : '') + '></td>' +
         '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-payment" ' + (o.paymentReceived ? 'checked' : '') + '></td>' +
 '<td style="white-space: nowrap;">' +
-  '<a href="javascript:void(0)" role="button" class="btn btn-sm btn-primary" data-action="edit" style="margin-right: 2px;">編集</a>' +
-  '<a href="javascript:void(0)" role="button" class="btn btn-sm btn-warning" data-action="duplicate" style="margin-right: 2px;">複製</a>' +
-  '<a href="javascript:void(0)" role="button" class="btn btn-sm btn-danger" data-action="delete">削除</a>' +
+  '<button class="btn btn-sm btn-primary" data-action="edit" style="margin-right: 2px;">編集</button>' +
+  '<button class="btn btn-sm btn-warning" data-action="duplicate" style="margin-right: 2px;">複製</button>' +
+  '<button class="btn btn-sm btn-danger" data-action="delete">削除</button>' +
 '</td>' +
 
       '</tr>';
