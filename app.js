@@ -201,12 +201,18 @@
         // elementsFromPoint でオーバーレイを透かして下のボタンを探す
         // ============================================================
         document.addEventListener('click', function(e) {
+            // ▼▼▼ 診断ログ（編集ボタンを押したときコンソールに表示されるか確認）
+            var tgt = e.target;
+            if (tgt && (tgt.tagName === 'BUTTON' || (tgt.parentElement && tgt.parentElement.tagName === 'BUTTON'))) {
+                console.warn('[DBG-CLICK] click on/near button. target=' + tgt.tagName + ' class=' + tgt.className);
+            }
             var els = document.elementsFromPoint(e.clientX, e.clientY);
             for (var i = 0; i < els.length; i++) {
                 var el = els[i];
                 // テーブル行のボタン
                 if (el.tagName === 'BUTTON' && el.getAttribute('data-action')) {
                     var action = el.getAttribute('data-action');
+                    console.warn('[DBG-CLICK] data-action button found: action=' + action);
                     var tr = el.closest('tr[data-order-id]');
                     if (tr) {
                         var rowId = Number(tr.getAttribute('data-order-id'));
@@ -2206,16 +2212,23 @@ function updateStatsFromView() {
 
         // 受注編集（idが取れない場合は行のdata-order-idからフォールバック）
         function editOrder(id, el) {
+            // ▼▼▼ 診断ログ
+            console.warn('[DBG-EDIT] editOrder called. id=' + id + ' type=' + typeof id + ' orders.length=' + orders.length);
             let order = orders.find(o => o.id === id);
             if (!order) {
                 const btn = el || document.activeElement;
                 const tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
                 const idAttr = tr ? tr.getAttribute('data-order-id') : null;
+                console.warn('[DBG-EDIT] fallback: idAttr=' + idAttr);
                 if (idAttr != null) {
                     order = orders.find(o => String(o.id) === String(idAttr));
                 }
             }
-            if (!order) return;
+            console.warn('[DBG-EDIT] order found=' + (!!order) + (order ? ' orderNo=' + order.orderNo : ''));
+            if (!order) {
+                showToast('受注データが見つかりません（id:' + id + '）', 'error');
+                return;
+            }
             
             editingId = order.id;
             document.getElementById('modalTitle').textContent = '受注編集';
@@ -2373,17 +2386,20 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         // 運行指示書印刷
         // 選択受注を取得して設定モーダルを開くエントリーポイント
         function printInstructions() {
+            console.warn('[DBG-PRINT] printInstructions called');
             const checkboxes = document.querySelectorAll('#tableBody .order-checkbox:checked');
+            console.warn('[DBG-PRINT] checked boxes count=' + checkboxes.length);
             const selected = [];
             checkboxes.forEach(cb => {
                 const id = parseInt(cb.getAttribute('data-id'));
                 if (!isNaN(id)) selected.push(id);
             });
             if (selected.length === 0) {
-                alert('印刷する受注を選択してください');
+                showToast('印刷する受注を選択してください（行左端のチェックボックスにチェックを入れてください）', 'error');
                 return;
             }
             const selectedOrders = orders.filter(o => selected.includes(o.id));
+            console.warn('[DBG-PRINT] selectedOrders count=' + selectedOrders.length);
             openInstructionSettingsModal(selectedOrders);
         }
 
@@ -2881,7 +2897,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
 
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
-                alert('ポップアップがブロックされました。\nブラウザのアドレスバー付近に表示される「ポップアップを許可」をクリックしてください。');
+                showToast('ポップアップがブロックされました。アドレスバー付近の「ポップアップを許可」をクリックしてください。', 'error');
                 return;
             }
             printWindow.document.write(printContent);
@@ -3251,7 +3267,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             
             const printWindow = window.open('', '_blank', 'width=800,height=600');
             if (!printWindow) {
-                alert('ポップアップがブロックされました。\nブラウザのアドレスバー付近に表示される「ポップアップを許可」をクリックしてください。');
+                showToast('ポップアップがブロックされました。アドレスバー付近の「ポップアップを許可」をクリックしてください。', 'error');
                 return;
             }
             printWindow.document.write(printContent);
