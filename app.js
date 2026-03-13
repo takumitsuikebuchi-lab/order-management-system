@@ -1377,6 +1377,25 @@ tbody.innerHTML = monthOrders.map(function(o) {
       '</tr>';
 }).join('');
 
+// innerHTML設定後に直接addEventListenerを設定
+// （Chrome拡張がイベントバブリングを妨害する場合のフォールバック）
+tbody.querySelectorAll('tr[data-order-id]').forEach(function(tr) {
+    var rowId = Number(tr.getAttribute('data-order-id'));
+    if (isNaN(rowId)) return;
+    var editBtn = tr.querySelector('button[data-action="edit"]');
+    var dupBtn  = tr.querySelector('button[data-action="duplicate"]');
+    var delBtn  = tr.querySelector('button[data-action="delete"]');
+    var invCb   = tr.querySelector('input[data-action="toggle-invoice"]');
+    var payyCb  = tr.querySelector('input[data-action="toggle-payment"]');
+    var selCb   = tr.querySelector('input.order-checkbox');
+    if (editBtn) editBtn.addEventListener('click', function() { editOrder(rowId, editBtn); });
+    if (dupBtn)  dupBtn.addEventListener('click',  function() { duplicateOrder(rowId, dupBtn); });
+    if (delBtn)  delBtn.addEventListener('click',  function() { deleteOrder(rowId); });
+    if (invCb)   invCb.addEventListener('change',  function() { toggleInvoice(rowId); });
+    if (payyCb)  payyCb.addEventListener('change', function() { togglePayment(rowId); });
+    if (selCb)   selCb.addEventListener('change',  function() { updateRowSelection(); });
+});
+
 updateStatsFromView();
         }
         
@@ -1550,6 +1569,11 @@ function updateStatsFromView() {
                     </td>
                 </tr>
             `).join('');
+            // 直接リスナーを設定（バブリング干渉対策）
+            tbody.querySelectorAll('button[data-action="delete-customer"]').forEach(function(btn) {
+                var idx = parseInt(btn.getAttribute('data-index'));
+                if (!isNaN(idx)) btn.addEventListener('click', function() { deleteCustomer(idx); });
+            });
         }
 
         // 顧客追加行
@@ -1635,7 +1659,11 @@ function updateStatsFromView() {
                     </div>
                 `;
             }).join('');
-            
+            // 直接リスナーを設定（バブリング干渉対策）
+            list.querySelectorAll('button[data-action="delete-master-item"]').forEach(function(btn) {
+                var idx = parseInt(btn.getAttribute('data-index'));
+                if (!isNaN(idx)) btn.addEventListener('click', function() { deleteSimpleMasterItem(idx); });
+            });
             // ドラッグ&ドロップイベントを設定
             setupDragAndDrop();
         }
