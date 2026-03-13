@@ -271,6 +271,64 @@
                     });
                 }
             });
+
+            // === イベントデリゲーション: テーブル本体 ===
+            // inline onclick/onchange を使わず addEventListener で処理する
+            // （Chrome拡張やCSPによるinline handler無効化を回避）
+            var tableBody = document.getElementById('tableBody');
+            if (tableBody) {
+                // ボタンクリック（編集・複製・削除）
+                tableBody.addEventListener('click', function(e) {
+                    var btn = e.target.closest('button[data-action]');
+                    if (!btn) return;
+                    var tr = btn.closest('tr');
+                    if (!tr) return;
+                    var orderId = Number(tr.getAttribute('data-order-id'));
+                    if (isNaN(orderId)) return;
+                    var action = btn.getAttribute('data-action');
+                    if (action === 'edit') editOrder(orderId, btn);
+                    else if (action === 'duplicate') duplicateOrder(orderId, btn);
+                    else if (action === 'delete') deleteOrder(orderId);
+                });
+                // チェックボックス変更（選択・請求書・入金）
+                tableBody.addEventListener('change', function(e) {
+                    var el = e.target;
+                    if (el.classList.contains('order-checkbox')) {
+                        updateRowSelection();
+                        return;
+                    }
+                    var action = el.getAttribute('data-action');
+                    if (!action) return;
+                    var tr = el.closest('tr');
+                    if (!tr) return;
+                    var orderId = Number(tr.getAttribute('data-order-id'));
+                    if (isNaN(orderId)) return;
+                    if (action === 'toggle-invoice') toggleInvoice(orderId);
+                    else if (action === 'toggle-payment') togglePayment(orderId);
+                });
+            }
+
+            // === イベントデリゲーション: 顧客マスタモーダル ===
+            var customerBody = document.getElementById('customerMasterBody');
+            if (customerBody) {
+                customerBody.addEventListener('click', function(e) {
+                    var btn = e.target.closest('button[data-action="delete-customer"]');
+                    if (!btn) return;
+                    var idx = parseInt(btn.getAttribute('data-index'));
+                    if (!isNaN(idx)) deleteCustomer(idx);
+                });
+            }
+
+            // === イベントデリゲーション: シンプルマスタモーダル ===
+            var masterList = document.getElementById('simpleMasterList');
+            if (masterList) {
+                masterList.addEventListener('click', function(e) {
+                    var btn = e.target.closest('button[data-action="delete-master-item"]');
+                    if (!btn) return;
+                    var idx = parseInt(btn.getAttribute('data-index'));
+                    if (!isNaN(idx)) deleteSimpleMasterItem(idx);
+                });
+            }
         });
 
         // CSV形式選択モーダル（confirm()の代替 — OKが社内用になる誤解を防ぐ）
@@ -1103,7 +1161,7 @@
 function getColorMapKey(ns) { return `colorMap_${ns}`; }
 function getColorMap(ns) {
     try { return JSON.parse(localStorage.getItem(getColorMapKey(ns))) || {}; }
-    catch { return {}; }
+    catch(_) { return {}; }
 }
 function setColorMap(ns, map) {
     localStorage.setItem(getColorMapKey(ns), JSON.stringify(map));
@@ -1294,7 +1352,7 @@ tbody.innerHTML = monthOrders.map(function(o) {
 
     return '' +
       '<tr data-order-id="' + o.id + '">' +
-        '<td><input type="checkbox" class="checkbox order-checkbox" data-id="' + o.id + '" onchange="updateRowSelection()"></td>' +
+        '<td><input type="checkbox" class="checkbox order-checkbox" data-id="' + o.id + '"></td>' +
         '<td style="white-space: nowrap;">' + formatDate(o.date) + '</td>' +
         '<td>' + escHtml(o.customerName   || '-') + '</td>' +
         '<td>' + escHtml(o.pickupLocation  || '-') + '</td>' +
@@ -1308,12 +1366,12 @@ tbody.innerHTML = monthOrders.map(function(o) {
         '<td>' + driverHtml + '</td>' +
         '<td style="font-size: 0.7rem;">' + escHtml(o.vehicle || '-') + '</td>' +
         '<td style="text-align: center;">' + (o.instructionSheet ? '<span class="badge badge-success">済</span>' : '<span class="badge badge-warning">未</span>') + '</td>' +
-        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.invoiceSent ? 'checked' : '') + ' onchange="toggleInvoice(' + o.id + ')"></td>' +
-        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" ' + (o.paymentReceived ? 'checked' : '') + ' onchange="togglePayment(' + o.id + ')"></td>' +
+        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-invoice" ' + (o.invoiceSent ? 'checked' : '') + '></td>' +
+        '<td style="text-align: center;"><input type="checkbox" class="checkbox-small" data-action="toggle-payment" ' + (o.paymentReceived ? 'checked' : '') + '></td>' +
 '<td style="white-space: nowrap;">' +
-  '<button class="btn btn-sm btn-primary" style="margin-right: 2px;" onclick="editOrder(' + o.id + ', this)">編集</button>' +
-  '<button class="btn btn-sm btn-warning" style="margin-right: 2px;" onclick="duplicateOrder(' + o.id + ', this)">複製</button>' +
-  '<button class="btn btn-sm btn-danger" onclick="deleteOrder(' + o.id + ')">削除</button>' +
+  '<button class="btn btn-sm btn-primary" data-action="edit" style="margin-right: 2px;">編集</button>' +
+  '<button class="btn btn-sm btn-warning" data-action="duplicate" style="margin-right: 2px;">複製</button>' +
+  '<button class="btn btn-sm btn-danger" data-action="delete">削除</button>' +
 '</td>' +
 
       '</tr>';
@@ -1488,7 +1546,7 @@ function updateStatsFromView() {
                     <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.address)}" data-field="address" data-index="${index}" lang="ja" inputmode="text"></td>
                     <td><input type="tel" class="form-input-full numeric-input" value="${escHtml(customer.tel)}" data-field="tel" data-index="${index}" inputmode="tel"></td>
                     <td>
-                        <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${index})">削除</button>
+                        <button class="btn btn-sm btn-danger" data-action="delete-customer" data-index="${index}">削除</button>
                     </td>
                 </tr>
             `).join('');
@@ -1572,7 +1630,7 @@ function updateStatsFromView() {
                         <span class="drag-handle">☰</span>
                         <span class="master-item-content">${escHtml(name)}</span>
                         <div class="master-item-actions">
-                            <button onclick="deleteSimpleMasterItem(${index})">×</button>
+                            <button data-action="delete-master-item" data-index="${index}">×</button>
                         </div>
                     </div>
                 `;
