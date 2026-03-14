@@ -1665,29 +1665,8 @@ textarea {
             
             // クラウドが有効なら最新データを取得して画面を更新
             if (cloudEnabled()) {
-                // マスタデータを読み込む
-                loadMastersFromCloud().then(() => {
-                    // 案件データを読み込む
-                    return cloudFetchOrders();
-                }).then(fetched => {
-                    if (Array.isArray(fetched) && fetched.length > 0) {
-                        orders = fetched.map(row => normalizeOrderRow(row));
-                        // ID欠損の受注に一意なIDを補完
-                        const base = Date.now();
-                        orders.forEach((o, idx) => {
-                            if (o.id === undefined || o.id === null || o.id === '') {
-                                o.id = base + idx;
-                            }
-                        });
-                        saveData();
-                        renderTable();
-                        updateStats();
-                        setupFilters();
-                        updateCloudStatusUI(true);
-                    }
-                }).catch(err => {
+                refreshCloudData({ includeMasters: true, showStatus: true }).catch(err => {
                     console.warn('クラウド読み込み失敗:', err);
-                    updateCloudStatusUI(false);
                 });
             }
             
@@ -1890,6 +1869,8 @@ textarea {
 
         // ====== クラウド（Supabase）関連ユーティリティ ======
         let cloudConfig = { url: '', anonKey: '', enabled: false };
+        let cloudReadSucceeded = false;
+        let cloudRefreshPromise = null;
 
         function normalizeCloudConfig(raw) {
             if (!raw || typeof raw !== 'object') return null;
@@ -2069,7 +2050,7 @@ textarea {
             if (!cloudEnabled()) return;
             try { compactCloudQueue(); } catch(_){}
             const q = getCloudQueue();
-            if (!q.length) { updateCloudStatusUI(true); return; }
+            if (!q.length) { updateCloudStatusUI(cloudReadSucceeded ? true : false); return; }
             updateCloudStatusUI();
             const toProcess = typeof limit === 'number' ? q.slice(0, limit) : q.slice();
             let processed = 0;
@@ -2095,10 +2076,14 @@ textarea {
                 setCloudQueue(remaining);
                 try { showToast(`Cloud同期処理（${processed}件）`); } catch(_){ }
             }
-            if (!getCloudQueue().length) updateCloudStatusUI(true);
+            if (!getCloudQueue().length) updateCloudStatusUI(cloudReadSucceeded ? true : false);
         }
-        window.addEventListener('online', () => { try { flushCloudQueue(); } catch(_){} });
+        window.addEventListener('online', () => {
+            try { flushCloudQueue(); } catch(_){}
+            try { refreshCloudData({ includeMasters: false, showStatus: true }); } catch(_){}
+        });
         setInterval(() => { try { flushCloudQueue(3); } catch(_){} }, 30000);
+        setInterval(() => { try { refreshCloudData({ includeMasters: false, showStatus: false }); } catch(_){} }, 60000);
 
         function updateCloudStatusUI(connected) {
             const el = document.getElementById('cloudStatus');
@@ -2202,10 +2187,67 @@ textarea {
             };
         }
 
-        async function cloudFetchOrders() {
+        async function cloudFetchOrders(opts = {}) {
+            const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 20000;
+            const retries = typeof opts.retries === 'number' ? opts.retries : 3;
             const url = getSupabaseBase() + '/orders?select=*&order=date.asc&order=order_no.asc';
-            const res = await cloudFetchRetry(url, { headers: supabaseHeaders() }, { retries: 2, timeoutMs: 10000 });
+            const res = await cloudFetchRetry(url, { headers: supabaseHeaders(), cache: 'no-store' }, { retries, timeoutMs });
             return await res.json();
+        }
+
+        function applyFetchedOrders(fetched) {
+            if (!Array.isArray(fetched)) return;
+            orders = fetched.map(row => normalizeOrderRow(row));
+            // ID欠損の受注に一意なIDを補完
+            const base = Date.now();
+            orders.forEach((o, idx) => {
+                if (o.id === undefined || o.id === null || o.id === '') {
+                    o.id = base + idx;
+                }
+            });
+            saveData();
+            renderTable();
+            updateStats();
+            setupFilters();
+        }
+
+        async function refreshCloudData(options = {}) {
+            if (!cloudEnabled()) return [];
+            if (cloudRefreshPromise) return cloudRefreshPromise;
+
+            const includeMasters = options.includeMasters !== false;
+            const showStatus = options.showStatus !== false;
+
+            cloudRefreshPromise = (async () => {
+                if (showStatus) updateCloudStatusUI();
+
+                const orderPromise = cloudFetchOrders({ timeoutMs: 20000, retries: 3 });
+                const masterPromise = includeMasters ? loadMastersFromCloud() : Promise.resolve(null);
+                const results = await Promise.allSettled([orderPromise, masterPromise]);
+                const orderResult = results[0];
+                const masterResult = results[1];
+
+                if (masterResult && masterResult.status === 'rejected') {
+                    logWarn('loadMastersFromCloud', masterResult.reason);
+                }
+
+                if (orderResult.status !== 'fulfilled' || !Array.isArray(orderResult.value)) {
+                    cloudReadSucceeded = false;
+                    updateCloudStatusUI(false);
+                    throw (orderResult.status === 'rejected' ? orderResult.reason : new Error('Cloud orders response invalid'));
+                }
+
+                applyFetchedOrders(orderResult.value);
+                cloudReadSucceeded = true;
+                updateCloudStatusUI(true);
+                return orderResult.value;
+            })();
+
+            try {
+                return await cloudRefreshPromise;
+            } finally {
+                cloudRefreshPromise = null;
+            }
         }
 
         async function cloudUpsertOrder(order) {
@@ -2553,18 +2595,8 @@ textarea {
             closeCloudSettings();
             // 設定が有効化されたら即時同期（読み込み）
             if (cloudEnabled()) {
-                cloudFetchOrders().then(fetched => {
-                    if (Array.isArray(fetched)) {
-                        orders = fetched.map(row => normalizeOrderRow(row));
-                        saveData();
-                        renderTable();
-                        updateStats();
-                        setupFilters();
-                        updateCloudStatusUI(true);
-                    }
-                }).catch(err => {
+                refreshCloudData({ includeMasters: true, showStatus: true }).catch(err => {
                     console.warn('クラウド読み込み失敗:', err);
-                    updateCloudStatusUI(false);
                 });
             }
         }
