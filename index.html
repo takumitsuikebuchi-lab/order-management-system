@@ -1628,11 +1628,20 @@ textarea {
 
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
+        const SHARED_CLOUD_CONFIG_PATH = 'cloud-config.json';
 
         // 初期化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            loadCloudConfig();
+            await loadSharedCloudConfig();
+
             // 初回起動チェック：セットアップ未完了ならウィザードへリダイレクト
-            const setupCompleted = localStorage.getItem('setupCompleted');
+            let setupCompleted = localStorage.getItem('setupCompleted');
+            if (!setupCompleted && cloudEnabled()) {
+                localStorage.setItem('setupCompleted', 'true');
+                localStorage.setItem('setupMode', 'cloud');
+                setupCompleted = 'true';
+            }
             if (!setupCompleted) {
                 window.location.href = 'setup-wizard.html';
                 return;
@@ -1642,8 +1651,6 @@ textarea {
             currentMonth = new Date();
             currentMonth.setDate(1); // 月の1日に設定
             
-            // クラウド設定読み込み＆ステータス表示
-            loadCloudConfig();
             updateCloudStatusUI();
 
             loadData();
@@ -1884,14 +1891,43 @@ textarea {
         // ====== クラウド（Supabase）関連ユーティリティ ======
         let cloudConfig = { url: '', anonKey: '', enabled: false };
 
+        function normalizeCloudConfig(raw) {
+            if (!raw || typeof raw !== 'object') return null;
+            const url = String(raw.url || '').trim();
+            const anonKey = String(raw.anonKey || '').trim();
+            const enabled = raw.enabled !== false;
+            if (!url || !anonKey) return null;
+            return { url, anonKey, enabled };
+        }
+
         function loadCloudConfig() {
             try {
                 const saved = localStorage.getItem('cloudConfig');
                 if (saved) {
-                    cloudConfig = JSON.parse(saved) || cloudConfig;
+                    const parsed = normalizeCloudConfig(JSON.parse(saved));
+                    if (parsed) cloudConfig = parsed;
                 }
             } catch(e) { /* noop */ }
             return cloudConfig;
+        }
+
+        async function loadSharedCloudConfig() {
+            try {
+                const res = await fetch(`${SHARED_CLOUD_CONFIG_PATH}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!res.ok) return null;
+                const parsed = normalizeCloudConfig(await res.json());
+                if (!parsed) return null;
+                const changed = cloudConfig.url !== parsed.url ||
+                    cloudConfig.anonKey !== parsed.anonKey ||
+                    cloudConfig.enabled !== parsed.enabled;
+                cloudConfig = parsed;
+                if (changed) {
+                    localStorage.setItem('cloudConfig', JSON.stringify(cloudConfig));
+                }
+                return cloudConfig;
+            } catch(e) {
+                return null;
+            }
         }
 
         function saveCloudConfig(cfg) {

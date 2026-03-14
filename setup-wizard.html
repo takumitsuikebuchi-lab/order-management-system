@@ -439,6 +439,37 @@
         let selectedOption = '';
 
         const totalSteps = 4; // Step 5を削除したため総ステップ数を4に変更
+        const SHARED_CLOUD_CONFIG_PATH = 'cloud-config.json';
+
+        function normalizeCloudConfig(raw) {
+            if (!raw || typeof raw !== 'object') return null;
+            const url = String(raw.url || '').trim();
+            const anonKey = String(raw.anonKey || '').trim();
+            const enabled = raw.enabled !== false;
+            if (!url || !anonKey) return null;
+            return { url, anonKey, enabled };
+        }
+
+        async function bootstrapSharedCloudSetup() {
+            if (window.location.search.indexOf('manualSetup=1') !== -1) return false;
+            try {
+                const res = await fetch(`${SHARED_CLOUD_CONFIG_PATH}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!res.ok) return false;
+                const config = normalizeCloudConfig(await res.json());
+                if (!config) return false;
+                localStorage.setItem('cloudConfig', JSON.stringify(config));
+                localStorage.setItem('setupCompleted', 'true');
+                localStorage.setItem('setupMode', 'cloud');
+                window.location.href = 'index.html';
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            bootstrapSharedCloudSetup();
+        });
 
         function showStep(stepNum) {
             document.querySelectorAll('.step').forEach(step => {
@@ -585,4 +616,3 @@
     </script>
 </body>
 </html>
-
