@@ -19,14 +19,35 @@
    https://takumitsuikebuchi-lab.github.io/order-management-system/
    ```
 
-2. 画面上の「**クラウド設定（Supabase）**」ボタンをクリック
+2. 数秒待って右上が `接続: Cloud（同期完了）` になることを確認
+3. 受注一覧やマスター情報が表示されれば利用開始できる
 
-3. 以下を入力して保存
-   - **Project URL**: `https://lcckvqnwompusovmopxx.supabase.co`
-   - **Anon Key**: SupabaseダッシュボードのLegacy anon keyを貼り付け
-   - **クラウド有効**: ✅ チェックを入れる
+### 補足
 
-4. 「接続: Cloud」と表示されればOK。データが自動で読み込まれる
+- 現在は `cloud-config.json` の共通設定を全ブラウザが自動読込します
+- 通常運用では、画面の「クラウド設定（Supabase）」を編集する必要はありません
+- 新しいPCや新しいブラウザでも、同じURLを開けば同じクラウドデータが見える前提です
+
+---
+
+## クラウド設定を変更する場所
+
+通常は [`cloud-config.json`](cloud-config.json) を編集します。
+
+- **変更対象**: Project URL / anon key / enabled
+- **反映方法**: ファイル更新 → commit → push → GitHub Pages反映待ち → ブラウザをハードリロード
+- **通常運用の画面上設定**: 共通設定が有効な間はロックされます
+
+### 画面から一時的に変更したい場合
+
+緊急保守時だけ、以下で手動変更できます。
+
+```text
+https://takumitsuikebuchi-lab.github.io/order-management-system/index.html?manualCloudConfig=1
+```
+
+- これは診断・一時復旧用です
+- 最終的な正しい設定は必ず `cloud-config.json` に戻してください
 
 ---
 
@@ -137,7 +158,15 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 - Anon Keyが正しいか確認（`eyJ...`で始まるLegacy形式を使う）
 - `sb_publishable_...`で始まるキーは**非対応**
 - Project URLの末尾に `/` が入っていないか確認
-- ページをリロードすると自然に解消することがある
+- `cloud-config.json` が意図したSupabaseプロジェクトを指しているか確認
+- ハードリロードすると解消することがある
+
+### PCやブラウザごとにデータが違う
+- まず右上表示が `接続: Cloud（同期完了）` か確認
+- `接続: Cloud（エラー）` や `接続: ローカル` の場合は、通信または設定を疑う
+- `cloud-config.json` が正しいか確認
+- そのブラウザで過去に `?manualCloudConfig=1` を使っていないか確認
+- ハードリロード後も差が出る場合は、AIツールに `SETUP.md` と `AGENTS.md` を読ませて対応する
 
 ### データが0件になった
 - クラウドを有効にするとSupabase（空）のデータが表示される
@@ -149,6 +178,11 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 - localStorageはURLのドメインごとに独立している
 - 旧URLでCSV出力 → 新URLでCSV取込 でデータを移行できる
 
+### 同じ受注を複数端末で開いて保存した
+- 現在は軽量な競合検知が入っている
+- 別端末で先に更新されていた場合、保存時に警告して止まる
+- 警告が出たら、いったん閉じて最新の受注を開き直す
+
 ### Supabaseの無料プランについて
 - 7日間アクセスがないと自動停止する
 - 毎日使っていれば停止しない
@@ -158,7 +192,20 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 
 ## セキュリティについて
 
-- Anon KeyはブラウザのlocalStorageに保存される（コード内には含まれない）
+- Anon Keyは共通設定 `cloud-config.json` とブラウザのlocalStorageに保持される
 - このシステムは社内ネットワーク内での使用を想定している
 - Anon Keyを他人に共有しない
 - 年1回程度でAnon Keyのローテーションを推奨
+
+---
+
+## AIツールに相談するときの伝え方
+
+Codex / Claude / Cursor などに依頼する場合は、次の4点を伝えると早いです。
+
+1. 本番URL: `https://takumitsuikebuchi-lab.github.io/order-management-system/`
+2. 共通クラウド設定は `cloud-config.json` が正本
+3. 通常運用ではクラウド設定UIはロックされている
+4. まず `AGENTS.md` と `SETUP.md` を読んでから対応してほしい
+
+これで、運用方式の誤解による再設定ミスをかなり防げます。
