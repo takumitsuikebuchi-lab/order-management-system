@@ -6,6 +6,8 @@
 - Default branch: `main`
 - Runtime is a static site served from GitHub Pages.
 - Shared cloud connection settings are stored in `cloud-config.json`.
+- Current shared Supabase Project ID: `xrmczawpwpctbpuebddi`
+- Current shared Supabase URL: `https://xrmczawpwpctbpuebddi.supabase.co`
 - Browsers still keep `localStorage`, but day-to-day operation is designed to converge to the shared Supabase data.
 
 ## Important invariants

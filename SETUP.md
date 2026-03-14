@@ -5,10 +5,10 @@
 | 項目 | 内容 |
 |---|---|
 | システムURL | `https://takumitsuikebuchi-lab.github.io/order-management-system/` |
-| Supabaseプロジェクト | `kyoushinyusou_jutyuukanri` |
-| Project ID | `lcckvqnwompusovmopxx` |
-| Project URL | `https://lcckvqnwompusovmopxx.supabase.co` |
-| Anon Key | Supabase → Project Settings → API Keys → Legacy anon キー（`eyJ...`で始まる） |
+| Supabaseプロジェクト | 本番共有プロジェクト |
+| Project ID | `xrmczawpwpctbpuebddi` |
+| Project URL | `https://xrmczawpwpctbpuebddi.supabase.co` |
+| Anon Key | `cloud-config.json` に保存されている Legacy anon キー |
 
 ---
 
@@ -72,11 +72,11 @@ Supabaseの無料プランは**7日間アクセスがないと自動停止**し�
 
 ローカル（localStorage）のデータをSupabaseに移す手順。
 
-1. クラウド設定を入力・保存する（データが0件になるが消えていない）
-2. 「**CSV出力**」で全データをエクスポート（先にやっておくと安全）
+1. 本番URLを開き、右上が `接続: Cloud（同期完了）` になることを確認する
+2. 「**CSV出力**」で全データをエクスポートする
 3. 「**CSV取込**」で同じCSVを読み込む
-4. 各マスタ画面（顧客・積荷・荷姿・単位・ドライバー・車両）を開いて「保存」
-5. SupabaseのTable Editorでデータが入ったことを確認
+4. 各マスタ画面（顧客・積荷・荷姿・単位・ドライバー・車両）を開いて「保存」する
+5. SupabaseのTable Editorでデータが入ったことを確認する
 
 ---
 

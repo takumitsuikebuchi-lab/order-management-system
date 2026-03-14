@@ -2,241 +2,61 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>A社 Supabase切替 手順書（方式A）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A社 切替手順メモ</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; line-height: 1.65; margin: 24px; color: #222; }
-    h1, h2, h3 { margin-top: 1.2em; }
-    code, kbd, pre { font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    pre { background: #f6f8fa; padding: 12px 16px; border-radius: 8px; overflow: auto; }
-    .toc { background: #f6f8fa; padding: 12px 16px; border-radius: 8px; }
-    .callout { background: #fffbe6; border: 1px solid #ffe58f; padding: 10px 12px; border-radius: 8px; }
-    .ok { color: #0a7; font-weight: 600; }
-    .ng { color: #d33; font-weight: 600; }
-    ul { margin: 0.5em 0 0.8em; }
-    li { margin: 0.2em 0; }
-    a { color: #0969da; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    .small { font-size: 90%; color: #555; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.7; margin: 0; background: #f7f8fb; color: #222; }
+    main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
+    .card { background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 8px 24px rgba(0,0,0,0.07); margin-bottom: 18px; }
+    .notice { background: #fff6dc; border-left: 4px solid #d8a331; padding: 12px 14px; border-radius: 6px; }
+    code { background: #eef3fb; padding: 0 6px; border-radius: 4px; }
+    ul, ol { padding-left: 1.2rem; }
   </style>
 </head>
 <body>
-  <h1>Supabase切替手順（方式A） — A社</h1>
-  <p>目的: A社のローカル運用からSupabase運用へ切替し、複数PCから同一データベースを共同運用できる状態にします。</p>
+  <main>
+    <section class="card">
+      <h1>A社 切替手順メモ</h1>
+      <p>このファイルは、旧来の「各PCで個別に Supabase を設定する」方式A資料を、現行運用に合わせて整理したメモです。</p>
+      <div class="notice">
+        現在の標準運用では、各PCでクラウド設定を手入力しません。<code>cloud-config.json</code> を更新して GitHub Pages に反映するのが正規手順です。
+      </div>
+    </section>
 
-  <div class="toc">
-    <strong>目次</strong>
-    <ul>
-      <li><a href="#prep">準備物・前提</a></li>
-      <li><a href="#step0">Step 0: 現状確認と切替タイミング</a></li>
-      <li><a href="#step1">Step 1: Supabaseプロジェクト作成</a></li>
-      <li><a href="#step2">Step 2: ordersテーブル作成とRLS設定</a></li>
-      <li><a href="#step3">Step 3: CORS（Allowed Origins）設定</a></li>
-      <li><a href="#step4">Step 4: 初期CSV（種データ）投入</a></li>
-      <li><a href="#step5">Step 5: A社の既存ローカルデータ移行</a></li>
-      <li><a href="#step6">Step 6: アプリのクラウド接続へ切替（現場PC）</a></li>
-      <li><a href="#step7">Step 7: 複数PC運用開始</a></li>
-      <li><a href="#verify">動作確認チェックリスト</a></li>
-      <li><a href="#trouble">トラブルシューティング</a></li>
-      <li><a href="#appendix">付録（SQL/CSV/RESTアップサート）</a></li>
-    </ul>
-  </div>
-
-  <h2 id="prep">準備物・前提</h2>
-  <ul>
-    <li>Supabaseアカウント（A社専用プロジェクトを作成）</li>
-    <li>控える情報: <code>Project URL</code>、<code>anon key</code></li>
-    <li>A社の既存ローカルCSV（例: <code>CSV保存/受注明細_2025年10月.csv</code>）</li>
-    <li>このPCにあるフォルダ: <code>/Users/takumitsu/Desktop/order-system 3/</code></li>
-  </ul>
-  <div class="callout small">方式Aの前提: 会社ごとにSupabaseプロジェクトを分け、アプリの「☁️ クラウド設定（Supabase）」へ各社の<code>Project URL</code>/<code>anon key</code>を入れて運用します。</div>
-
-  <h2 id="step0">Step 0: 現状確認と切替タイミング</h2>
-  <ul>
-    <li>現場（A社）での入力を短時間停止できる時間帯を確保（5〜15分程度）</li>
-    <li>この間に「既存ローカルCSVの出力」「Supabaseへの投入」「アプリ設定切替」を行います</li>
-    <li>停止前に未保存データがないことを確認（ローカルは自動保存だが念のため最新に更新）</li>
-  </ul>
-
-  <h2 id="step1">Step 1: Supabaseプロジェクト作成</h2>
-  <ol>
-    <li>Supabase Studioにログイン → 「New project」でA社専用プロジェクトを作成</li>
-    <li>作成完了後、<strong>Project Settings → API</strong> から <code>Project URL</code> と <code>anon key</code> を控える</li>
-    <li>リージョンは日本向けなら <span class="small">AP-Northeast（任意）</span></li>
-  </ol>
-
-  <h2 id="step2">Step 2: ordersテーブル作成とRLS設定</h2>
-  <ol>
-    <li>左メニュー「SQL Editor」を開く → 新規クエリ</li>
-    <li>下記SQLを貼り付けて「Run」実行（テーブル作成・ユニーク設定・RLS許可）</li>
-  </ol>
-  <pre><code>-- orders テーブル（方式A用の簡易RLS: anonロールにCRUDを許可）
-create table if not exists public.orders (
-  id bigserial primary key,
-  order_no text not null,
-  date date not null,
-  customer_name text not null,
-  pickup_location text,
-  pickup_address text,
-  delivery_location text,
-  delivery_address text,
-  delivery_tel text,
-  cargo text not null,
-  quantity numeric,
-  unit text,
-  packaging text,
-  unit_price numeric,
-  amount_net numeric,
-  amount_gross numeric,
-  driver text,
-  vehicle text,
-  instructions text,
-  instruction_sheet boolean default false,
-  invoice_sent boolean default false,
-  payment_received boolean default false,
-  order_completed boolean default false,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
--- 受注番号のユニーク制約（アップサートの衝突判定用）
-create unique index if not exists orders_order_no_key
-  on public.orders(order_no);
-
--- RLSを有効化し、anonロールに簡易許可（方式Aの前提: 内部ネットのみ）
-alter table public.orders enable row level security;
-
-drop policy if exists anon_select on public.orders;
-drop policy if exists anon_insert on public.orders;
-drop policy if exists anon_update on public.orders;
-drop policy if exists anon_delete on public.orders;
-
-create policy anon_select on public.orders
-  for select to anon using (true);
-create policy anon_insert on public.orders
-  for insert to anon with check (true);
-create policy anon_update on public.orders
-  for update to anon using (true) with check (true);
-create policy anon_delete on public.orders
-  for delete to anon using (true);
-</code></pre>
-  <div class="callout small">注意: 方式Aは<code>anon key</code>でCRUDを許可する簡易運用です。社内ネットへの限定、鍵の厳重管理、定期的な鍵ローテーションを推奨。</div>
-
-  <h2 id="step3">Step 3: CORS（Allowed Origins）設定</h2>
-  <ol>
-    <li>Supabase Studio → <strong>Project Settings → API</strong> → <strong>Allowed origins</strong></li>
-    <li>以下を追加（A社の運用形態に応じて）
-      <ul>
-        <li><code>http://localhost:8000</code>（各PCでローカル起動する場合）</li>
-        <li><code>http://&lt;PCのIP&gt;:8000</code>（他PCからアクセスする場合）</li>
-      </ul>
-    </li>
-    <li>保存（Save） → 変更が反映されるまで数十秒待機</li>
-  </ol>
-
-  <h2 id="step4">Step 4: 初期CSV（種データ）投入</h2>
-  <p>サンプル行を入れることで、アプリの動作評価がしやすくなります。</p>
-  <ul>
-    <li>CSVファイルの場所: <code>/Users/takumitsu/Desktop/order-system 3/CSV保存/orders_seed.csv</code></li>
-    <li>投入方法A（GUI）:
+    <section class="card">
+      <h2>現行の切替手順</h2>
       <ol>
-        <li>左メニュー「Table editor」→ <strong>orders</strong> を選択</li>
-        <li>右上「Import data」→ ファイル選択で上記CSVを指定</li>
-        <li>ヘッダーがカラムと一致していることを確認→「Import」</li>
+        <li>切替先の Supabase プロジェクトを用意する</li>
+        <li><code>cloud-config.json</code> の URL / anon key / enabled を更新する</li>
+        <li><code>main</code> に commit / push する</li>
+        <li>GitHub Pages 反映後、各端末でハードリロードする</li>
+        <li>右上が <code>接続: Cloud（同期完了）</code> になることを確認する</li>
       </ol>
-    </li>
-    <li>投入方法B（RESTアップサート）: 重複のあるデータを安全に更新したい場合
-      <pre><code>curl -X POST '&lt;PROJECT_URL&gt;/rest/v1/orders?on_conflict=order_no' \
-  -H 'apikey: &lt;ANON_KEY&gt;' \
-  -H 'Authorization: Bearer &lt;ANON_KEY&gt;' \
-  -H 'Content-Type: text/csv' \
-  -H 'Prefer: return=representation, resolution=merge-duplicates' \
-  --data-binary '@/Users/takumitsu/Desktop/order-system 3/CSV保存/orders_seed.csv'
-</code></pre>
-    </li>
-  </ul>
+    </section>
 
-  <h2 id="step5">Step 5: A社の既存ローカルデータ移行</h2>
-  <ol>
-    <li>A社の運用PCで、アプリの「📊 CSV出力」で全件または対象月を出力（例: <code>受注明細_2025年10月.csv</code>）</li>
-    <li>ヘッダーを <strong>orders</strong> 用にマッピング（順不同可）
+    <section class="card">
+      <h2>データ移行が必要な場合</h2>
       <ul>
-        <li><code>order_no,date,customer_name,pickup_location,pickup_address,delivery_location,delivery_address,delivery_tel,cargo,quantity,unit,packaging,unit_price,amount_net,amount_gross,driver,vehicle,instructions,instruction_sheet,invoice_sent,payment_received,order_completed</code></li>
-        <li>ブール値は <code>true/false</code>、日付は <code>YYYY-MM-DD</code></li>
+        <li>先に CSV バックアップを取得する</li>
+        <li>新しい Supabase 側へ受注データとマスターを投入する</li>
+        <li>その後で <code>cloud-config.json</code> を切り替える</li>
       </ul>
-    </li>
-    <li>投入方法の選択:
+    </section>
+
+    <section class="card">
+      <h2>やってはいけないこと</h2>
       <ul>
-        <li>GUIインポート（重複が少ない場合）</li>
-        <li>RESTアップサート（<code>on_conflict=order_no</code> で重複更新、推奨）
-          <pre><code>curl -X POST '&lt;PROJECT_URL&gt;/rest/v1/orders?on_conflict=order_no' \
-  -H 'apikey: &lt;ANON_KEY&gt;' \
-  -H 'Authorization: Bearer &lt;ANON_KEY&gt;' \
-  -H 'Content-Type: text/csv' \
-  -H 'Prefer: return=representation, resolution=merge-duplicates' \
-  --data-binary '@/Users/takumitsu/Desktop/order-system 3/CSV保存/受注明細_2025年10月.csv'
-</code></pre>
-        </li>
+        <li>通常URLの画面から各PCごとにバラバラのクラウド設定を保存する</li>
+        <li>本番設定を変更したのに <code>cloud-config.json</code> を更新しない</li>
+        <li>切替後の確認をせず、そのまま業務を再開する</li>
       </ul>
-    </li>
-  </ol>
+    </section>
 
-  <h2 id="step6">Step 6: アプリのクラウド接続へ切替（現場PC）</h2>
-  <ol>
-    <li>現場PCで <code>受注管理システム.html</code> を開く（例: <code>http://localhost:8000/受注管理システム.html</code>）</li>
-    <li>右上または設定メニューから「☁️ クラウド設定（Supabase）」を開く</li>
-    <li><strong>入力:</strong> <code>Project URL</code> と <code>anon key</code> を貼付</li>
-    <li><strong>チェック:</strong> 「クラウド接続を有効化」にチェック → 「保存」</li>
-    <li>右上ステータスが <span class="ok">「接続: Cloud」</span> に変わることを確認（ネット不調時は <span class="ng">「Cloud更新に失敗（キューに追加）」</span> とトースト表示＋「キュー:件数」併記）</li>
-  </ol>
-
-  <h2 id="step7">Step 7: 複数PC運用開始</h2>
-  <ul>
-    <li>追加PCでも同様に「☁️ クラウド設定（Supabase）」へ A社の <code>Project URL</code>/<code>anon key</code> を設定 → 有効化 → 保存</li>
-    <li>全PCが同じ Supabase <code>orders</code> を共有（同時運用可能）</li>
-    <li>編集衝突回避のため、同じ受注の同時編集は避ける運用ルール（担当分担・時間帯調整）を推奨</li>
-  </ul>
-
-  <h2 id="verify">動作確認チェックリスト</h2>
-  <ul>
-    <li>「＋ 新規受注」で1件登録 → Supabase Table Editorで反映確認</li>
-    <li>行の「請求書」「入金」チェックの切替 → 反映確認</li>
-    <li>「顧客検索」「ドライバー絞り込み」が正常に働く</li>
-    <li>オフライン時はキューに溜まり、復帰後に自動同期して「Cloud同期完了」トーストが出る</li>
-    <li>複数PCで同じデータが見える（ブラウザリロードで確認）</li>
-  </ul>
-
-  <h2 id="trouble">トラブルシューティング</h2>
-  <ul>
-    <li><strong>403/401:</strong> <code>Project URL</code>/<code>anon key</code> の誤り／RLS未設定／CORS未許可 → API設定見直し</li>
-    <li><strong>409（重複）:</strong> <code>order_no</code> 重複 → RESTアップサートで更新（<code>on_conflict=order_no</code>）</li>
-    <li><strong>429/5xx:</strong> ネット不安定やレート → アプリのキューとリトライで後追い同期、安定後に再実行</li>
-    <li><strong>インポート失敗:</strong> ヘッダー不一致／型不正 → ヘッダーと型（<code>true/false</code>, <code>YYYY-MM-DD</code>, 数値）を修正</li>
-  </ul>
-
-  <h2 id="appendix">付録（SQL/CSV/RESTアップサート）</h2>
-  <h3>CSVヘッダー（orders用）</h3>
-  <pre><code>order_no,date,customer_name,pickup_location,pickup_address,delivery_location,delivery_address,delivery_tel,cargo,quantity,unit,packaging,unit_price,amount_net,amount_gross,driver,vehicle,instructions,instruction_sheet,invoice_sent,payment_received,order_completed
-</code></pre>
-  <div class="small">CSV例: <code>/Users/takumitsu/Desktop/order-system 3/CSV保存/orders_seed.csv</code></div>
-
-  <h3>RESTアップサート（日次・月次CSV投入に利用）</h3>
-  <pre><code>curl -X POST '&lt;PROJECT_URL&gt;/rest/v1/orders?on_conflict=order_no' \
-  -H 'apikey: &lt;ANON_KEY&gt;' \
-  -H 'Authorization: Bearer &lt;ANON_KEY&gt;' \
-  -H 'Content-Type: text/csv' \
-  -H 'Prefer: return=representation, resolution=merge-duplicates' \
-  --data-binary '@/絶対パス/受注明細_YYYY年MM月.csv'
-</code></pre>
-
-  <h3>運用上の推奨</h3>
-  <ul>
-    <li><strong>鍵管理:</strong> <code>anon key</code> は社内限定で共有、年1回程度でローテーション</li>
-    <li><strong>番号設計:</strong> <code>order_no</code> の一意性を確保（例: <code>RYYMMDD-連番</code>）</li>
-    <li><strong>バックアップ:</strong> Supabaseの自動バックアップ＋月次CSVエクスポートを実施</li>
-  </ul>
-
-  <hr />
-  <p class="small">この手順書は A社向け方式Aの現場作業に最適化されています。印刷する場合はブラウザの印刷からPDF保存してください。</p>
+    <section class="card">
+      <h2>補足</h2>
+      <p>緊急診断時だけ <code>?manualCloudConfig=1</code> を使って一時的に手動変更できますが、最終的な正本は必ず <code>cloud-config.json</code> に合わせてください。</p>
+      <p>詳細は <code>SETUP.md</code> と <code>AGENTS.md</code> を参照してください。</p>
+    </section>
+  </main>
 </body>
 </html>
