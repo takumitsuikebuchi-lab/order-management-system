@@ -1032,6 +1032,21 @@ textarea {
     </style>
 </head>
 <body>
+    <!-- ブラウザ互換性チェック -->
+    <script>
+    (function() {
+        var ok = true;
+        try {
+            // Promise / fetch（IE非対応）
+            if (typeof Promise === 'undefined' || typeof fetch === 'undefined') ok = false;
+            // Arrow function（IE非対応）
+            eval('var _t = () => {}');
+        } catch(e) { ok = false; }
+        if (!ok) {
+            document.write('<div style="position:fixed;top:0;left:0;width:100%;background:#ef4444;color:#fff;padding:16px;text-align:center;z-index:99999;font-size:15px;font-weight:bold;">このブラウザには対応していません。<b>Microsoft Edge</b>・<b>Google Chrome</b>・<b>Safari</b> の最新版でお開きください。</div>');
+        }
+    })();
+    </script>
     <!-- ヘッダー -->
     <div class="header">
         <div class="header-content">
