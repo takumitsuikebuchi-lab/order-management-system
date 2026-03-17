@@ -1,0 +1,47 @@
+name: Guard And Sync
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify shared config exists
+        run: test -f cloud-config.json
+
+      - name: Verify shared config shape
+        run: |
+          node -e "const cfg=require('./cloud-config.json'); if (!cfg.url || !cfg.anonKey || typeof cfg.enabled !== 'boolean') { throw new Error('cloud-config.json is invalid'); }"
+
+      - name: Verify index.html script syntax
+        run: |
+          node -e "const fs=require('fs'); const vm=require('vm'); const html=fs.readFileSync('index.html','utf8'); const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]; if(!scripts.length) throw new Error('script not found'); scripts.forEach((m,i)=>new vm.Script(m[1],{filename:'script-'+i+'.js'}));"
+
+  sync-master:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Push main to master
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git push origin HEAD:master
