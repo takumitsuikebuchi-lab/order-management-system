@@ -9,10 +9,12 @@
 - Current shared Supabase Project ID: `xrmczawpwpctbpuebddi`
 - Current shared Supabase URL: `https://xrmczawpwpctbpuebddi.supabase.co`
 - Browsers still keep `localStorage`, but day-to-day operation is designed to converge to the shared Supabase data.
+- `index.html` also contains an embedded fallback cloud config so new browsers do not fail open if `cloud-config.json` is accidentally missing.
 
 ## Important invariants
 
 - `cloud-config.json` is the source of truth for Supabase URL / anon key / enabled flag.
+- The embedded fallback in `index.html` is only a safety net; if `cloud-config.json` changes, update the embedded fallback too.
 - In normal operation, the in-app cloud settings modal is locked when shared config is active.
 - Temporary manual override is only for maintenance and requires `?manualCloudConfig=1`.
 - Order data, customer master, and simple masters are expected to sync through Supabase across PCs and browsers.
@@ -62,3 +64,4 @@
 - Supabase writes are guarded by retry / queue logic.
 - Shared config was added to eliminate browser-by-browser drift.
 - Cloud settings UI was intentionally restricted to reduce accidental local-only operation.
+- `.github/workflows/guard-and-sync.yml` verifies `cloud-config.json` and mirrors `main` to `master` on push.

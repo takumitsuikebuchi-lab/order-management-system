@@ -1647,6 +1647,12 @@ textarea {
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
         const SHARED_CLOUD_CONFIG_PATH = 'cloud-config.json';
+        // cloud-config.json が消えても新しい端末で起動できるよう、最終確定値を埋め込みで保持
+        const EMBEDDED_SHARED_CLOUD_CONFIG = {
+            url: 'https://xrmczawpwpctbpuebddi.supabase.co',
+            anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhybWN6YXdwd3BjdGJwdWViZGRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4ODQ1MDAsImV4cCI6MjA3NjQ2MDUwMH0.KPa6RVDPbC6ovZ47Y-ZZ4Sg4OfHaEz3DcNKGN_YiG8k',
+            enabled: true
+        };
 
         // 初期化
         document.addEventListener('DOMContentLoaded', async function() {
@@ -1936,17 +1942,25 @@ textarea {
         }
 
         async function loadSharedCloudConfig() {
+            let parsed = null;
+            let source = 'embedded';
             try {
                 const res = await fetch(`${SHARED_CLOUD_CONFIG_PATH}?t=${Date.now()}`, { cache: 'no-store' });
-                if (!res.ok) {
-                    sharedCloudConfigLocked = false;
-                    return null;
+                if (res.ok) {
+                    parsed = normalizeCloudConfig(await res.json());
+                    if (parsed) source = 'cloud-config.json';
                 }
-                const parsed = normalizeCloudConfig(await res.json());
-                if (!parsed) {
-                    sharedCloudConfigLocked = false;
-                    return null;
-                }
+            } catch(e) {
+                /* noop */
+            }
+            if (!parsed) {
+                parsed = normalizeCloudConfig(EMBEDDED_SHARED_CLOUD_CONFIG);
+            }
+            if (!parsed) {
+                sharedCloudConfigLocked = false;
+                return null;
+            }
+            try {
                 const changed = cloudConfig.url !== parsed.url ||
                     cloudConfig.anonKey !== parsed.anonKey ||
                     cloudConfig.enabled !== parsed.enabled;
@@ -1955,6 +1969,7 @@ textarea {
                 if (changed) {
                     localStorage.setItem('cloudConfig', JSON.stringify(cloudConfig));
                 }
+                logInfo('loadSharedCloudConfig', 'Loaded shared config from', source);
                 return cloudConfig;
             } catch(e) {
                 sharedCloudConfigLocked = false;
