@@ -9,6 +9,15 @@
 | Project ID | `xrmczawpwpctbpuebddi` |
 | Project URL | `https://xrmczawpwpctbpuebddi.supabase.co` |
 | Anon Key | `cloud-config.json` に保存されている Legacy anon キー |
+| デフォルトブランチ | `main` |
+| 補助ブランチ | `master`（互換維持のため自動同期） |
+
+### 直近の整理（2026-03-17）
+
+- GitHub のデフォルトブランチを `master` から `main` に変更
+- `main` に push した内容を `master` に自動同期するワークフローを追加
+- `index.html` に共有クラウド設定の埋め込みフォールバックを追加
+- これにより、新しい端末やブラウザでも起動失敗しにくい構成になっています
 
 ---
 

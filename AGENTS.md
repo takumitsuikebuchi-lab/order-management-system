@@ -11,6 +11,15 @@
 - Browsers still keep `localStorage`, but day-to-day operation is designed to converge to the shared Supabase data.
 - `index.html` also contains an embedded fallback cloud config so new browsers do not fail open if `cloud-config.json` is accidentally missing.
 
+## Recent updates
+
+### 2026-03-17
+
+- GitHub default branch was changed to `main`.
+- `main` and `master` were manually resynced to the same commit after an accidental revert.
+- `.github/workflows/guard-and-sync.yml` was added so pushes to `main` verify the app and mirror the result to `master`.
+- `index.html` keeps the shared cloud config loader and now also has an embedded fallback for safer startup if `cloud-config.json` is missing.
+
 ## Important invariants
 
 - `cloud-config.json` is the source of truth for Supabase URL / anon key / enabled flag.
