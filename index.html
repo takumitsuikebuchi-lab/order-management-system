@@ -1037,7 +1037,9 @@ textarea {
     (function() {
         var ok = true;
         try {
+            // Promise / fetch（IE非対応）
             if (typeof Promise === 'undefined' || typeof fetch === 'undefined') ok = false;
+            // Arrow function（IE非対応）
             eval('var _t = () => {}');
         } catch(e) { ok = false; }
         if (!ok) {
@@ -1290,6 +1292,9 @@ textarea {
                 <button class="close-button" onclick="closeCloudSettings()">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="note" id="cloudConfigLockNotice" style="display: none; margin-bottom: 12px; padding: 10px 12px; border-radius: 4px; border: 1px solid #f0cf85; background: #fff4db; color: #8a5a00; font-size: 0.9rem;">
+                    共有クラウド設定が適用されています。通常運用ではこの画面から変更できません。保守時のみ <code>?manualCloudConfig=1</code> を付けて開いてください。
+                </div>
                 <div class="form-group">
                     <label class="form-label">Project URL</label>
                     <input type="text" class="form-input-full" id="cloudProjectUrl" placeholder="https://xxxx.supabase.co">
@@ -1309,7 +1314,7 @@ textarea {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCloudSettings()">キャンセル</button>
-                <button class="btn btn-primary" onclick="saveCloudSettings()">保存</button>
+                <button class="btn btn-primary" id="cloudSettingsSaveButton" onclick="saveCloudSettings()">保存</button>
             </div>
         </div>
     </div>
@@ -1641,11 +1646,20 @@ textarea {
 
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
         let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
+        const SHARED_CLOUD_CONFIG_PATH = 'cloud-config.json';
 
         // 初期化
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            loadCloudConfig();
+            await loadSharedCloudConfig();
+
             // 初回起動チェック：セットアップ未完了ならウィザードへリダイレクト
-            const setupCompleted = localStorage.getItem('setupCompleted');
+            let setupCompleted = localStorage.getItem('setupCompleted');
+            if (!setupCompleted && cloudEnabled()) {
+                localStorage.setItem('setupCompleted', 'true');
+                localStorage.setItem('setupMode', 'cloud');
+                setupCompleted = 'true';
+            }
             if (!setupCompleted) {
                 window.location.href = 'setup-wizard.html';
                 return;
@@ -1655,8 +1669,6 @@ textarea {
             currentMonth = new Date();
             currentMonth.setDate(1); // 月の1日に設定
             
-            // クラウド設定読み込み＆ステータス表示
-            loadCloudConfig();
             updateCloudStatusUI();
 
             loadData();
@@ -1671,29 +1683,8 @@ textarea {
             
             // クラウドが有効なら最新データを取得して画面を更新
             if (cloudEnabled()) {
-                // マスタデータを読み込む
-                loadMastersFromCloud().then(() => {
-                    // 案件データを読み込む
-                    return cloudFetchOrders();
-                }).then(fetched => {
-                    if (Array.isArray(fetched) && fetched.length > 0) {
-                        orders = fetched.map(row => normalizeOrderRow(row));
-                        // ID欠損の受注に一意なIDを補完
-                        const base = Date.now();
-                        orders.forEach((o, idx) => {
-                            if (o.id === undefined || o.id === null || o.id === '') {
-                                o.id = base + idx;
-                            }
-                        });
-                        saveData();
-                        renderTable();
-                        updateStats();
-                        setupFilters();
-                        updateCloudStatusUI(true);
-                    }
-                }).catch(err => {
+                refreshCloudData({ includeMasters: true, showStatus: true }).catch(err => {
                     console.warn('クラウド読み込み失敗:', err);
-                    updateCloudStatusUI(false);
                 });
             }
             
@@ -1896,15 +1887,79 @@ textarea {
 
         // ====== クラウド（Supabase）関連ユーティリティ ======
         let cloudConfig = { url: '', anonKey: '', enabled: false };
+        let sharedCloudConfigLocked = false;
+        let cloudReadSucceeded = false;
+        let cloudRefreshPromise = null;
+        let editSessionBaseline = null;
+
+        function normalizeCloudConfig(raw) {
+            if (!raw || typeof raw !== 'object') return null;
+            const url = String(raw.url || '').trim();
+            const anonKey = String(raw.anonKey || '').trim();
+            const enabled = raw.enabled !== false;
+            if (!url || !anonKey) return null;
+            return { url, anonKey, enabled };
+        }
 
         function loadCloudConfig() {
             try {
                 const saved = localStorage.getItem('cloudConfig');
                 if (saved) {
-                    cloudConfig = JSON.parse(saved) || cloudConfig;
+                    const parsed = normalizeCloudConfig(JSON.parse(saved));
+                    if (parsed) cloudConfig = parsed;
                 }
             } catch(e) { /* noop */ }
             return cloudConfig;
+        }
+
+        function manualCloudConfigAllowed() {
+            try { return window.location.search.indexOf('manualCloudConfig=1') !== -1; } catch(_) { return false; }
+        }
+
+        function isCloudConfigLocked() {
+            return !!(sharedCloudConfigLocked && !manualCloudConfigAllowed());
+        }
+
+        function updateCloudSettingsLockUI() {
+            const locked = isCloudConfigLocked();
+            const urlInput = document.getElementById('cloudProjectUrl');
+            const keyInput = document.getElementById('cloudAnonKey');
+            const enabledCheckbox = document.getElementById('cloudEnabledCheckbox');
+            const saveButton = document.getElementById('cloudSettingsSaveButton');
+            const notice = document.getElementById('cloudConfigLockNotice');
+
+            if (urlInput) urlInput.disabled = locked;
+            if (keyInput) keyInput.disabled = locked;
+            if (enabledCheckbox) enabledCheckbox.disabled = locked;
+            if (saveButton) saveButton.disabled = locked;
+            if (notice) notice.style.display = locked ? 'block' : 'none';
+        }
+
+        async function loadSharedCloudConfig() {
+            try {
+                const res = await fetch(`${SHARED_CLOUD_CONFIG_PATH}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!res.ok) {
+                    sharedCloudConfigLocked = false;
+                    return null;
+                }
+                const parsed = normalizeCloudConfig(await res.json());
+                if (!parsed) {
+                    sharedCloudConfigLocked = false;
+                    return null;
+                }
+                const changed = cloudConfig.url !== parsed.url ||
+                    cloudConfig.anonKey !== parsed.anonKey ||
+                    cloudConfig.enabled !== parsed.enabled;
+                cloudConfig = parsed;
+                sharedCloudConfigLocked = true;
+                if (changed) {
+                    localStorage.setItem('cloudConfig', JSON.stringify(cloudConfig));
+                }
+                return cloudConfig;
+            } catch(e) {
+                sharedCloudConfigLocked = false;
+                return null;
+            }
         }
 
         function saveCloudConfig(cfg) {
@@ -2046,7 +2101,7 @@ textarea {
             if (!cloudEnabled()) return;
             try { compactCloudQueue(); } catch(_){}
             const q = getCloudQueue();
-            if (!q.length) { updateCloudStatusUI(true); return; }
+            if (!q.length) { updateCloudStatusUI(cloudReadSucceeded ? true : false); return; }
             updateCloudStatusUI();
             const toProcess = typeof limit === 'number' ? q.slice(0, limit) : q.slice();
             let processed = 0;
@@ -2072,10 +2127,14 @@ textarea {
                 setCloudQueue(remaining);
                 try { showToast(`Cloud同期処理（${processed}件）`); } catch(_){ }
             }
-            if (!getCloudQueue().length) updateCloudStatusUI(true);
+            if (!getCloudQueue().length) updateCloudStatusUI(cloudReadSucceeded ? true : false);
         }
-        window.addEventListener('online', () => { try { flushCloudQueue(); } catch(_){} });
+        window.addEventListener('online', () => {
+            try { flushCloudQueue(); } catch(_){}
+            try { refreshCloudData({ includeMasters: false, showStatus: true }); } catch(_){}
+        });
         setInterval(() => { try { flushCloudQueue(3); } catch(_){} }, 30000);
+        setInterval(() => { try { refreshCloudData({ includeMasters: false, showStatus: false }); } catch(_){} }, 60000);
 
         function updateCloudStatusUI(connected) {
             const el = document.getElementById('cloudStatus');
@@ -2179,10 +2238,140 @@ textarea {
             };
         }
 
-        async function cloudFetchOrders() {
+        function buildOrderConflictSignature(order) {
+            const normalized = normalizeOrderRow(order || {});
+            return JSON.stringify({
+                orderNo: normalized.orderNo || '',
+                date: normalized.date || '',
+                customerName: normalized.customerName || '',
+                pickupLocation: normalized.pickupLocation || '',
+                pickupAddress: normalized.pickupAddress || '',
+                deliveryLocation: normalized.deliveryLocation || '',
+                deliveryAddress: normalized.deliveryAddress || '',
+                deliveryTel: normalized.deliveryTel || '',
+                cargo: normalized.cargo || '',
+                quantity: Number(normalized.quantity || 0),
+                unit: normalized.unit || '',
+                packaging: normalized.packaging || '',
+                unitPrice: Number(normalized.unitPrice || 0),
+                amountNet: Number(normalized.amountNet || 0),
+                amountGross: Number(normalized.amountGross || 0),
+                instructions: normalized.instructions || '',
+                driver: normalized.driver || '',
+                vehicle: normalized.vehicle || '',
+                instructionSheet: !!normalized.instructionSheet,
+                invoiceSent: !!normalized.invoiceSent,
+                paymentReceived: !!normalized.paymentReceived,
+                orderCompleted: !!normalized.orderCompleted
+            });
+        }
+
+        function setEditSessionBaseline(order) {
+            if (!order) {
+                editSessionBaseline = null;
+                return;
+            }
+            const normalized = normalizeOrderRow(order);
+            editSessionBaseline = {
+                orderNo: normalized.orderNo || '',
+                signature: buildOrderConflictSignature(normalized)
+            };
+        }
+
+        function clearEditSessionBaseline() {
+            editSessionBaseline = null;
+        }
+
+        function hasPendingCloudUpsert(orderNo) {
+            try {
+                return getCloudQueue().some(item => {
+                    if (!item || item.op !== 'upsert' || !item.payload) return false;
+                    const queuedOrderNo = item.payload.orderNo || item.payload.order_no || '';
+                    return String(queuedOrderNo) === String(orderNo);
+                });
+            } catch(_) {
+                return false;
+            }
+        }
+
+        async function cloudFetchOrders(opts = {}) {
+            const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 20000;
+            const retries = typeof opts.retries === 'number' ? opts.retries : 3;
             const url = getSupabaseBase() + '/orders?select=*&order=date.asc&order=order_no.asc';
-            const res = await cloudFetchRetry(url, { headers: supabaseHeaders() }, { retries: 2, timeoutMs: 10000 });
+            const res = await cloudFetchRetry(url, { headers: supabaseHeaders(), cache: 'no-store' }, { retries, timeoutMs });
             return await res.json();
+        }
+
+        async function cloudFetchOrderByOrderNo(orderNo) {
+            if (!cloudEnabled() || !orderNo) return { ok: false, order: null };
+            try {
+                const base = getSupabaseBase();
+                const url = `${base}/orders?order_no=eq.${encodeURIComponent(orderNo)}&select=*&limit=1`;
+                const res = await cloudFetchRetry(url, { headers: supabaseHeaders(), cache: 'no-store' }, { retries: 1, timeoutMs: 8000 });
+                const rows = await res.json();
+                return {
+                    ok: true,
+                    order: Array.isArray(rows) && rows[0] ? normalizeOrderRow(rows[0]) : null
+                };
+            } catch (err) {
+                logWarn('cloudFetchOrderByOrderNo', orderNo, err);
+                return { ok: false, order: null };
+            }
+        }
+
+        function applyFetchedOrders(fetched) {
+            if (!Array.isArray(fetched)) return;
+            orders = fetched.map(row => normalizeOrderRow(row));
+            // ID欠損の受注に一意なIDを補完
+            const base = Date.now();
+            orders.forEach((o, idx) => {
+                if (o.id === undefined || o.id === null || o.id === '') {
+                    o.id = base + idx;
+                }
+            });
+            saveData();
+            renderTable();
+            updateStats();
+            setupFilters();
+        }
+
+        async function refreshCloudData(options = {}) {
+            if (!cloudEnabled()) return [];
+            if (cloudRefreshPromise) return cloudRefreshPromise;
+
+            const includeMasters = options.includeMasters !== false;
+            const showStatus = options.showStatus !== false;
+
+            cloudRefreshPromise = (async () => {
+                if (showStatus) updateCloudStatusUI();
+
+                const orderPromise = cloudFetchOrders({ timeoutMs: 20000, retries: 3 });
+                const masterPromise = includeMasters ? loadMastersFromCloud() : Promise.resolve(null);
+                const results = await Promise.allSettled([orderPromise, masterPromise]);
+                const orderResult = results[0];
+                const masterResult = results[1];
+
+                if (masterResult && masterResult.status === 'rejected') {
+                    logWarn('loadMastersFromCloud', masterResult.reason);
+                }
+
+                if (orderResult.status !== 'fulfilled' || !Array.isArray(orderResult.value)) {
+                    cloudReadSucceeded = false;
+                    updateCloudStatusUI(false);
+                    throw (orderResult.status === 'rejected' ? orderResult.reason : new Error('Cloud orders response invalid'));
+                }
+
+                applyFetchedOrders(orderResult.value);
+                cloudReadSucceeded = true;
+                updateCloudStatusUI(true);
+                return orderResult.value;
+            })();
+
+            try {
+                return await cloudRefreshPromise;
+            } finally {
+                cloudRefreshPromise = null;
+            }
         }
 
         async function cloudUpsertOrder(order) {
@@ -2341,7 +2530,7 @@ textarea {
         
         // 顧客マスタをSupabaseから取得
         async function cloudFetchCustomers() {
-            if (!cloudEnabled()) return [];
+            if (!cloudEnabled()) return null;
             try {
                 const base = getSupabaseBase();
                 const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc`, {
@@ -2351,21 +2540,18 @@ textarea {
                 return await resp.json();
             } catch (err) {
                 logError('cloudFetchCustomers', err);
-                return [];
+                return null;
             }
         }
         
         // 顧客マスタをSupabaseに保存（全件削除後再挿入）
         async function cloudSaveCustomers(customers) {
             if (!cloudEnabled()) return;
-            if (!customers || customers.length === 0) {
-                logInfo('cloudSaveCustomers', 'No customers to save');
-                return;
-            }
             
             try {
                 const base = getSupabaseBase();
                 const headers = supabaseHeaders();
+                const safeCustomers = Array.isArray(customers) ? customers : [];
                 
                 // 既存データを取得
                 let existingIds = [];
@@ -2397,19 +2583,21 @@ textarea {
                 }
                 
                 // 新しいデータを挿入
-                const resp = await cloudFetchRetry(`${base}/customers`, {
-                    method: 'POST',
-                    headers: { ...headers, 'Prefer': 'return=minimal' },
-                    body: JSON.stringify(customers.map(c => ({
-                        customer_name: c.name || c.customerName,
-                        pickup_address: c.address || c.pickupAddress || '',
-                        delivery_address: c.deliveryAddress || '',
-                        phone_number: c.tel || c.phoneNumber || ''
-                    })))
-                });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                if (safeCustomers.length > 0) {
+                    const resp = await cloudFetchRetry(`${base}/customers`, {
+                        method: 'POST',
+                        headers: { ...headers, 'Prefer': 'return=minimal' },
+                        body: JSON.stringify(safeCustomers.map(c => ({
+                            customer_name: c.name || c.customerName,
+                            pickup_address: c.address || c.pickupAddress || '',
+                            delivery_address: c.deliveryAddress || '',
+                            phone_number: c.tel || c.phoneNumber || ''
+                        })))
+                    });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                }
                 
-                logInfo('cloudSaveCustomers', `Saved ${customers.length} customers`);
+                logInfo('cloudSaveCustomers', `Saved ${safeCustomers.length} customers`);
             } catch (err) {
                 logError('cloudSaveCustomers', err);
                 throw err;
@@ -2418,7 +2606,7 @@ textarea {
         
         // シンプルマスタをSupabaseから取得
         async function cloudFetchSimpleMaster(masterType) {
-            if (!cloudEnabled()) return [];
+            if (!cloudEnabled()) return null;
             try {
                 const base = getSupabaseBase();
                 const resp = await cloudFetchRetry(`${base}/simple_masters?master_type=eq.${masterType}&select=*&order=sort_order.asc`, {
@@ -2429,7 +2617,7 @@ textarea {
                 return data.map(item => item.name);
             } catch (err) {
                 logError('cloudFetchSimpleMaster', masterType, err);
-                return [];
+                return null;
             }
         }
         
@@ -2470,9 +2658,9 @@ textarea {
             if (!cloudEnabled()) return;
             
             try {
-                // 顧客マスタを取得（空配列ならローカルデータを保持）
+                // クラウド取得が成功したマスターは、空配列でも正しい状態として反映する
                 const cloudCustomers = await cloudFetchCustomers();
-                if (cloudCustomers.length > 0) {
+                if (Array.isArray(cloudCustomers)) {
                     customerMaster = cloudCustomers.map(c => ({
                         name: c.customer_name,
                         address: c.pickup_address || '',
@@ -2481,21 +2669,20 @@ textarea {
                     localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
                 }
 
-                // シンプルマスタを取得（空配列ならローカルデータを保持）
                 const cloudCargo = await cloudFetchSimpleMaster('cargo');
-                if (cloudCargo.length > 0) { cargoMaster = cloudCargo; localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster)); }
+                if (Array.isArray(cloudCargo)) { cargoMaster = cloudCargo; localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster)); }
 
                 const cloudPackaging = await cloudFetchSimpleMaster('packaging');
-                if (cloudPackaging.length > 0) { packagingMaster = cloudPackaging; localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster)); }
+                if (Array.isArray(cloudPackaging)) { packagingMaster = cloudPackaging; localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster)); }
 
                 const cloudUnit = await cloudFetchSimpleMaster('unit');
-                if (cloudUnit.length > 0) { unitMaster = cloudUnit; localStorage.setItem('unitMaster', JSON.stringify(unitMaster)); }
+                if (Array.isArray(cloudUnit)) { unitMaster = cloudUnit; localStorage.setItem('unitMaster', JSON.stringify(unitMaster)); }
 
                 const cloudDriver = await cloudFetchSimpleMaster('driver');
-                if (cloudDriver.length > 0) { driverMaster = cloudDriver; localStorage.setItem('driverMaster', JSON.stringify(driverMaster)); }
+                if (Array.isArray(cloudDriver)) { driverMaster = cloudDriver; localStorage.setItem('driverMaster', JSON.stringify(driverMaster)); }
 
                 const cloudVehicle = await cloudFetchSimpleMaster('vehicle');
-                if (cloudVehicle.length > 0) { vehicleMaster = cloudVehicle; localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster)); }
+                if (Array.isArray(cloudVehicle)) { vehicleMaster = cloudVehicle; localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster)); }
                 
                 logInfo('loadMastersFromCloud', 'All masters loaded from cloud');
                 updateSelectOptions();
@@ -2516,12 +2703,17 @@ textarea {
             document.getElementById('cloudProjectUrl').value = cloudConfig.url || '';
             document.getElementById('cloudAnonKey').value = cloudConfig.anonKey || '';
             document.getElementById('cloudEnabledCheckbox').checked = !!cloudConfig.enabled;
+            updateCloudSettingsLockUI();
             document.getElementById('cloudSettingsModal').style.display = 'block';
         }
         function closeCloudSettings() {
             document.getElementById('cloudSettingsModal').style.display = 'none';
         }
         function saveCloudSettings() {
+            if (isCloudConfigLocked()) {
+                showToast('共有クラウド設定が適用されているため変更できません', 'warn');
+                return;
+            }
             const url = document.getElementById('cloudProjectUrl').value.trim();
             const key = document.getElementById('cloudAnonKey').value.trim();
             const enabled = document.getElementById('cloudEnabledCheckbox').checked;
@@ -2530,18 +2722,8 @@ textarea {
             closeCloudSettings();
             // 設定が有効化されたら即時同期（読み込み）
             if (cloudEnabled()) {
-                cloudFetchOrders().then(fetched => {
-                    if (Array.isArray(fetched)) {
-                        orders = fetched.map(row => normalizeOrderRow(row));
-                        saveData();
-                        renderTable();
-                        updateStats();
-                        setupFilters();
-                        updateCloudStatusUI(true);
-                    }
-                }).catch(err => {
+                refreshCloudData({ includeMasters: true, showStatus: true }).catch(err => {
                     console.warn('クラウド読み込み失敗:', err);
-                    updateCloudStatusUI(false);
                 });
             }
         }
@@ -2852,7 +3034,7 @@ function updateStatsFromView() {
         }
     });
 
-    const visibleOrders = orders.filter(o => visibleIds.includes(o.id));
+    const visibleOrders = orders.filter(o => visibleIds.includes(String(o.id)));
 
     const totalGross = visibleOrders.reduce((sum, o) => sum + (o.amountGross || 0), 0);
     const totalNet   = visibleOrders.reduce((sum, o) => sum + (o.amountNet   || 0), 0);
@@ -2898,6 +3080,7 @@ function updateStatsFromView() {
         // モーダル開く
         function openModal() {
             editingId = null;
+            clearEditSessionBaseline();
             document.getElementById('modalTitle').textContent = '新規受注登録';
             document.getElementById('orderForm').reset();
             document.getElementById('orderDate').value = new Date().toISOString().split('T')[0];
@@ -2911,6 +3094,7 @@ function updateStatsFromView() {
         function closeModal() {
             document.getElementById('orderModal').style.display = 'none';
             editingId = null;
+            clearEditSessionBaseline();
             document.querySelectorAll('.autocomplete-list').forEach(list => {
                 list.classList.remove('active');
             });
@@ -3406,7 +3590,7 @@ function updateStatsFromView() {
 
 
         // 受注保存
-        function saveOrder() {
+        async function saveOrder() {
             // フォーム入力値の取得と検証
             const orderNo = document.getElementById('orderNo').value;
             const orderDate = document.getElementById('orderDate').value;
@@ -3452,6 +3636,20 @@ function updateStatsFromView() {
                 driver: document.getElementById('driver').value,
                 vehicle: document.getElementById('vehicle').value
             };
+
+            if (editingId && cloudEnabled() && editSessionBaseline && editSessionBaseline.orderNo) {
+                const latest = await cloudFetchOrderByOrderNo(editSessionBaseline.orderNo);
+                if (latest.ok && latest.order) {
+                    const latestSignature = buildOrderConflictSignature(latest.order);
+                    if (latestSignature !== editSessionBaseline.signature) {
+                        alert('別の端末でこの受注が更新されています。いったん閉じて最新の内容を開き直してください。');
+                        return;
+                    }
+                } else if (latest.ok && !latest.order && !hasPendingCloudUpsert(editSessionBaseline.orderNo)) {
+                    alert('この受注は別の端末で削除、または受注Noが変更されている可能性があります。最新の内容を読み直してから再度操作してください。');
+                    return;
+                }
+            }
 
             if (editingId) {
                 // 既存データの更新（instructionSheet/invoiceSent/paymentReceived/orderCompleted は保持）
@@ -3549,6 +3747,7 @@ function updateStatsFromView() {
             }
             
             editingId = order.id;
+            setEditSessionBaseline(order);
             document.getElementById('modalTitle').textContent = '受注編集';
             
             document.getElementById('orderNo').value = order.orderNo;
@@ -3589,6 +3788,7 @@ function duplicateOrder(id, el) {
 
     // 編集IDは新規として扱う
     editingId = null;
+    clearEditSessionBaseline();
 
     // モーダルタイトルを変更
     document.getElementById('modalTitle').textContent = '受注複製';
@@ -3630,7 +3830,7 @@ function duplicateOrder(id, el) {
         function deleteOrder(id) {
             if (!confirm('この受注を削除しますか？')) return;
             const target = orders.find(o => String(o.id) === String(id));
-            orders = orders.filter(o => o.id !== id);
+            orders = orders.filter(o => String(o.id) !== String(id));
             saveData();
             renderTable();
             updateStats();
