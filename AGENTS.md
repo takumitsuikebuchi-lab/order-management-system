@@ -20,6 +20,13 @@
 - `.github/workflows/guard-and-sync.yml` was added so pushes to `main` verify the app and mirror the result to `master`.
 - `index.html` keeps the shared cloud config loader and now also has an embedded fallback for safer startup if `cloud-config.json` is missing.
 
+### 2026-03-18
+
+- Periodic cloud refresh now preserves the current table filter state instead of snapping back to the full list.
+- The order list search UI was simplified to one `顧客検索` field that supports both free-text input and datalist selection.
+- Customer filter clearing is now done by the single right-side `クリア` button.
+- Date filter clearing is labeled `日付解除` to distinguish it from customer filter clearing.
+
 ## Important invariants
 
 - `cloud-config.json` is the source of truth for Supabase URL / anon key / enabled flag.
@@ -74,3 +81,4 @@
 - Shared config was added to eliminate browser-by-browser drift.
 - Cloud settings UI was intentionally restricted to reduce accidental local-only operation.
 - `.github/workflows/guard-and-sync.yml` verifies `cloud-config.json` and mirrors `main` to `master` on push.
+- The visible order list must not lose active filters just because a background cloud refresh ran.
