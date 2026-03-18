@@ -2334,8 +2334,44 @@ textarea {
             }
         }
 
+        function captureTableFilterState() {
+            const getValue = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value : '';
+            };
+            return {
+                search: getValue('searchInput'),
+                dateFilter: getValue('dateFilter'),
+                driverFilter: getValue('driverFilter'),
+                customerFilterSearch: getValue('customerFilterSearch'),
+                scrollY: window.scrollY
+            };
+        }
+
+        function restoreTableFilterState(state) {
+            if (!state) return;
+
+            const searchInput = document.getElementById('searchInput');
+            const dateFilter = document.getElementById('dateFilter');
+            const customerFilterInput = document.getElementById('customerFilterSearch');
+            const driverFilter = document.getElementById('driverFilter');
+
+            if (searchInput) searchInput.value = state.search || '';
+            if (dateFilter) dateFilter.value = state.dateFilter || '';
+            if (customerFilterInput) customerFilterInput.value = state.customerFilterSearch || '';
+            if (driverFilter) {
+                const desired = state.driverFilter || '';
+                const exists = Array.from(driverFilter.options).some(opt => opt.value === desired);
+                driverFilter.value = exists ? desired : '';
+            }
+
+            filterTable();
+            window.scrollTo({ top: typeof state.scrollY === 'number' ? state.scrollY : window.scrollY, behavior: 'auto' });
+        }
+
         function applyFetchedOrders(fetched) {
             if (!Array.isArray(fetched)) return;
+            const prevFilterState = captureTableFilterState();
             orders = fetched.map(row => normalizeOrderRow(row));
             // ID欠損の受注に一意なIDを補完
             const base = Date.now();
@@ -2348,6 +2384,7 @@ textarea {
             renderTable();
             updateStats();
             setupFilters();
+            restoreTableFilterState(prevFilterState);
         }
 
         async function refreshCloudData(options = {}) {
