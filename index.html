@@ -1123,12 +1123,11 @@ textarea {
     <div class="date-filter">
         <label style="font-size: 0.875rem;">顧客検索:</label>
         <input type="text" class="form-input" id="searchInput" list="customerFilterList" placeholder="顧客名を入力または選択" oninput="filterTable()" style="width: 220px;">
-        <button class="btn btn-sm btn-secondary" onclick="clearCustomerFilter()">クリア</button>
     </div>
     <div class="date-filter">
         <label style="font-size: 0.875rem;">日付指定:</label>
         <input type="date" class="form-input" id="dateFilter" onchange="filterTable()">
-        <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">クリア</button>
+        <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">日付解除</button>
     </div>
     <select class="form-select" id="sortOrder" onchange="sortTable()" style="width: 120px;">
         <option value="date-asc">日付順</option>
@@ -1137,6 +1136,7 @@ textarea {
     <select class="form-select" id="driverFilter" onchange="filterTable()">
         <option value="">全ドライバー</option>
     </select>
+    <button class="btn btn-sm btn-secondary" onclick="clearCustomerFilter()">クリア</button>
     <datalist id="customerFilterList"></datalist>
 </div>
 
