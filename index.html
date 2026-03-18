@@ -1120,7 +1120,11 @@ textarea {
 
 <div class="action-row">
     <!-- 3行目：検索/フィルタ（元のまま移設） -->
-    <input type="text" class="form-input" placeholder="検索..." id="searchInput" onkeyup="filterTable()" style="width: 200px;">
+    <div class="date-filter">
+        <label style="font-size: 0.875rem;">顧客検索:</label>
+        <input type="text" class="form-input" id="searchInput" list="customerFilterList" placeholder="顧客名を入力または選択" oninput="filterTable()" style="width: 220px;">
+        <button class="btn btn-sm btn-secondary" onclick="clearCustomerFilter()">クリア</button>
+    </div>
     <div class="date-filter">
         <label style="font-size: 0.875rem;">日付指定:</label>
         <input type="date" class="form-input" id="dateFilter" onchange="filterTable()">
@@ -1133,7 +1137,6 @@ textarea {
     <select class="form-select" id="driverFilter" onchange="filterTable()">
         <option value="">全ドライバー</option>
     </select>
-    <input type="text" class="form-input" id="customerFilterSearch" list="customerFilterList" placeholder="顧客検索（キーワード）" oninput="filterTable()" style="width: 180px;" />
     <datalist id="customerFilterList"></datalist>
 </div>
 
@@ -2343,7 +2346,6 @@ textarea {
                 search: getValue('searchInput'),
                 dateFilter: getValue('dateFilter'),
                 driverFilter: getValue('driverFilter'),
-                customerFilterSearch: getValue('customerFilterSearch'),
                 scrollY: window.scrollY
             };
         }
@@ -2353,12 +2355,10 @@ textarea {
 
             const searchInput = document.getElementById('searchInput');
             const dateFilter = document.getElementById('dateFilter');
-            const customerFilterInput = document.getElementById('customerFilterSearch');
             const driverFilter = document.getElementById('driverFilter');
 
             if (searchInput) searchInput.value = state.search || '';
             if (dateFilter) dateFilter.value = state.dateFilter || '';
-            if (customerFilterInput) customerFilterInput.value = state.customerFilterSearch || '';
             if (driverFilter) {
                 const desired = state.driverFilter || '';
                 const exists = Array.from(driverFilter.options).some(opt => opt.value === desired);
@@ -3129,6 +3129,12 @@ function updateStatsFromView() {
             filterTable();
         }
 
+        function clearCustomerFilter() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.value = '';
+            filterTable();
+        }
+
         // モーダル開く
         function openModal() {
             editingId = null;
@@ -3743,14 +3749,12 @@ function updateStatsFromView() {
             _el = document.getElementById('searchInput'); var prevSearch = _el ? _el.value : '';
             _el = document.getElementById('dateFilter'); var prevDateFilter = _el ? _el.value : '';
             _el = document.getElementById('driverFilter'); var prevDriverFilter = _el ? _el.value : '';
-            _el = document.getElementById('customerFilterSearch'); var prevCustomerFilterSearch = _el ? _el.value : '';
             
             updateStats();
             setupFilters();
             
             if (document.getElementById('searchInput')) document.getElementById('searchInput').value = prevSearch;
             if (document.getElementById('dateFilter')) document.getElementById('dateFilter').value = prevDateFilter;
-            if (document.getElementById('customerFilterSearch')) document.getElementById('customerFilterSearch').value = prevCustomerFilterSearch;
             if (document.getElementById('driverFilter')) {
                 const driverSel = document.getElementById('driverFilter');
                 const exists = Array.from(driverSel.options).some(opt => opt.value === prevDriverFilter);
@@ -3916,29 +3920,25 @@ function duplicateOrder(id, el) {
 
         // テーブルフィルタ
         function filterTable() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
+            const customerSearch = document.getElementById('searchInput').value.toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
             const driverFilter = document.getElementById('driverFilter').value;
-            var _cEl = document.getElementById('customerFilterSearch');
-            const customerFilterSearch = (_cEl ? _cEl.value : '').toLowerCase();
             
             const rows = document.querySelectorAll('#tableBody tr');
             rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
                 const dateText = row.cells[1].textContent;
                 const driver = row.cells[11].textContent;
-                const customer = row.cells[2].textContent;
+                const customer = row.cells[2].textContent.toLowerCase();
                 
                 let show = true;
                 
-                if (search && !text.includes(search)) show = false;
+                if (customerSearch && !customer.includes(customerSearch)) show = false;
                 if (dateFilter) {
                     const filterDate = new Date(dateFilter);
                     const rowDateStr = `${filterDate.getMonth() + 1}`.padStart(2, '0') + '/' + `${filterDate.getDate()}`.padStart(2, '0');
                     if (dateText !== rowDateStr) show = false;
                 }
                 if (driverFilter && !driver.includes(driverFilter)) show = false;
-                if (customerFilterSearch && !customer.toLowerCase().includes(customerFilterSearch)) show = false;
                 
                 row.style.display = show ? '' : 'none';
             });
