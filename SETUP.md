@@ -36,6 +36,12 @@
 - 日付絞り込みの解除は `日付解除` ボタンで行う
 - バックグラウンドのクラウド再同期が入っても、表示中の絞り込み条件は維持される
 
+### 自動確認の現在地（2026-03-19）
+
+- GitHub Actions の `Guard And Sync` で Playwright UI smoke test を自動実行
+- 現在は、受注CRUD、検索・絞り込み、月切替、統計カード、印刷、CSV入出力、クラウド再同期、キュー回復、空マスタ同期まで自動確認する
+- 修正後に手元で確認する場合は `npm run test:ui`
+
 ---
 
 ## 新しいPCでシステムを使い始める手順
@@ -197,6 +203,7 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 - Project URLの末尾に `/` が入っていないか確認
 - `cloud-config.json` が意図したSupabaseプロジェクトを指しているか確認
 - ハードリロードすると解消することがある
+- `接続: Cloud（エラー ・キュー:n）` のように表示される場合は、ローカル保存は残っていて再送待ちの可能性が高い
 
 ### PCやブラウザごとにデータが違う
 - まず右上表示が `接続: Cloud（同期完了）` か確認

@@ -47,6 +47,10 @@ Supabase の orders / customers / simple_masters に接続
           <p>静的ファイルの公開先です。通常の本番反映は <code>main</code> への push で行います。</p>
         </div>
         <div class="box">
+          <h3>GitHub Actions</h3>
+          <p><code>Guard And Sync</code> が push 後に UI smoke test を実行し、通過後に <code>master</code> へ同期します。</p>
+        </div>
+        <div class="box">
           <h3>cloud-config.json</h3>
           <p>Supabase の URL / anon key / enabled を配布する正本です。ブラウザごとの差異を防ぐ役割があります。</p>
         </div>
@@ -68,6 +72,7 @@ Supabase の orders / customers / simple_masters に接続
         <li>受注やマスターの更新はクラウドに反映されます</li>
         <li>通信に失敗したときはキューに積み、復帰後に再送します</li>
         <li>空のマスター状態も有効データとして同期されます</li>
+        <li>一覧の絞り込み条件は、バックグラウンド再同期後も維持される設計です</li>
       </ul>
     </section>
 
@@ -88,6 +93,7 @@ Supabase の orders / customers / simple_masters に接続
         <li><code>TEST_CHECKLIST.md</code></li>
         <li><code>AGENTS.md</code></li>
         <li><code>SETUP.md</code></li>
+        <li><code>tests/smoke.spec.js</code></li>
         <li><code>schema.sql</code></li>
         <li><code>cloud-config.json</code></li>
         <li><code>index.html</code></li>

@@ -55,6 +55,7 @@
           <tr><td><code>接続: Cloud（同期完了）</code></td><td>正常。最新データに同期済み</td></tr>
           <tr><td><code>接続: Cloud（同期中）</code></td><td>起動直後や同期処理の途中</td></tr>
           <tr><td><code>接続: Cloud（エラー）</code></td><td>通信や接続設定に問題がある可能性</td></tr>
+          <tr><td><code>接続: Cloud（エラー ・キュー:n）</code></td><td>ローカル保存は残り、クラウド再送待ちの可能性が高い状態</td></tr>
           <tr><td><code>接続: ローカル</code></td><td>クラウド設定が使われていない状態</td></tr>
         </tbody>
       </table>
@@ -96,10 +97,17 @@
       <h2>困ったとき</h2>
       <ul>
         <li>データ差異が出たら、まず右上表示を確認する</li>
+        <li><code>エラー ・キュー:n</code> が出ている場合は、まずクラウド再送待ちを疑う</li>
         <li>顧客検索で絞った一覧が勝手に戻る場合は、まずハードリロードして最新版を読み込む</li>
         <li>ハードリロード後も直らなければ <code>SETUP.md</code> を参照する</li>
         <li>AIツールに依頼するときは <code>AGENTS.md</code> と <code>SETUP.md</code> を先に読ませる</li>
       </ul>
+    </div>
+
+    <div class="card">
+      <h2>自動確認について</h2>
+      <p>現在は GitHub Actions と Playwright による UI smoke test があり、主要な受注操作、検索・絞り込み、印刷、CSV入出力、クラウド再同期を自動確認しています。</p>
+      <p>修正後に保守者や AI ツールが確認する場合は、可能なら <code>npm run test:ui</code> まで実施するのが安全です。</p>
     </div>
   </main>
 </body>
