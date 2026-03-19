@@ -91,6 +91,30 @@ async function seedLocalMode(page) {
   }, { orders: seededOrders, customers: seededCustomers });
 }
 
+async function installPrintCapture(page) {
+  await page.addInitScript(() => {
+    window.__printWrites = [];
+    window.open = () => {
+      const capture = { html: '', printed: false, closed: false };
+      window.__printWrites.push(capture);
+      return {
+        document: {
+          write(content) {
+            capture.html += String(content || '');
+          },
+          close() {
+            capture.closed = true;
+          }
+        },
+        focus() {},
+        print() {
+          capture.printed = true;
+        }
+      };
+    };
+  });
+}
+
 async function seedLockedCloudMode(page) {
   await page.route('**/cloud-config.json?*', async route => {
     await route.fulfill({
@@ -217,6 +241,25 @@ test('customer master add flow updates the master list', async ({ page }) => {
   await expect(page.locator('#customerMasterBody input[data-field="name"]').nth(2)).toHaveValue('追加テスト商事');
 });
 
+test('driver master save updates filter options', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /ドライバーマスタ/ }).click();
+  await expect(page.locator('#simpleMasterModal')).toBeVisible();
+  await expect(page.locator('#simpleMasterTitle')).toHaveText('ドライバーマスタ管理');
+
+  await page.locator('#simpleMasterInput').fill('追加ドライバー');
+  await page.getByRole('button', { name: '追加', exact: true }).click();
+  await expect(page.locator('#simpleMasterList')).toContainText('追加ドライバー');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#simpleMasterModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+
+  await page.locator('#driverFilter').selectOption('追加ドライバー');
+  await expect(page.locator('#driverFilter')).toHaveValue('追加ドライバー');
+});
+
 test('print entry points still respond as expected', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -226,8 +269,41 @@ test('print entry points still respond as expected', async ({ page }) => {
 
   await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
   await page.getByRole('button', { name: /運行指示書/ }).click();
-
   await expect(page.locator('#instructionSettingsModal')).toBeVisible();
   await expect(page.locator('#instructionSettingsModal h2')).toHaveText('運行指示書の設定');
   await expect(page.locator('#orderSequenceList .order-sequence-item')).toHaveCount(1);
+});
+
+test('instruction sheet and pickup slip write printable HTML', async ({ page }) => {
+  await seedLocalMode(page);
+  await installPrintCapture(page);
+  await page.goto('/');
+
+  await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
+
+  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await page.locator('#instructionSettingsModal .modal-footer').getByRole('button', { name: /運行指示書を出力/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites.length);
+  }).toBe(1);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.printed === true);
+  }).toBe(true);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('運行指示書');
+
+  await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
+  await page.getByRole('button', { name: /引取書/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites.length);
+  }).toBe(2);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[1]?.html || '');
+  }).toContain('貨物引取書・荷渡書');
 });
