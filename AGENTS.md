@@ -31,6 +31,7 @@
 
 - Playwright-based UI smoke tests were added outside the app runtime so regression checks do not change production behavior.
 - The GitHub Actions guard workflow now runs the UI smoke tests before mirroring `main` to `master`.
+- The smoke suite now covers core order CRUD, filter persistence, month switching, dashboard stats, selected-order printing, CSV import/export, customer/simple master CSV flows, cloud queue recovery, and empty-master sync propagation.
 
 ## Important invariants
 
@@ -93,3 +94,5 @@
 - `.github/workflows/guard-and-sync.yml` verifies `cloud-config.json` and mirrors `main` to `master` on push.
 - The visible order list must not lose active filters just because a background cloud refresh ran.
 - UI regression checks should stay external to the app runtime; prefer test files and workflow steps over diagnostic code inside `index.html`.
+- CSV import must not silently duplicate an existing order when `orderNo` matches.
+- Cloud write failures must preserve local data first and recover through the queue when connectivity returns.
