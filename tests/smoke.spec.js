@@ -155,6 +155,8 @@ async function seedLockedCloudMode(page) {
   await page.addInitScript(() => {
     localStorage.setItem('setupCompleted', 'true');
     localStorage.setItem('setupMode', 'cloud');
+    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', '門脇悟大']));
+    localStorage.setItem('vehicleMaster', JSON.stringify(['札幌100あ12-34', '帯広500た56-78']));
   });
 }
 
@@ -205,6 +207,55 @@ async function seedConflictMode(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify([])
+    });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+  });
+}
+
+async function seedRefreshCloudMode(page, updatedOrders) {
+  let orderFetchCount = 0;
+
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+    orderFetchCount += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(orderFetchCount === 1 ? seededOrders : updatedOrders)
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(seededCustomers)
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { master_type: 'driver', name: '混載流通', sort_order: 0 },
+        { master_type: 'driver', name: '門脇悟大', sort_order: 1 }
+      ])
     });
   });
 
@@ -1096,4 +1147,92 @@ test('pickup slip print output uses only the selected orders', async ({ page }) 
   await expect.poll(async () => {
     return await page.evaluate(() => window.__printWrites[0]?.html || '');
   }).not.toContain('テスト青果');
+});
+
+test('date and driver filters narrow the table and stats, then clear safely', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.selectOption('#driverFilter', '門脇悟大');
+
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#totalGross')).toHaveText('¥1,870');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeHidden();
+
+  await page.locator('#dateFilter').fill('2026-03-19');
+
+  await expect(page.locator('#orderCount')).toHaveText('0件');
+  await expect(page.locator('#totalGross')).toHaveText('¥0');
+  await expect(page.locator('#incompleteCount')).toHaveText('0件');
+
+  await page.getByRole('button', { name: '日付解除' }).click();
+
+  await expect(page.locator('#dateFilter')).toHaveValue('');
+  await expect(page.locator('#driverFilter')).toHaveValue('門脇悟大');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#totalGross')).toHaveText('¥1,870');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
+});
+
+test('cloud refresh keeps search, date, and driver filters while applying new data', async ({ page }) => {
+  const refreshedOrders = [
+    ...seededOrders,
+    {
+      id: 'test-8',
+      orderNo: 'R260320-003',
+      date: '2026-03-20',
+      customerName: 'サンプル運送 北海道',
+      pickupLocation: '釧路市場',
+      pickupAddress: '釧路市星が浦',
+      deliveryLocation: '札幌中央市場',
+      deliveryAddress: '札幌市中央区北12条',
+      deliveryTel: '0154-00-0000',
+      cargo: 'ごぼう',
+      quantity: 9,
+      unit: '袋',
+      packaging: 'クラフト袋',
+      unitPrice: 100,
+      amountNet: 900,
+      amountGross: 990,
+      instructions: '',
+      driver: '門脇悟大',
+      vehicle: '釧路100な77-88',
+      instructionSheet: false,
+      invoiceSent: false,
+      paymentReceived: false,
+      orderCompleted: false
+    }
+  ];
+
+  await seedRefreshCloudMode(page, refreshedOrders);
+  await page.goto('/');
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await page.locator('#searchInput').fill('サンプル');
+  await page.locator('#dateFilter').fill('2026-03-20');
+  await page.selectOption('#driverFilter', '門脇悟大');
+
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#totalGross')).toHaveText('¥1,870');
+
+  await page.evaluate(() => refreshCloudData({ includeMasters: false, showStatus: true }));
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await expect(page.locator('#searchInput')).toHaveValue('サンプル');
+  await expect(page.locator('#dateFilter')).toHaveValue('2026-03-20');
+  await expect(page.locator('#driverFilter')).toHaveValue('門脇悟大');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalGross')).toHaveText('¥2,860');
+  await expect.poll(async () => await visibleCustomers(page)).toEqual([
+    'サンプル運送',
+    'サンプル運送 北海道'
+  ]);
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeHidden();
 });
