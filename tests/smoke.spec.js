@@ -589,6 +589,74 @@ test('csv import adds a new order row', async ({ page }) => {
   }).toBe(true);
 });
 
+test('csv import with header only leaves existing orders unchanged', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const beforeCount = await page.locator('#tableBody tr').count();
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.locator('#csvImport').setInputFiles({
+    name: 'orders-empty.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('受注番号,日付,顧客名\n', 'utf8')
+  });
+
+  await expect.poll(() => seenAlert).toContain('CSVファイルをインポートしました');
+  await expect(page.locator('#tableBody tr')).toHaveCount(beforeCount);
+  await expect.poll(async () => {
+    return await page.evaluate(() => JSON.parse(localStorage.getItem('orders') || '[]').length);
+  }).toBe(seededOrders.length);
+});
+
+test('csv import updates an existing order instead of duplicating it', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  const csvText = [
+    '受注番号,日付,顧客名,引取先,配送先,積荷,数量,単位,荷姿,単価,金額(税別),金額(税込),ドライバー,車両,備考',
+    'R260319-001,2026-03-19,テスト青果,札幌市場,旭川市場,更新トマト,11,ケース,ダンボール,120,1320,1452,混載流通,札幌100あ12-34,CSV上書き'
+  ].join('\n');
+
+  await page.locator('#csvImport').setInputFiles({
+    name: 'orders-duplicate.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csvText, 'utf8')
+  });
+
+  await expect.poll(() => seenAlert).toContain('CSVファイルをインポートしました（1件）');
+  await expect(page.locator('#tableBody tr')).toHaveCount(2);
+  await expect(page.locator('#tableBody')).toContainText('更新トマト');
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const target = orders.find(order => order.orderNo === 'R260319-001');
+      return {
+        cargo: target?.cargo,
+        quantity: target?.quantity,
+        instructions: target?.instructions,
+        count: orders.length
+      };
+    });
+  }).toEqual({
+    cargo: '更新トマト',
+    quantity: 11,
+    instructions: 'CSV上書き',
+    count: 2
+  });
+});
+
 test('customer master csv import adds new customers and skips duplicates', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -619,6 +687,37 @@ test('customer master csv import adds new customers and skips duplicates', async
   await expect.poll(() => seenAlert).toContain('スキップ: 1件');
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(3);
   await expect(page.locator('#customerMasterBody input[data-field="name"]').nth(2)).toHaveValue('CSV顧客追加');
+});
+
+test('customer master csv import with duplicates only keeps the list unchanged', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  const csvText = [
+    '顧客名,住所,電話番号',
+    'テスト青果,札幌市中央区北12条西20丁目,011-000-0000',
+    'サンプル運送,帯広市西20条南1丁目,0155-00-0000'
+  ].join('\n');
+
+  await page.locator('#customerCsvImport').setInputFiles({
+    name: 'customers-duplicates.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csvText, 'utf8')
+  });
+
+  await expect.poll(() => seenAlert).toContain('CSVインポート完了');
+  await expect.poll(() => seenAlert).toContain('追加: 0件');
+  await expect.poll(() => seenAlert).toContain('スキップ: 2件');
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
 });
 
 test('customer master csv export creates a customer csv download', async ({ page }) => {
