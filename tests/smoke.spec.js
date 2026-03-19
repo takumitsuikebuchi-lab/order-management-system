@@ -1195,6 +1195,7 @@ test('today and tomorrow delivery cards exclude completed orders', async ({ page
 });
 
 test('csv export follows the currently selected month', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installCsvCapture(page);
   await page.goto('/');
@@ -1226,13 +1227,15 @@ test('csv export follows the currently selected month', async ({ page }) => {
   };
 
   await replaceOrdersAndRefresh(page, [...seededOrders, aprilOrder]);
+
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
+  await page.getByRole('button', { name: '→' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+
   await page.evaluate(() => {
     window.showCsvFormatDialog = async () => 'internal';
     window.saveCsvToDir = async () => false;
-    currentMonth = new Date('2026-04-01T00:00:00');
-    updateMonth();
-    renderTable();
-    updateStats();
   });
 
   await page.getByRole('button', { name: /CSV出力/ }).click();
