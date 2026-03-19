@@ -12,6 +12,15 @@
 | デフォルトブランチ | `main` |
 | 補助ブランチ | `master`（互換維持のため自動同期） |
 
+### まず読むべき文書
+
+- `requirements.md`: システムが満たすべき要件と壊してはいけない仕様
+- `SETUP.md`: 運用・復旧・セットアップ手順
+- `RUNBOOK.md`: 障害時の初動確認
+- `TEST_CHECKLIST.md`: 修正後の最低限確認項目
+- `schema.sql`: 新規環境構築時の DB スキーマ正本
+- `AGENTS.md`: AI ツール向けの保守メモ
+
 ### 直近の整理（2026-03-17）
 
 - GitHub のデフォルトブランチを `master` から `main` に変更
@@ -234,6 +243,6 @@ Codex / Claude / Cursor などに依頼する場合は、次の4点を伝える�
 1. 本番URL: `https://takumitsuikebuchi-lab.github.io/order-management-system/`
 2. 共通クラウド設定は `cloud-config.json` が正本
 3. 通常運用ではクラウド設定UIはロックされている
-4. まず `AGENTS.md` と `SETUP.md` を読んでから対応してほしい
+4. まず `requirements.md` `AGENTS.md` `SETUP.md` を読んでから対応してほしい
 
 これで、運用方式の誤解による再設定ミスをかなり防げます。

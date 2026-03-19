@@ -71,6 +71,9 @@
 
 - `README.md`
 - `SETUP.md`
+- `requirements.md`
+- `RUNBOOK.md`
+- `TEST_CHECKLIST.md`
 - `cloud-config.json`
 - `index.html`
 

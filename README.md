@@ -15,6 +15,10 @@
 
 - **かんたん運用マニュアル**: 画像付きで初心者にも分かりやすい
 - **セットアップガイド**: 5〜10分で完了する簡単設定
+- **要件定義書**: 現在の仕様と壊してはいけない前提を `requirements.md` に整理
+- **テストチェックリスト**: 修正後の最低限確認を `TEST_CHECKLIST.md` に整理
+- **障害対応ランブック**: 代表的な障害初動を `RUNBOOK.md` に整理
+- **変更履歴**: 重要変更を `CHANGELOG.md` に整理
 - **保守メモ**: AIツール向けの判断材料を `AGENTS.md` に整理
 
 ## 🚀 使い始める
@@ -89,6 +93,11 @@ order-system-improved/
 ├── かんたん運用マニュアル.md      # 運用マニュアル
 ├── README.md                     # このファイル
 ├── SETUP.md                      # セットアップガイド
+├── requirements.md               # 要件定義
+├── TEST_CHECKLIST.md             # 動作確認チェックリスト
+├── RUNBOOK.md                    # 障害対応手順
+├── CHANGELOG.md                  # 変更履歴
+├── schema.sql                    # DBスキーマ正本
 ├── manual_images/                # マニュアル用画像
 │   ├── 01-welcome.webp
 │   ├── 02-cloud-info.webp
@@ -135,10 +144,10 @@ order-system-improved/
 ## 📞 サポート
 
 詳しい使い方は `かんたん運用マニュアル.md` をご覧ください。
-保守や障害対応は `SETUP.md` と `AGENTS.md` を参照してください。
+保守や障害対応は `requirements.md` `SETUP.md` `RUNBOOK.md` `AGENTS.md` を参照してください。
 
 ---
 
 **開発**: Manus AI  
 **バージョン**: 2.0（改良版）  
-**更新日**: 2026年3月18日
+**更新日**: 2026年3月19日
