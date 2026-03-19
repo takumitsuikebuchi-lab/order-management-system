@@ -158,12 +158,87 @@ async function seedLockedCloudMode(page) {
   });
 }
 
+async function seedConflictMode(page) {
+  const conflictedOrder = {
+    ...seededOrders[0],
+    instructions: '別端末で更新済み'
+  };
+
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(seededOrders)
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?order_no=eq\..*&select=\*&limit=1/, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([conflictedOrder])
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+  });
+}
+
 async function visibleCustomers(page) {
   return await page.locator('#tableBody tr').evaluateAll(rows =>
     rows
       .filter(row => getComputedStyle(row).display !== 'none')
       .map(row => row.cells[2]?.textContent?.trim() || '')
   );
+}
+
+async function installCsvCapture(page) {
+  await page.addInitScript(() => {
+    window.__csvCapture = { filename: '', content: '' };
+    const originalCreateObjectURL = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = function patchedCreateObjectURL(blob) {
+      Promise.resolve(blob.text()).then(text => {
+        window.__csvCapture.content = text;
+      });
+      return originalCreateObjectURL(blob);
+    };
+
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function patchedClick() {
+      window.__csvCapture.filename = this.download || '';
+      return originalClick.call(this);
+    };
+  });
 }
 
 test('basic order row actions open the expected UI', async ({ page }) => {
@@ -306,4 +381,65 @@ test('instruction sheet and pickup slip write printable HTML', async ({ page }) 
   await expect.poll(async () => {
     return await page.evaluate(() => window.__printWrites[1]?.html || '');
   }).toContain('貨物引取書・荷渡書');
+});
+
+test('csv export creates an internal format download', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    window.showCsvFormatDialog = async () => 'internal';
+    window.saveCsvToDir = async () => false;
+  });
+
+  await page.getByRole('button', { name: /CSV出力/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toContain('受注明細_');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('受注番号,日付,顧客名');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('R260319-001');
+});
+
+test('editing warns when the same order was changed on another device', async ({ page }) => {
+  await seedConflictMode(page);
+  await page.goto('/');
+
+  await page.locator('#tableBody tr').nth(0).getByRole('button', { name: '編集' }).click();
+  await page.locator('#customerName').fill(seededOrders[0].customerName);
+  await page.locator('#pickupLocation').fill(seededOrders[0].pickupLocation);
+  await page.locator('#deliveryLocation').fill(seededOrders[0].deliveryLocation);
+  await page.evaluate((cargo) => {
+    const select = document.getElementById('cargo');
+    if (!select) return;
+    const exists = Array.from(select.options).some(option => option.value === cargo);
+    if (!exists) {
+      const option = document.createElement('option');
+      option.value = cargo;
+      option.textContent = cargo;
+      select.appendChild(option);
+    }
+    select.value = cargo;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }, seededOrders[0].cargo);
+  await page.locator('#instructions').fill('この端末での変更');
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+
+  await expect.poll(() => seenAlert).toContain('別の端末でこの受注が更新されています');
+  await expect(page.locator('#orderModal')).toBeVisible();
+  await expect(page.locator('#instructions')).toHaveValue('この端末での変更');
 });
