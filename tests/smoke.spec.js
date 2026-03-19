@@ -271,6 +271,38 @@ async function replaceOrdersAndRefresh(page, orders) {
   }, orders);
 }
 
+async function freezePageDate(page, isoDateString) {
+  await page.addInitScript(({ fixedIso }) => {
+    const RealDate = Date;
+    const fixedTime = new RealDate(fixedIso).getTime();
+
+    class MockDate extends RealDate {
+      constructor(...args) {
+        if (args.length === 0) {
+          super(fixedTime);
+          return;
+        }
+        super(...args);
+      }
+
+      static now() {
+        return fixedTime;
+      }
+
+      static parse(value) {
+        return RealDate.parse(value);
+      }
+
+      static UTC(...args) {
+        return RealDate.UTC(...args);
+      }
+    }
+
+    Object.setPrototypeOf(MockDate, RealDate);
+    window.Date = MockDate;
+  }, { fixedIso: isoDateString });
+}
+
 test('basic order row actions open the expected UI', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -779,4 +811,80 @@ test('invoice and payment checkboxes persist to local storage', async ({ page })
       };
     });
   }).toEqual({ invoiceSent: true, paymentReceived: true });
+});
+
+test('visible stats follow customer filtering and reset after clear', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const adjustedOrders = [
+    seededOrders[0],
+    {
+      ...seededOrders[1],
+      orderCompleted: true
+    }
+  ];
+
+  await replaceOrdersAndRefresh(page, adjustedOrders);
+
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalGross')).toHaveText('¥2,970');
+  await expect(page.locator('#totalNet')).toHaveText('¥2,700');
+  await expect(page.locator('#incompleteCount')).toHaveText('1件');
+
+  await page.locator('#searchInput').fill('サンプル');
+
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#totalGross')).toHaveText('¥1,870');
+  await expect(page.locator('#totalNet')).toHaveText('¥1,700');
+  await expect(page.locator('#incompleteCount')).toHaveText('0件');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeHidden();
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'クリア' }).click();
+
+  await expect(page.locator('#searchInput')).toHaveValue('');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalGross')).toHaveText('¥2,970');
+  await expect(page.locator('#incompleteCount')).toHaveText('1件');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeVisible();
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
+});
+
+test('today and tomorrow delivery cards exclude completed orders', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const todayCompletedOrder = {
+    id: 'test-4',
+    orderNo: 'R260319-004',
+    date: '2026-03-19',
+    customerName: '完了済みテスト',
+    pickupLocation: '石狩市場',
+    pickupAddress: '石狩市新港西1丁目',
+    deliveryLocation: '札幌西倉庫',
+    deliveryAddress: '札幌市西区発寒',
+    deliveryTel: '0133-00-0000',
+    cargo: '長ねぎ',
+    quantity: 8,
+    unit: 'ケース',
+    packaging: 'ダンボール',
+    unitPrice: 120,
+    amountNet: 960,
+    amountGross: 1056,
+    instructions: '',
+    driver: '混載流通',
+    vehicle: '札幌100あ12-34',
+    instructionSheet: false,
+    invoiceSent: false,
+    paymentReceived: false,
+    orderCompleted: true
+  };
+
+  await replaceOrdersAndRefresh(page, [...seededOrders, todayCompletedOrder]);
+
+  await expect(page.locator('#todayDeliveryCount')).toHaveText('1件');
+  await expect(page.locator('#tomorrowDeliveryCount')).toHaveText('1件');
+  await expect(page.locator('#incompleteCount')).toHaveText('2件');
 });
