@@ -1038,3 +1038,62 @@ test('invoice csv export uses only the selected month and groups that month cust
 
   await expect.poll(() => seenAlert).toContain('明細 2 行');
 });
+
+test('instruction sheet modal and print output use only the selected orders', async ({ page }) => {
+  await seedLocalMode(page);
+  await installPrintCapture(page);
+  await page.goto('/');
+
+  await page.locator('#tableBody tr').nth(1).locator('.order-checkbox').check();
+  await page.getByRole('button', { name: /運行指示書/ }).click();
+
+  await expect(page.locator('#instructionSettingsModal')).toBeVisible();
+  await expect(page.locator('#orderSequenceList')).toContainText('サンプル運送');
+  await expect(page.locator('#orderSequenceList')).toContainText('R260319-002');
+  await expect(page.locator('#orderSequenceList')).not.toContainText('テスト青果');
+
+  await page.locator('#dispatchTime').fill('08:30');
+  await page.getByRole('button', { name: '運行指示書を出力' }).click();
+
+  await expect(page.locator('#instructionSettingsModal')).toBeHidden();
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites.length);
+  }).toBe(1);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('サンプル運送');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('08:30');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).not.toContain('テスト青果');
+});
+
+test('pickup slip print output uses only the selected orders', async ({ page }) => {
+  await seedLocalMode(page);
+  await installPrintCapture(page);
+  await page.goto('/');
+
+  await page.locator('#tableBody tr').nth(1).locator('.order-checkbox').check();
+  await page.getByRole('button', { name: /引取書/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites.length);
+  }).toBe(1);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('サンプル運送');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('帯広500た56-78');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).not.toContain('テスト青果');
+});
