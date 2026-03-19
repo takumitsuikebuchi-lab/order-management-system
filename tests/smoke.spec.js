@@ -888,3 +888,153 @@ test('today and tomorrow delivery cards exclude completed orders', async ({ page
   await expect(page.locator('#tomorrowDeliveryCount')).toHaveText('1件');
   await expect(page.locator('#incompleteCount')).toHaveText('2件');
 });
+
+test('csv export follows the currently selected month', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  const aprilOrder = {
+    id: 'test-5',
+    orderNo: 'R260401-001',
+    date: '2026-04-06',
+    customerName: '4月青果',
+    pickupLocation: '函館市場',
+    pickupAddress: '函館市港町1-1',
+    deliveryLocation: '札幌青果センター',
+    deliveryAddress: '札幌市白石区流通センター',
+    deliveryTel: '0138-00-0000',
+    cargo: 'アスパラ',
+    quantity: 12,
+    unit: 'ケース',
+    packaging: 'ダンボール',
+    unitPrice: 220,
+    amountNet: 2640,
+    amountGross: 2904,
+    instructions: '4月出力確認',
+    driver: '混載流通',
+    vehicle: '函館100か11-22',
+    instructionSheet: false,
+    invoiceSent: false,
+    paymentReceived: false,
+    orderCompleted: false
+  };
+
+  await replaceOrdersAndRefresh(page, [...seededOrders, aprilOrder]);
+  await page.evaluate(() => {
+    window.showCsvFormatDialog = async () => 'internal';
+    window.saveCsvToDir = async () => false;
+    currentMonth = new Date('2026-04-01T00:00:00');
+    updateMonth();
+    renderTable();
+    updateStats();
+  });
+
+  await page.getByRole('button', { name: /CSV出力/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toContain('2026年4月');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('R260401-001');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).not.toContain('R260319-001');
+});
+
+test('invoice csv export uses only the selected month and groups that month customers', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  const aprilOrders = [
+    {
+      id: 'test-6',
+      orderNo: 'R260401-010',
+      date: '2026-04-03',
+      customerName: '4月共同運送',
+      pickupLocation: '小樽市場',
+      pickupAddress: '小樽市港町1-2',
+      deliveryLocation: '札幌共同倉庫',
+      deliveryAddress: '札幌市東区東雁来',
+      deliveryTel: '0134-00-0000',
+      cargo: 'にんじん',
+      quantity: 10,
+      unit: 'ケース',
+      packaging: 'ダンボール',
+      unitPrice: 180,
+      amountNet: 1800,
+      amountGross: 1980,
+      instructions: '',
+      driver: '混載流通',
+      vehicle: '小樽100さ33-44',
+      instructionSheet: false,
+      invoiceSent: false,
+      paymentReceived: false,
+      orderCompleted: false
+    },
+    {
+      id: 'test-7',
+      orderNo: 'R260401-011',
+      date: '2026-04-08',
+      customerName: '4月共同運送',
+      pickupLocation: '北見市場',
+      pickupAddress: '北見市卸町2丁目',
+      deliveryLocation: '札幌共同倉庫',
+      deliveryAddress: '札幌市東区東雁来',
+      deliveryTel: '0157-00-0000',
+      cargo: 'たまねぎ',
+      quantity: 14,
+      unit: '袋',
+      packaging: 'ネット',
+      unitPrice: 130,
+      amountNet: 1820,
+      amountGross: 2002,
+      instructions: '',
+      driver: '門脇悟大',
+      vehicle: '北見100た55-66',
+      instructionSheet: false,
+      invoiceSent: false,
+      paymentReceived: false,
+      orderCompleted: false
+    }
+  ];
+
+  await replaceOrdersAndRefresh(page, [...seededOrders, ...aprilOrders]);
+  await page.evaluate(() => {
+    window.saveCsvToDir = async () => false;
+    currentMonth = new Date('2026-04-01T00:00:00');
+    updateMonth();
+    renderTable();
+    updateStats();
+  });
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.getByRole('button', { name: /請求書CSV/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toContain('請求書_2026年04月分');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('4月共同運送');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('202604-001');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).not.toContain('テスト青果');
+
+  await expect.poll(() => seenAlert).toContain('明細 2 行');
+});
