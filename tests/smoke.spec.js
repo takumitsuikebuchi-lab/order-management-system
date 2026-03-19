@@ -265,6 +265,161 @@ async function seedRefreshCloudMode(page, updatedOrders) {
   });
 }
 
+async function seedQueueRecoveryCloudMode(page) {
+  let patchAttempts = 0;
+  let postAttempts = 0;
+  let currentCloudOrders = [...seededOrders];
+
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(currentCloudOrders)
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?order_no=eq\..*/, async route => {
+    if (route.request().method() !== 'PATCH') {
+      await route.fulfill({ status: 405, contentType: 'application/json', body: JSON.stringify({ message: 'unsupported' }) });
+      return;
+    }
+
+    patchAttempts += 1;
+    if (patchAttempts <= 3) {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'temporary patch failure' })
+      });
+      return;
+    }
+
+    const patch = JSON.parse(route.request().postData() || '{}');
+    const orderNo = decodeURIComponent(route.request().url().split('order_no=eq.')[1] || '').split('&')[0];
+    currentCloudOrders = currentCloudOrders.map(order =>
+      String(order.orderNo || order.order_no) === String(orderNo) ? { ...order, ...patch } : order
+    );
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(currentCloudOrders.filter(order => String(order.orderNo || order.order_no) === String(orderNo)))
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/orders?on_conflict=order_no', async route => {
+    if (route.request().method() !== 'POST') {
+      await route.fulfill({ status: 405, contentType: 'application/json', body: JSON.stringify({ message: 'unsupported' }) });
+      return;
+    }
+
+    postAttempts += 1;
+    const inserted = JSON.parse(route.request().postData() || '{}');
+    if (postAttempts === 1) {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'temporary insert failure' })
+      });
+      return;
+    }
+
+    const cloudRow = { ...inserted, id: inserted.order_no || inserted.orderNo };
+    currentCloudOrders = [...currentCloudOrders, cloudRow];
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify([cloudRow])
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(seededCustomers.map(customer => ({
+        customer_name: customer.name,
+        pickup_address: customer.address,
+        phone_number: customer.tel
+      })))
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        { master_type: 'driver', name: '混載流通', sort_order: 0 },
+        { master_type: 'driver', name: '門脇悟大', sort_order: 1 }
+      ])
+    });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+  });
+}
+
+async function seedEmptyMastersCloudMode(page) {
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(seededOrders)
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  await page.addInitScript(({ customers }) => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+    localStorage.setItem('customerMaster', JSON.stringify(customers));
+    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', '門脇悟大']));
+    localStorage.setItem('vehicleMaster', JSON.stringify(['札幌100あ12-34', '帯広500た56-78']));
+  }, { customers: seededCustomers });
+}
+
 async function visibleCustomers(page) {
   return await page.locator('#tableBody tr').evaluateAll(rows =>
     rows
@@ -1334,4 +1489,109 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
     'サンプル運送 北海道'
   ]);
   await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeHidden();
+});
+
+test('cloud save failure keeps the local order and retries from the queue later', async ({ page }) => {
+  await seedQueueRecoveryCloudMode(page);
+  await page.goto('/');
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await page.getByRole('button', { name: /新規受注/ }).click();
+  await page.locator('#orderNo').fill('R260319-020');
+  await page.locator('#orderDate').fill('2026-03-23');
+  await page.locator('#customerName').fill('クラウド失敗テスト');
+  await page.locator('#pickupLocation').fill('石狩市場');
+  await page.locator('#pickupAddress').fill('石狩市新港東');
+  await page.locator('#deliveryLocation').fill('札幌冷蔵センター');
+  await page.locator('#deliveryAddress').fill('札幌市東区東雁来');
+  await ensureSelectOption(page, '#cargo', 'たまねぎ');
+  await page.locator('#quantity').fill('5');
+  await ensureSelectOption(page, '#unit', 'ケース');
+  await ensureSelectOption(page, '#packaging', 'ダンボール');
+  await page.locator('#unitPrice').fill('300');
+  await page.locator('#amountNet').fill('1500');
+  await ensureSelectOption(page, '#driver', '混載流通');
+  await ensureSelectOption(page, '#vehicle', '札幌100あ12-34');
+  await page.locator('#instructions').fill('同期失敗からの復旧確認');
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+
+  await expect(page.locator('#orderModal')).toBeHidden();
+  await expect(page.locator('#tableBody')).toContainText('クラウド失敗テスト');
+  await expect.poll(async () => {
+    return await page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length);
+  }).toBe(1);
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('エラー');
+
+  await page.evaluate(() => flushCloudQueue());
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length);
+  }).toBe(0);
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      return orders.some(order => order.orderNo === 'R260319-020');
+    });
+  }).toBe(true);
+});
+
+test('cloud master sync accepts empty customer and driver lists as the latest state', async ({ page }) => {
+  await seedEmptyMastersCloudMode(page);
+  await page.goto('/');
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => ({
+      customers: JSON.parse(localStorage.getItem('customerMaster') || '[]').length,
+      drivers: JSON.parse(localStorage.getItem('driverMaster') || '[]').length
+    }));
+  }).toEqual({ customers: 0, drivers: 0 });
+
+  await expect(page.locator('#driverFilter')).toHaveValue('');
+  await expect.poll(async () => {
+    return await page.locator('#driverFilter option').evaluateAll(options =>
+      options.map(option => option.textContent?.trim() || '')
+    );
+  }).toEqual(['全ドライバー']);
+
+  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(0);
+});
+
+test('invoice csv export stops safely when the selected month has no orders', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    window.saveCsvToDir = async () => false;
+    currentMonth = new Date('2026-04-01T00:00:00');
+    updateMonth();
+    renderTable();
+    updateStats();
+  });
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.getByRole('button', { name: /請求書CSV/ }).click();
+
+  await expect.poll(() => seenAlert).toContain('出力するデータがありません');
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toBe('');
 });
