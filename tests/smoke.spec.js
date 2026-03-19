@@ -261,6 +261,16 @@ async function checkedOrderCount(page) {
   return await page.locator('#tableBody .order-checkbox:checked').count();
 }
 
+async function replaceOrdersAndRefresh(page, orders) {
+  await page.evaluate((nextOrders) => {
+    localStorage.setItem('orders', JSON.stringify(nextOrders));
+    loadData();
+    renderTable();
+    updateStats();
+    setupFilters();
+  }, orders);
+}
+
 test('basic order row actions open the expected UI', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -697,4 +707,76 @@ test('select all toggles all visible order checkboxes', async ({ page }) => {
 
   await page.locator('#selectAll').uncheck();
   await expect.poll(async () => await checkedOrderCount(page)).toBe(0);
+});
+
+test('month navigation updates the visible month and monthly stats', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const aprilOrder = {
+    id: 'test-3',
+    orderNo: 'R260401-001',
+    date: '2026-04-05',
+    customerName: '4月テスト商事',
+    pickupLocation: '釧路市場',
+    pickupAddress: '釧路市新富士町1-1',
+    deliveryLocation: '札幌冷蔵倉庫',
+    deliveryAddress: '札幌市東区東雁来',
+    deliveryTel: '0154-00-0000',
+    cargo: '玉ねぎ',
+    quantity: 15,
+    unit: 'ケース',
+    packaging: 'ダンボール',
+    unitPrice: 200,
+    amountNet: 3000,
+    amountGross: 3300,
+    instructions: '',
+    driver: '混載流通',
+    vehicle: '札幌100あ12-34',
+    instructionSheet: false,
+    invoiceSent: false,
+    paymentReceived: false,
+    orderCompleted: false
+  };
+
+  await replaceOrdersAndRefresh(page, [...seededOrders, aprilOrder]);
+
+  await page.evaluate(() => {
+    currentMonth = new Date('2026-03-01T00:00:00');
+    updateMonth();
+    renderTable();
+    updateStats();
+  });
+
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalGross')).toHaveText('¥2,970');
+
+  await page.getByRole('button', { name: '→' }).click();
+
+  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#totalGross')).toHaveText('¥3,300');
+});
+
+test('invoice and payment checkboxes persist to local storage', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const firstRow = page.locator('#tableBody tr').nth(0);
+  const invoiceCheckbox = firstRow.locator('input.checkbox-small').nth(0);
+  const paymentCheckbox = firstRow.locator('input.checkbox-small').nth(1);
+
+  await invoiceCheckbox.check();
+  await paymentCheckbox.check();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      return {
+        invoiceSent: !!orders[0]?.invoiceSent,
+        paymentReceived: !!orders[0]?.paymentReceived
+      };
+    });
+  }).toEqual({ invoiceSent: true, paymentReceived: true });
 });
