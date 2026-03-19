@@ -1570,17 +1570,20 @@ test('cloud master sync accepts empty customer and driver lists as the latest st
 });
 
 test('invoice csv export stops safely when the selected month has no orders', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installCsvCapture(page);
   await page.goto('/');
 
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
+  await page.getByRole('button', { name: '→' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+
   await page.evaluate(() => {
     window.saveCsvToDir = async () => false;
-    currentMonth = new Date('2026-04-01T00:00:00');
-    updateMonth();
-    renderTable();
-    updateStats();
   });
+
+  await expect(page.locator('#orderCount')).toHaveText('0件');
 
   let seenAlert = '';
   page.once('dialog', async dialog => {
