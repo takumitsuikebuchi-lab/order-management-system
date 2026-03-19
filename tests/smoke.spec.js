@@ -241,6 +241,22 @@ async function installCsvCapture(page) {
   });
 }
 
+async function ensureSelectOption(page, selector, value) {
+  await page.evaluate(({ selector: selectSelector, value: optionValue }) => {
+    const select = document.querySelector(selectSelector);
+    if (!select) return;
+    const exists = Array.from(select.options).some(option => option.value === optionValue);
+    if (!exists) {
+      const option = document.createElement('option');
+      option.value = optionValue;
+      option.textContent = optionValue;
+      select.appendChild(option);
+    }
+    select.value = optionValue;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { selector, value });
+}
+
 test('basic order row actions open the expected UI', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -442,4 +458,73 @@ test('editing warns when the same order was changed on another device', async ({
   await expect.poll(() => seenAlert).toContain('別の端末でこの受注が更新されています');
   await expect(page.locator('#orderModal')).toBeVisible();
   await expect(page.locator('#instructions')).toHaveValue('この端末での変更');
+});
+
+test('csv import adds a new order row', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const csvText = [
+    '受注番号,日付,顧客名,引取先,引取先住所,配送先,配送先住所,配送先電話番号,積荷,数量,単位,荷姿,単価,金額(税別),金額(税込),ドライバー,車両,備考,指示書,請求済,入金済,完了',
+    'R260319-003,2026-03-21,CSV取込テスト,石狩市場,石狩市新港,函館市場,函館市港町,0138-00-0000,にんじん,30,箱,ダンボール,150,4500,4950,混載流通,札幌100あ12-34,CSV取り込み,false,false,false,false'
+  ].join('\n');
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.locator('#csvImport').setInputFiles({
+    name: 'orders.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csvText, 'utf8')
+  });
+
+  await expect.poll(() => seenAlert).toContain('CSVファイルをインポートしました');
+  await expect(page.locator('#tableBody tr')).toHaveCount(3);
+  await expect(page.locator('#tableBody')).toContainText('CSV取込テスト');
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      return orders.some(order => order.orderNo === 'R260319-003');
+    });
+  }).toBe(true);
+});
+
+test('new order save adds a row locally', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /新規受注/ }).click();
+  await expect(page.locator('#modalTitle')).toHaveText('新規受注登録');
+
+  await page.locator('#orderNo').fill('R260319-010');
+  await page.locator('#orderDate').fill('2026-03-22');
+  await page.locator('#customerName').fill('新規保存テスト');
+  await page.locator('#pickupLocation').fill('苫小牧市場');
+  await page.locator('#pickupAddress').fill('苫小牧市港町1-1');
+  await page.locator('#deliveryLocation').fill('札幌加工センター');
+  await page.locator('#deliveryAddress').fill('札幌市白石区流通センター1-1');
+  await ensureSelectOption(page, '#cargo', 'たまねぎ');
+  await page.locator('#quantity').fill('12');
+  await ensureSelectOption(page, '#unit', 'ケース');
+  await ensureSelectOption(page, '#packaging', 'ダンボール');
+  await page.locator('#unitPrice').fill('200');
+  await page.locator('#amountNet').fill('2400');
+  await ensureSelectOption(page, '#driver', '混載流通');
+  await ensureSelectOption(page, '#vehicle', '札幌100あ12-34');
+  await page.locator('#instructions').fill('新規保存の自動テスト');
+
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+
+  await expect(page.locator('#orderModal')).toBeHidden();
+  await expect(page.locator('#tableBody tr')).toHaveCount(3);
+  await expect(page.locator('#tableBody')).toContainText('新規保存テスト');
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      return orders.some(order => order.orderNo === 'R260319-010');
+    });
+  }).toBe(true);
 });
