@@ -27,6 +27,11 @@
 - Customer filter clearing is now done by the single right-side `クリア` button.
 - Date filter clearing is labeled `日付解除` to distinguish it from customer filter clearing.
 
+### 2026-03-19
+
+- Playwright-based UI smoke tests were added outside the app runtime so regression checks do not change production behavior.
+- The GitHub Actions guard workflow now runs the UI smoke tests before mirroring `main` to `master`.
+
 ## Important invariants
 
 - `cloud-config.json` is the source of truth for Supabase URL / anon key / enabled flag.
@@ -74,6 +79,8 @@
 - `requirements.md`
 - `RUNBOOK.md`
 - `TEST_CHECKLIST.md`
+- `package.json`
+- `tests/smoke.spec.js`
 - `cloud-config.json`
 - `index.html`
 
@@ -85,3 +92,4 @@
 - Cloud settings UI was intentionally restricted to reduce accidental local-only operation.
 - `.github/workflows/guard-and-sync.yml` verifies `cloud-config.json` and mirrors `main` to `master` on push.
 - The visible order list must not lose active filters just because a background cloud refresh ran.
+- UI regression checks should stay external to the app runtime; prefer test files and workflow steps over diagnostic code inside `index.html`.

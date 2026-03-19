@@ -27,6 +27,21 @@ jobs:
         run: |
           node -e "const fs=require('fs'); const vm=require('vm'); const html=fs.readFileSync('index.html','utf8'); const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]; if(!scripts.length) throw new Error('script not found'); scripts.forEach((m,i)=>new vm.Script(m[1],{filename:'script-'+i+'.js'}));"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run UI smoke tests
+        run: npm run test:ui
+
   sync-master:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify

@@ -17,6 +17,7 @@
 - **セットアップガイド**: 5〜10分で完了する簡単設定
 - **要件定義書**: 現在の仕様と壊してはいけない前提を `requirements.md` に整理
 - **テストチェックリスト**: 修正後の最低限確認を `TEST_CHECKLIST.md` に整理
+- **自動UIテスト**: Playwright の smoke test を `tests/smoke.spec.js` に追加
 - **障害対応ランブック**: 代表的な障害初動を `RUNBOOK.md` に整理
 - **変更履歴**: 重要変更を `CHANGELOG.md` に整理
 - **保守メモ**: AIツール向けの判断材料を `AGENTS.md` に整理
@@ -98,6 +99,9 @@ order-system-improved/
 ├── RUNBOOK.md                    # 障害対応手順
 ├── CHANGELOG.md                  # 変更履歴
 ├── schema.sql                    # DBスキーマ正本
+├── package.json                  # テスト実行設定
+├── playwright.config.js          # Playwright設定
+├── tests/smoke.spec.js           # UIスモークテスト
 ├── manual_images/                # マニュアル用画像
 │   ├── 01-welcome.webp
 │   ├── 02-cloud-info.webp
