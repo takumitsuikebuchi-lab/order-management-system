@@ -257,6 +257,10 @@ async function ensureSelectOption(page, selector, value) {
   }, { selector, value });
 }
 
+async function checkedOrderCount(page) {
+  return await page.locator('#tableBody .order-checkbox:checked').count();
+}
+
 test('basic order row actions open the expected UI', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -524,6 +528,31 @@ test('customer master csv import adds new customers and skips duplicates', async
   await expect(page.locator('#customerMasterBody input[data-field="name"]').nth(2)).toHaveValue('CSV顧客追加');
 });
 
+test('customer master csv export creates a customer csv download', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    window.saveCsvToDir = async () => false;
+  });
+
+  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await page.locator('#customerMasterModal').getByRole('button', { name: /CSV出力/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toContain('顧客マスタ_');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('顧客名,住所,電話番号');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('テスト青果');
+});
+
 test('new order save adds a row locally', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -599,4 +628,73 @@ test('invoice csv export creates a moneyforward formatted download', async ({ pa
   }).toContain('含まない');
 
   await expect.poll(() => seenAlert).toContain('請求書CSVを出力しました');
+});
+
+test('simple master csv import adds new driver values and skips duplicates', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /ドライバーマスタ/ }).click();
+  await expect(page.locator('#simpleMasterTitle')).toHaveText('ドライバーマスタ管理');
+
+  const csvText = [
+    '名称',
+    '混載流通',
+    'CSVドライバー'
+  ].join('\n');
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.locator('#simpleMasterCsvImport').setInputFiles({
+    name: 'drivers.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csvText, 'utf8')
+  });
+
+  await expect.poll(() => seenAlert).toContain('ドライバーマスタCSV取込完了');
+  await expect.poll(() => seenAlert).toContain('追加: 1件');
+  await expect.poll(() => seenAlert).toContain('スキップ: 1件');
+  await expect(page.locator('#simpleMasterList')).toContainText('CSVドライバー');
+});
+
+test('simple master csv export creates a driver csv download', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    window.saveCsvToDir = async () => false;
+  });
+
+  await page.getByRole('button', { name: /ドライバーマスタ/ }).click();
+  await page.locator('#simpleMasterModal').getByRole('button', { name: /CSV出力/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toContain('ドライバーマスタ_');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('名称');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('混載流通');
+});
+
+test('select all toggles all visible order checkboxes', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await expect(await checkedOrderCount(page)).toBe(0);
+
+  await page.locator('#selectAll').check();
+  await expect.poll(async () => await checkedOrderCount(page)).toBe(2);
+
+  await page.locator('#selectAll').uncheck();
+  await expect.poll(async () => await checkedOrderCount(page)).toBe(0);
 });
