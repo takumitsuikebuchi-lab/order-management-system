@@ -492,6 +492,38 @@ test('csv import adds a new order row', async ({ page }) => {
   }).toBe(true);
 });
 
+test('customer master csv import adds new customers and skips duplicates', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
+
+  const csvText = [
+    '顧客名,住所,電話番号',
+    'テスト青果,札幌市中央区北12条西20丁目,011-000-0000',
+    'CSV顧客追加,小樽市港町1-2-3,0134-00-0000'
+  ].join('\n');
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.locator('#customerCsvImport').setInputFiles({
+    name: 'customers.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csvText, 'utf8')
+  });
+
+  await expect.poll(() => seenAlert).toContain('CSVインポート完了');
+  await expect.poll(() => seenAlert).toContain('追加: 1件');
+  await expect.poll(() => seenAlert).toContain('スキップ: 1件');
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(3);
+  await expect(page.locator('#customerMasterBody input[data-field="name"]').nth(2)).toHaveValue('CSV顧客追加');
+});
+
 test('new order save adds a row locally', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
@@ -527,4 +559,44 @@ test('new order save adds a row locally', async ({ page }) => {
       return orders.some(order => order.orderNo === 'R260319-010');
     });
   }).toBe(true);
+});
+
+test('invoice csv export creates a moneyforward formatted download', async ({ page }) => {
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  await page.evaluate(() => {
+    window.saveCsvToDir = async () => false;
+  });
+
+  let seenAlert = '';
+  page.once('dialog', async dialog => {
+    seenAlert = dialog.message();
+    await dialog.accept();
+  });
+
+  await page.getByRole('button', { name: /請求書CSV/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.filename);
+  }).toContain('請求書_');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('csv_type(変更不可)');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('40101');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('源泉徴収');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toContain('含まない');
+
+  await expect.poll(() => seenAlert).toContain('請求書CSVを出力しました');
 });
