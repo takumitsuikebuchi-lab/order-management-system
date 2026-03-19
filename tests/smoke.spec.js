@@ -194,3 +194,40 @@ test('shared cloud config keeps cloud settings locked in normal mode', async ({ 
   await expect(page.locator('#cloudEnabledCheckbox')).toBeDisabled();
   await expect(page.locator('#cloudSettingsSaveButton')).toBeDisabled();
 });
+
+test('customer master add flow updates the master list', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await expect(page.locator('#customerMasterModal')).toBeVisible();
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
+
+  await page.getByRole('button', { name: /新規追加/ }).click();
+  await expect(page.locator('#customerAddModal')).toBeVisible();
+
+  await page.locator('#newCustomerName').fill('追加テスト商事');
+  await page.locator('#newCustomerAddress').fill('札幌市東区テスト1-2-3');
+  await page.locator('#newCustomerTel').fill('011-999-0000');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: '追加', exact: true }).click();
+
+  await expect(page.locator('#customerMasterBody tr')).toHaveCount(3);
+  await expect(page.locator('#customerMasterBody input[data-field="name"]').nth(2)).toHaveValue('追加テスト商事');
+});
+
+test('print entry points still respond as expected', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: /引取書/ }).click();
+
+  await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
+  await page.getByRole('button', { name: /運行指示書/ }).click();
+
+  await expect(page.locator('#instructionSettingsModal')).toBeVisible();
+  await expect(page.locator('#instructionSettingsModal h2')).toHaveText('運行指示書の設定');
+  await expect(page.locator('#orderSequenceList .order-sequence-item')).toHaveCount(1);
+});
