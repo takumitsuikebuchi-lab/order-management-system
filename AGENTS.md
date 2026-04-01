@@ -1,4 +1,7 @@
-# Order Management System Notes
+# Order Management System — AI Maintenance Notes
+
+> Claude Codeを使う場合は、同じリポジトリの `CLAUDE.md` も参照すること。
+> `CLAUDE.md` にはClaude Code固有の指示（作業前の読込ファイル順・データ保護ルール・禁止事項）が書かれている。
 
 ## Current operating model
 
@@ -26,6 +29,12 @@
 - The order list search UI was simplified to one `顧客検索` field that supports both free-text input and datalist selection.
 - Customer filter clearing is now done by the single right-side `クリア` button.
 - Date filter clearing is labeled `日付解除` to distinguish it from customer filter clearing.
+
+### 2026-04-01
+
+- `CLAUDE.md` を新設。Claude Codeが改修前に読むべきファイル順・データ保護ルール・禁止事項を明記
+- `.github/workflows/weekly-backup.yml` を追加。毎週水曜深夜0時（JST）に受注明細・顧客マスタをCSV出力し `backups/` フォルダへ自動保存
+- `tasks/todo.md` を追加（タスク管理ログ）
 
 ### 2026-03-19
 
@@ -75,15 +84,26 @@
 
 ## Files AI tools should read first
 
+- `CLAUDE.md` — Claude Code固有の指示書（必ず最初に読む）
 - `README.md`
+- `AGENTS.md`（このファイル）
 - `SETUP.md`
 - `requirements.md`
 - `RUNBOOK.md`
 - `TEST_CHECKLIST.md`
+- `tasks/lessons.md`
 - `package.json`
 - `tests/smoke.spec.js`
 - `cloud-config.json`
 - `index.html`
+
+## Backup
+
+- Weekly auto-backup is configured in `.github/workflows/weekly-backup.yml`
+- Runs every Wednesday at 15:00 UTC (= midnight JST Thursday)
+- Exports `orders` and `customers` tables as CSV to `backups/YYYY-MM-DD_受注明細.csv` and `backups/YYYY-MM-DD_顧客マスタ.csv`
+- Manual trigger is available from GitHub Actions tab → "Weekly Backup" → "Run workflow"
+- **Before any modification that touches order data, verify a recent backup exists in `backups/`**
 
 ## Known design decisions
 

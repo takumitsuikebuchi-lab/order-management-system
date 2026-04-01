@@ -14,6 +14,7 @@
 
 ### まず読むべき文書
 
+- `CLAUDE.md`: Claude Code向けの指示書（作業前の必読ファイル順・データ保護ルール）
 - `requirements.md`: システムが満たすべき要件と壊してはいけない仕様
 - `SETUP.md`: 運用・復旧・セットアップ手順
 - `RUNBOOK.md`: 障害時の初動確認
@@ -35,6 +36,14 @@
 - 顧客絞り込みの解除は右端の `クリア` ボタンで行う
 - 日付絞り込みの解除は `日付解除` ボタンで行う
 - バックグラウンドのクラウド再同期が入っても、表示中の絞り込み条件は維持される
+
+### バックアップ体制（2026-04-01）
+
+- **週次自動バックアップ**が `.github/workflows/weekly-backup.yml` で設定済み
+- 毎週水曜日の深夜0時（JST）にSupabaseから受注明細・顧客マスタを取得し、`backups/` フォルダにCSV保存
+- ファイル名例: `backups/2026-04-02_受注明細.csv` / `backups/2026-04-02_顧客マスタ.csv`
+- 緊急バックアップはGitHub → Actions → 「Weekly Backup」→「Run workflow」から即時実行可能
+- 受注データに影響する改修を行う前に、必ず最新のバックアップが存在することを確認する
 
 ### 自動確認の現在地（2026-03-19）
 
@@ -245,11 +254,13 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 
 ## AIツールに相談するときの伝え方
 
-Codex / Claude / Cursor などに依頼する場合は、次の4点を伝えると早いです。
+**Claude Codeを使う場合**はリポジトリに `CLAUDE.md` があるので、自動的に読み込まれます。追加の説明は不要です。
+
+**その他のAIツール（Codex / Cursor など）に依頼する場合**は、次の4点を伝えると早いです。
 
 1. 本番URL: `https://takumitsuikebuchi-lab.github.io/order-management-system/`
 2. 共通クラウド設定は `cloud-config.json` が正本
 3. 通常運用ではクラウド設定UIはロックされている
-4. まず `requirements.md` `AGENTS.md` `SETUP.md` を読んでから対応してほしい
+4. まず `CLAUDE.md` `requirements.md` `AGENTS.md` `SETUP.md` を読んでから対応してほしい
 
 これで、運用方式の誤解による再設定ミスをかなり防げます。

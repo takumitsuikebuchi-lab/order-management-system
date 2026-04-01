@@ -21,6 +21,8 @@
 - **障害対応ランブック**: 代表的な障害初動を `RUNBOOK.md` に整理
 - **変更履歴**: 重要変更を `CHANGELOG.md` に整理
 - **保守メモ**: AIツール向けの判断材料を `AGENTS.md` に整理
+- **Claude Code指示書**: Claude Codeがこのプロジェクトを正しく扱うための指示を `CLAUDE.md` に整理
+- **週次自動バックアップ**: 毎週水曜深夜0時（JST）に受注明細・顧客マスタをCSV保存（`backups/` フォルダに蓄積）
 
 ## 🚀 使い始める
 
@@ -76,7 +78,7 @@ npx http-server -p 8000
 - ✅ ローカルストレージ対応（オフライン可）
 - ✅ Supabaseクラウド同期
 - ✅ CSV取込・出力
-- ✅ 自動バックアップ
+- ✅ 週次自動バックアップ（毎週水曜深夜0時・`backups/` フォルダに保存）
 
 ## 🛠️ 技術仕様
 
@@ -88,33 +90,34 @@ npx http-server -p 8000
 ## 📁 ファイル構成
 
 ```
-order-system-improved/
+order-management-system/
 ├── index.html                    # メインアプリケーション
 ├── setup-wizard.html             # 初回セットアップウィザード
-├── かんたん運用マニュアル.md      # 運用マニュアル
+├── cloud-config.json             # 共有クラウド設定の正本
+├── schema.sql                    # DBスキーマ正本
+├── かんたん運用マニュアル.md      # 運用マニュアル（利用者向け）
 ├── README.md                     # このファイル
-├── SETUP.md                      # セットアップガイド
-├── requirements.md               # 要件定義
+├── CLAUDE.md                     # Claude Code向け指示書
+├── AGENTS.md                     # AIツール全般向け保守メモ
+├── SETUP.md                      # セットアップ・運用ガイド
+├── requirements.md               # 要件定義（壊してはいけない仕様）
 ├── TEST_CHECKLIST.md             # 動作確認チェックリスト
 ├── RUNBOOK.md                    # 障害対応手順
 ├── CHANGELOG.md                  # 変更履歴
-├── schema.sql                    # DBスキーマ正本
 ├── package.json                  # テスト実行設定
 ├── playwright.config.js          # Playwright設定
+├── .github/workflows/
+│   ├── guard-and-sync.yml        # CI/CD（テスト → main→master自動同期）
+│   └── weekly-backup.yml         # 週次自動バックアップ（毎週水曜深夜0時JST）
 ├── tests/smoke.spec.js           # UIスモークテスト
+├── backups/                      # 週次CSVバックアップ保存先
+├── tasks/
+│   ├── todo.md                   # タスク管理ログ
+│   └── lessons.md                # 過去の失敗から学んだ教訓
 ├── manual_images/                # マニュアル用画像
-│   ├── 01-welcome.webp
-│   ├── 02-cloud-info.webp
-│   ├── 03-supabase-project.webp
-│   ├── 04-create-table.webp
-│   └── 05-connection-info.webp
 ├── CSV保存/                      # サンプルCSVデータ
-│   ├── orders_seed.csv
-│   ├── 受注明細_2025年10月.csv
-│   └── 顧客マスタ_20251012.csv
 ├── 運用マニュアル.html           # 現行運用マニュアル
 ├── システム全体像.html           # 現行アーキテクチャ説明
-├── AGENTS.md                     # AI向け保守メモ
 └── 切替手順_方式A_A社.html       # 現行切替メモ
 ```
 
@@ -135,8 +138,9 @@ order-system-improved/
 ## 💡 ヒント
 
 ### データのバックアップ
-- 週に1回は「CSV出力」でデータをバックアップしましょう
-- クラウド運用でも、念のためローカルバックアップを推奨
+- **週次自動バックアップが設定済みです**（毎週水曜深夜0時・GitHub上の `backups/` フォルダに保存）
+- 手動バックアップも引き続き「CSV出力」で取得できます
+- 緊急バックアップは GitHub → Actions → 「Weekly Backup」→「Run workflow」で即時実行できます
 
 ### トラブルシューティング
 - データが表示されない → ブラウザのキャッシュをクリア
@@ -168,6 +172,6 @@ order-system-improved/
 
 ---
 
-**開発**: Manus AI  
-**バージョン**: 2.0（改良版）  
-**更新日**: 2026年3月19日
+**開発**: Manus AI
+**バージョン**: 2.0（改良版）
+**更新日**: 2026年4月1日
