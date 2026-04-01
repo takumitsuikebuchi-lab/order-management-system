@@ -1,0 +1,62 @@
+name: Weekly Backup
+
+on:
+  schedule:
+    # 毎週水曜日 15:00 UTC = 日本時間 木曜日 0:00
+    # 水曜日深夜0時（JST）= 火曜日 15:00 UTC → cron では曜日2=火曜
+    - cron: '0 15 * * 2'
+  workflow_dispatch:
+    # GitHub画面から手動実行も可能（テスト・緊急バックアップ用）
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: 受注データをCSV出力
+        run: |
+          SUPABASE_URL=$(jq -r '.url' cloud-config.json)
+          SUPABASE_KEY=$(jq -r '.anonKey' cloud-config.json)
+          DATE=$(date -u +%Y-%m-%d)
+
+          mkdir -p backups
+
+          # 受注明細（全件・日付昇順）
+          curl -sf "${SUPABASE_URL}/rest/v1/orders?select=*&order=date.asc,order_no.asc" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Accept: text/csv" \
+            -o "backups/${DATE}_受注明細.csv"
+
+          echo "受注明細: $(wc -l < backups/${DATE}_受注明細.csv) 行（ヘッダー含む）"
+
+          # 顧客マスタ
+          curl -sf "${SUPABASE_URL}/rest/v1/customers?select=*&order=customer_name.asc" \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            -H "Accept: text/csv" \
+            -o "backups/${DATE}_顧客マスタ.csv"
+
+          echo "顧客マスタ: $(wc -l < backups/${DATE}_顧客マスタ.csv) 行（ヘッダー含む）"
+
+      - name: バックアップをコミット
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add backups/
+          git diff --staged --quiet && echo "変更なし（データが空の可能性）" && exit 0
+
+          git commit -m "backup: ${DATE} 週次自動バックアップ"
+          git push origin main
+
+          echo "バックアップ完了: backups/${DATE}_受注明細.csv / backups/${DATE}_顧客マスタ.csv"
