@@ -510,6 +510,7 @@ async function freezePageDate(page, isoDateString) {
 }
 
 test('basic order row actions open the expected UI', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -534,6 +535,7 @@ test('basic order row actions open the expected UI', async ({ page }) => {
 });
 
 test('customer filter survives a table refresh', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -604,6 +606,7 @@ test('driver master save updates filter options', async ({ page }) => {
 });
 
 test('print entry points still respond as expected', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -618,6 +621,7 @@ test('print entry points still respond as expected', async ({ page }) => {
 });
 
 test('instruction sheet and pickup slip write printable HTML', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installPrintCapture(page);
   await page.goto('/');
@@ -652,6 +656,7 @@ test('instruction sheet and pickup slip write printable HTML', async ({ page }) 
 });
 
 test('csv export creates an internal format download', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installCsvCapture(page);
   await page.goto('/');
@@ -677,6 +682,7 @@ test('csv export creates an internal format download', async ({ page }) => {
 });
 
 test('editing warns when the same order was changed on another device', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedConflictMode(page);
   await page.goto('/');
 
@@ -713,6 +719,7 @@ test('editing warns when the same order was changed on another device', async ({
 });
 
 test('csv import adds a new order row', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -770,6 +777,7 @@ test('csv import with header only leaves existing orders unchanged', async ({ pa
 });
 
 test('csv import updates an existing order instead of duplicating it', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -938,6 +946,7 @@ test('new order save adds a row locally', async ({ page }) => {
 });
 
 test('invoice csv export creates a moneyforward formatted download', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installCsvCapture(page);
   await page.goto('/');
@@ -1034,6 +1043,7 @@ test('simple master csv export creates a driver csv download', async ({ page }) 
 });
 
 test('select all toggles all visible order checkboxes', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -1047,6 +1057,7 @@ test('select all toggles all visible order checkboxes', async ({ page }) => {
 });
 
 test('month navigation updates the visible month and monthly stats', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -1078,13 +1089,6 @@ test('month navigation updates the visible month and monthly stats', async ({ pa
 
   await replaceOrdersAndRefresh(page, [...seededOrders, aprilOrder]);
 
-  await page.evaluate(() => {
-    currentMonth = new Date('2026-03-01T00:00:00');
-    updateMonth();
-    renderTable();
-    updateStats();
-  });
-
   await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
   await expect(page.locator('#orderCount')).toHaveText('2件');
   await expect(page.locator('#totalGross')).toHaveText('¥2,970');
@@ -1097,6 +1101,7 @@ test('month navigation updates the visible month and monthly stats', async ({ pa
 });
 
 test('invoice and payment checkboxes persist to local storage', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -1119,6 +1124,7 @@ test('invoice and payment checkboxes persist to local storage', async ({ page })
 });
 
 test('visible stats follow customer filtering and reset after clear', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -1254,6 +1260,7 @@ test('csv export follows the currently selected month', async ({ page }) => {
 });
 
 test('invoice csv export uses only the selected month and groups that month customers', async ({ page }) => {
+  await freezePageDate(page, '2026-04-01T09:00:00+09:00');
   await seedLocalMode(page);
   await installCsvCapture(page);
   await page.goto('/');
@@ -1314,10 +1321,6 @@ test('invoice csv export uses only the selected month and groups that month cust
   await replaceOrdersAndRefresh(page, [...seededOrders, ...aprilOrders]);
   await page.evaluate(() => {
     window.saveCsvToDir = async () => false;
-    currentMonth = new Date('2026-04-01T00:00:00');
-    updateMonth();
-    renderTable();
-    updateStats();
   });
 
   let seenAlert = '';
@@ -1348,6 +1351,7 @@ test('invoice csv export uses only the selected month and groups that month cust
 });
 
 test('instruction sheet modal and print output use only the selected orders', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installPrintCapture(page);
   await page.goto('/');
@@ -1382,6 +1386,7 @@ test('instruction sheet modal and print output use only the selected orders', as
 });
 
 test('pickup slip print output uses only the selected orders', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await installPrintCapture(page);
   await page.goto('/');
@@ -1407,6 +1412,7 @@ test('pickup slip print output uses only the selected orders', async ({ page }) 
 });
 
 test('date and driver filters narrow the table and stats, then clear safely', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
@@ -1462,6 +1468,7 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
     }
   ];
 
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedRefreshCloudMode(page, refreshedOrders);
   await page.goto('/');
 

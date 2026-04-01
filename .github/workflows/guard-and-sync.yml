@@ -23,6 +23,21 @@ jobs:
         run: |
           node -e "const cfg=require('./cloud-config.json'); if (!cfg.url || !cfg.anonKey || typeof cfg.enabled !== 'boolean') { throw new Error('cloud-config.json is invalid'); }"
 
+      - name: Verify index.html fallback matches cloud-config.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const cfg = require('./cloud-config.json');
+            const html = fs.readFileSync('index.html', 'utf8');
+            const urlMatch = html.match(/url:\s*'(https:\/\/[a-z]+\.supabase\.co)'/);
+            const keyMatch = html.match(/anonKey:\s*'(eyJ[^']{50,})'/);
+            if (!urlMatch) throw new Error('index.html embedded URL not found');
+            if (!keyMatch) throw new Error('index.html embedded anonKey not found');
+            if (urlMatch[1] !== cfg.url) throw new Error('Embedded URL does not match cloud-config.json: ' + urlMatch[1]);
+            if (keyMatch[1] !== cfg.anonKey) throw new Error('Embedded anonKey does not match cloud-config.json');
+            console.log('OK: embedded fallback matches cloud-config.json');
+          "
+
       - name: Verify index.html script syntax
         run: |
           node -e "const fs=require('fs'); const vm=require('vm'); const html=fs.readFileSync('index.html','utf8'); const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]; if(!scripts.length) throw new Error('script not found'); scripts.forEach((m,i)=>new vm.Script(m[1],{filename:'script-'+i+'.js'}));"

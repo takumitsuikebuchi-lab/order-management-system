@@ -42,6 +42,7 @@
 - **週次自動バックアップ**が `.github/workflows/weekly-backup.yml` で設定済み
 - 毎週水曜日の深夜0時（JST）にSupabaseから受注明細・顧客マスタを取得し、`backups/` フォルダにCSV保存
 - ファイル名例: `backups/2026-04-02_受注明細.csv` / `backups/2026-04-02_顧客マスタ.csv`
+- 初回バックアップは設定後の最初の水曜深夜0時に自動作成されます（それまで `backups/` フォルダは空です）
 - 緊急バックアップはGitHub → Actions → 「Weekly Backup」→「Run workflow」から即時実行可能
 - 受注データに影響する改修を行う前に、必ず最新のバックアップが存在することを確認する
 

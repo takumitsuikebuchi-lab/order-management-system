@@ -3508,8 +3508,16 @@ function updateStatsFromView() {
                         case 'vehicle': vehicleMaster = masterData; break;
                     }
                     
+                    // localStorageに即時保存（saveSimpleMasterと同じキー）
+                    const _storageKeyMap = {
+                        cargo: 'cargoMaster', packaging: 'packagingMaster',
+                        unit: 'unitMaster', driver: 'driverMaster', vehicle: 'vehicleMaster'
+                    };
+                    const _storageKey = _storageKeyMap[currentMasterType];
+                    if (_storageKey) localStorage.setItem(_storageKey, JSON.stringify(masterData));
+
                     renderSimpleMaster(masterData);
-                    
+
                     // Supabaseに保存
                     if (cloudEnabled()) {
                         cloudSaveSimpleMaster(currentMasterType, masterData).then(() => {
@@ -4935,14 +4943,35 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         }
 
         // CSVインポート（ヘッダーマッピング機能付き、Supabase自動同期）
+        // 引用符内の改行を保持するCSV行分割（RFC4180対応）
+        function splitCsvRows(text) {
+            const rows = [];
+            let current = '';
+            let inQuotes = false;
+            const src = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            for (let i = 0; i < src.length; i++) {
+                const ch = src[i];
+                if (ch === '"') {
+                    if (inQuotes && src[i + 1] === '"') { current += '""'; i++; }
+                    else { inQuotes = !inQuotes; current += ch; }
+                } else if (ch === '\n' && !inQuotes) {
+                    rows.push(current); current = '';
+                } else {
+                    current += ch;
+                }
+            }
+            if (current) rows.push(current);
+            return rows;
+        }
+
         function importCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             const reader = new FileReader();
             reader.onload = function(e) {
                 const text = e.target.result;
-                const lines = text.split('\n');
+                const lines = splitCsvRows(text);
                 const csvHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
                 
                 // ヘッダーマッピング定義

@@ -139,6 +139,7 @@ order-management-system/
 
 ### データのバックアップ
 - **週次自動バックアップが設定済みです**（毎週水曜深夜0時・GitHub上の `backups/` フォルダに保存）
+- 初回バックアップは最初の水曜深夜0時に自動作成されます（それまで `backups/` フォルダは空です）
 - 手動バックアップも引き続き「CSV出力」で取得できます
 - 緊急バックアップは GitHub → Actions → 「Weekly Backup」→「Run workflow」で即時実行できます
 

@@ -2,8 +2,7 @@ name: Weekly Backup
 
 on:
   schedule:
-    # 毎週水曜日 15:00 UTC = 日本時間 木曜日 0:00
-    # 水曜日深夜0時（JST）= 火曜日 15:00 UTC → cron では曜日2=火曜
+    # 火曜日 15:00 UTC = 日本時間 水曜日 0:00（cron 曜日2=火曜）
     - cron: '0 15 * * 2'
   workflow_dispatch:
     # GitHub画面から手動実行も可能（テスト・緊急バックアップ用）
@@ -24,7 +23,7 @@ jobs:
         run: |
           SUPABASE_URL=$(jq -r '.url' cloud-config.json)
           SUPABASE_KEY=$(jq -r '.anonKey' cloud-config.json)
-          DATE=$(date -u +%Y-%m-%d)
+          DATE=$(TZ='Asia/Tokyo' date +%Y-%m-%d)
 
           mkdir -p backups
 
@@ -48,7 +47,7 @@ jobs:
 
       - name: バックアップをコミット
         run: |
-          DATE=$(date -u +%Y-%m-%d)
+          DATE=$(TZ='Asia/Tokyo' date +%Y-%m-%d)
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
