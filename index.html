@@ -690,6 +690,59 @@
         }
 
         /* マスタテーブル */
+        /* マスタモーダル共通ツールバー */
+        .master-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        .master-toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        .master-toolbar-right {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .master-search-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .master-search-bar input[type="text"] {
+            flex: 1;
+        }
+        .master-count {
+            white-space: nowrap;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            min-width: 90px;
+            text-align: right;
+        }
+        .master-sort-select {
+            padding: 0.4rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: white;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .master-no-results {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
         .master-table {
             width: 100%;
             border-collapse: collapse;
@@ -1330,16 +1383,30 @@ textarea {
                 <button class="close-button" onclick="closeCustomerMaster()">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
-                <button class="btn btn-primary" onclick="openAddCustomerModal()">＋ 新規追加</button>
-                    <input type="file" id="customerCsvImport" accept=".csv" style="display: none;" onchange="importCustomerCSV(event)">
-                    <button class="btn btn-secondary" onclick="document.getElementById('customerCsvImport').click()">
-                        📁 CSV取込
-                    </button>
-                    <button class="btn btn-success" onclick="exportCustomerCSV()">
-                        📊 CSV出力
-                    </button>
+                <!-- ツールバー -->
+                <div class="master-toolbar">
+                    <div class="master-toolbar-left">
+                        <button class="btn btn-primary" onclick="openAddCustomerModal()">＋ 新規追加</button>
+                        <input type="file" id="customerCsvImport" accept=".csv" style="display:none;" onchange="importCustomerCSV(event)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('customerCsvImport').click()">📁 CSV取込</button>
+                        <button class="btn btn-success" onclick="exportCustomerCSV()">📊 CSV出力</button>
+                    </div>
+                    <div class="master-toolbar-right">
+                        <button class="btn btn-primary" onclick="saveCustomerMaster()">💾 保存</button>
+                    </div>
                 </div>
+                <!-- 検索・ソートバー -->
+                <div class="master-search-bar">
+                    <input type="text" class="form-input-full jp-input" id="customerSearchBox"
+                        placeholder="顧客名・住所・電話番号で検索..." lang="ja" inputmode="text"
+                        oninput="renderCustomerMaster()">
+                    <select class="master-sort-select" id="customerSortMode" onchange="renderCustomerMaster()">
+                        <option value="date">登録日順</option>
+                        <option value="kana">あいうえお順</option>
+                    </select>
+                    <span class="master-count" id="customerMasterCount"></span>
+                </div>
+                <!-- 一覧テーブル -->
                 <table class="master-table">
                     <thead>
                         <tr>
@@ -1349,14 +1416,12 @@ textarea {
                             <th>操作</th>
                         </tr>
                     </thead>
-                    <tbody id="customerMasterBody">
-                        <!-- データ行がここに挿入される -->
-                    </tbody>
+                    <tbody id="customerMasterBody"></tbody>
                 </table>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCustomerMaster()">閉じる</button>
-                <button class="btn btn-primary" onclick="saveCustomerMaster()">保存</button>
+                <button class="btn btn-primary" onclick="saveCustomerMaster()">💾 保存</button>
             </div>
         </div>
     </div>
@@ -1369,28 +1434,37 @@ textarea {
                 <button class="close-button" onclick="closeSimpleMaster()">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom: 1rem;">
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                        <input type="text" class="form-input-full jp-input" id="simpleMasterInput" placeholder="新規追加..." lang="ja" inputmode="text">
+                <!-- ツールバー：新規追加＋保存 -->
+                <div class="master-toolbar">
+                    <div class="master-toolbar-left">
+                        <input type="text" class="form-input-full jp-input" id="simpleMasterInput"
+                            placeholder="新規追加..." lang="ja" inputmode="text"
+                            onkeydown="if(event.key==='Enter'){addSimpleMasterItem();}">
                         <button class="btn btn-primary" onclick="addSimpleMasterItem()">追加</button>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
-                        <input type="file" id="simpleMasterCsvImport" accept=".csv" style="display: none;" onchange="importSimpleMasterCSV(event)">
-                        <button class="btn btn-secondary" onclick="document.getElementById('simpleMasterCsvImport').click()">
-                            📁 CSV取込
-                        </button>
-                        <button class="btn btn-success" onclick="exportSimpleMasterCSV()">
-                            📊CSV出力
-                        </button>
+                    <div class="master-toolbar-right">
+                        <button class="btn btn-primary" onclick="saveSimpleMaster()">💾 保存</button>
                     </div>
                 </div>
-                <div class="master-list" id="simpleMasterList">
-                    <!-- アイテムがここに挿入される -->
+                <!-- 検索バー -->
+                <div class="master-search-bar">
+                    <input type="text" class="form-input-full jp-input" id="simpleMasterSearchBox"
+                        placeholder="検索..." lang="ja" inputmode="text"
+                        oninput="filterSimpleMaster()">
+                    <span class="master-count" id="simpleMasterCount"></span>
                 </div>
+                <!-- CSV操作 -->
+                <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+                    <input type="file" id="simpleMasterCsvImport" accept=".csv" style="display:none;" onchange="importSimpleMasterCSV(event)">
+                    <button class="btn btn-secondary" onclick="document.getElementById('simpleMasterCsvImport').click()">📁 CSV取込</button>
+                    <button class="btn btn-success" onclick="exportSimpleMasterCSV()">📊 CSV出力</button>
+                </div>
+                <!-- 一覧 -->
+                <div class="master-list" id="simpleMasterList"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeSimpleMaster()">閉じる</button>
-                <button class="btn btn-primary" onclick="saveSimpleMaster()">保存</button>
+                <button class="btn btn-primary" onclick="saveSimpleMaster()">💾 保存</button>
             </div>
         </div>
     </div>
@@ -2612,7 +2686,7 @@ textarea {
 
                 while (true) {
                     const end = start + pageSize - 1;
-                    const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc`, {
+                    const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc,id.asc`, {
                         headers: { ...supabaseHeaders(), 'Range': `${start}-${end}`, 'Prefer': 'count=exact' },
                         cache: 'no-store'
                     });
@@ -3195,6 +3269,8 @@ function updateStatsFromView() {
 
         // 顧客マスタモーダル開く
         function openCustomerMaster() {
+            const searchBox = document.getElementById('customerSearchBox');
+            if (searchBox) searchBox.value = '';
             renderCustomerMaster();
             document.getElementById('customerMasterModal').style.display = 'block';
         }
@@ -3204,16 +3280,51 @@ function updateStatsFromView() {
             document.getElementById('customerMasterModal').style.display = 'none';
         }
 
-        // 顧客マスタ描画
+        // 顧客マスタ描画（検索・ソート対応）
         function renderCustomerMaster() {
             const tbody = document.getElementById('customerMasterBody');
-            tbody.innerHTML = customerMaster.map((customer, index) => `
+            const searchTerm = (document.getElementById('customerSearchBox')?.value || '').toLowerCase().trim();
+            const sortMode = document.getElementById('customerSortMode')?.value || 'date';
+
+            // 元の配列インデックスを保持したまま表示リストを作る
+            let displayList = customerMaster.map((c, i) => ({ ...c, _origIndex: i }));
+
+            // 検索フィルター
+            if (searchTerm) {
+                displayList = displayList.filter(c =>
+                    (c.name || '').toLowerCase().includes(searchTerm) ||
+                    (c.address || '').toLowerCase().includes(searchTerm) ||
+                    (c.tel || '').toLowerCase().includes(searchTerm)
+                );
+            }
+
+            // ソート（あいうえお順の場合のみ並び替え。登録日順はSupabase取得順をそのまま使う）
+            if (sortMode === 'kana') {
+                displayList = [...displayList].sort((a, b) =>
+                    (a.name || '').localeCompare(b.name || '', 'ja')
+                );
+            }
+
+            // 件数表示
+            const countEl = document.getElementById('customerMasterCount');
+            if (countEl) {
+                countEl.textContent = searchTerm
+                    ? `${displayList.length}件表示 / 全${customerMaster.length}件`
+                    : `全${customerMaster.length}件`;
+            }
+
+            // テーブル描画（data-indexは元の配列の位置を使うことで保存・削除が正しく動く）
+            if (displayList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="master-no-results">該当する顧客が見つかりません</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = displayList.map(customer => `
                 <tr>
-                    <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.name)}" data-field="name" data-index="${index}" lang="ja" inputmode="text"></td>
-                    <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.address)}" data-field="address" data-index="${index}" lang="ja" inputmode="text"></td>
-                    <td><input type="tel" class="form-input-full numeric-input" value="${escHtml(customer.tel)}" data-field="tel" data-index="${index}" inputmode="tel"></td>
+                    <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.name)}" data-field="name" data-index="${customer._origIndex}" lang="ja" inputmode="text"></td>
+                    <td><input type="text" class="form-input-full jp-input" value="${escHtml(customer.address)}" data-field="address" data-index="${customer._origIndex}" lang="ja" inputmode="text"></td>
+                    <td><input type="tel" class="form-input-full numeric-input" value="${escHtml(customer.tel)}" data-field="tel" data-index="${customer._origIndex}" inputmode="tel"></td>
                     <td>
-                        <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${index})">削除</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${customer._origIndex})">削除</button>
                     </td>
                 </tr>
             `).join('');
@@ -3286,24 +3397,65 @@ function updateStatsFromView() {
             document.getElementById('simpleMasterModal').style.display = 'block';
         }
 
-        // シンプルマスタ描画
+        // シンプルマスタ描画（検索フィルター対応）
         function renderSimpleMaster(masterData) {
             const list = document.getElementById('simpleMasterList');
-            list.innerHTML = masterData.map((item, index) => {
-                // 文字列配列とオブジェクト配列の両方に対応
-                const name = typeof item === 'string' ? item : item.name;
-                return `
-                    <div class="master-item" draggable="true" data-index="${index}" data-name="${escHtml(name)}">
-                        <span class="drag-handle">☰</span>
-                        <span class="master-item-content">${escHtml(name)}</span>
-                        <div class="master-item-actions">
-                            <button onclick="deleteSimpleMasterItem(${index})">×</button>
-                        </div>
+            const searchTerm = (document.getElementById('simpleMasterSearchBox')?.value || '').toLowerCase().trim();
+
+            // 元インデックスを保持したリスト
+            let displayItems = masterData.map((item, index) => ({
+                name: typeof item === 'string' ? item : (item.name || ''),
+                _origIndex: index
+            }));
+
+            // 検索フィルター
+            if (searchTerm) {
+                displayItems = displayItems.filter(item => item.name.toLowerCase().includes(searchTerm));
+            }
+
+            // 件数表示
+            const countEl = document.getElementById('simpleMasterCount');
+            if (countEl) {
+                countEl.textContent = searchTerm
+                    ? `${displayItems.length}件表示 / 全${masterData.length}件`
+                    : `全${masterData.length}件`;
+            }
+
+            const isFiltering = !!searchTerm;
+
+            if (displayItems.length === 0) {
+                list.innerHTML = `<div class="master-no-results">該当する項目が見つかりません</div>`;
+                return;
+            }
+
+            list.innerHTML = displayItems.map(item => `
+                <div class="master-item" ${!isFiltering ? 'draggable="true"' : ''}
+                    data-index="${item._origIndex}" data-name="${escHtml(item.name)}">
+                    <span class="drag-handle" style="${isFiltering ? 'opacity:0.25;cursor:default;' : ''}">☰</span>
+                    <span class="master-item-content">${escHtml(item.name)}</span>
+                    <div class="master-item-actions">
+                        <button onclick="deleteSimpleMasterItem(${item._origIndex})">×</button>
                     </div>
-                `;
-            }).join('');
-            // ドラッグ&ドロップイベントを設定
-            setupDragAndDrop();
+                </div>
+            `).join('');
+
+            // 検索中はドラッグ無効（並び替えは絞り込み解除後に行う）
+            if (!isFiltering) {
+                setupDragAndDrop();
+            }
+        }
+
+        // シンプルマスタ検索フィルター呼び出し
+        function filterSimpleMaster() {
+            let masterData = [];
+            switch(currentMasterType) {
+                case 'cargo':     masterData = cargoMaster;     break;
+                case 'packaging': masterData = packagingMaster; break;
+                case 'unit':      masterData = unitMaster;      break;
+                case 'driver':    masterData = driverMaster;    break;
+                case 'vehicle':   masterData = vehicleMaster;   break;
+            }
+            renderSimpleMaster(masterData);
         }
 
         // ドラッグ&ドロップ設定
@@ -3409,6 +3561,8 @@ function updateStatsFromView() {
         function closeSimpleMaster() {
             document.getElementById('simpleMasterModal').style.display = 'none';
             document.getElementById('simpleMasterInput').value = '';
+            const searchBox = document.getElementById('simpleMasterSearchBox');
+            if (searchBox) searchBox.value = '';
         }
 
         // シンプルマスタ保存
