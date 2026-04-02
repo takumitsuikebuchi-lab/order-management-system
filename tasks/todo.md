@@ -63,3 +63,28 @@ Claudeへの指示にデータ保護ルールを明記し、月末の自動CSV�
 - backups/: 例）`backups/2026-03_受注明細.csv` の形式で蓄積される
 - 手動実行（緊急バックアップ）にも対応（GitHubのActionsタブから実行可能）
 - 完全無料（公開リポジトリのためGitHub Actions使い放題）
+
+---
+
+## 2026-04-02: 顧客マスタ新規登録がリロード後に消える不具合の修正
+
+### 背景・目的
+「＋ 新規追加」で顧客を登録してもリロードすると消える不具合が報告された。
+原因調査・修正をClaudeとCodexで分担して対応。
+
+### 計画
+- [x] ブラウザで動作確認・原因調査
+- [x] cloudSaveCustomers の DELETE URL長すぎ問題を修正（`?id=not.is.null` 方式へ）
+- [x] cloudFetchCustomers に `&limit=10000` を追加
+- [x] saveNewCustomer を async/await 化して保存完了を待つよう修正
+- [x] Supabase の重複30,847件をクリーンアップ（削除→正しい1,000件を再投入）
+- [x] Codex が根本原因を特定・修正（`cloudInsertCustomer` 新設、ページング取得）
+- [x] ドキュメント更新（AGENTS.md・CHANGELOG.md はCodex、lessons.md・todo.md はClaude）
+
+### 結果
+- 根本原因: 1件追加のたびに全件DELETE+再INSERTしていた設計 + Supabase 1,000件上限 + 非同期の競合
+- Codex の修正: `cloudInsertCustomer()`（1件だけInsert）を新設し saveNewCustomer から呼ぶ方式へ変更
+- Codex の修正: `cloudFetchCustomers()` を Range ヘッダによるページング取得に変更
+- Supabase の customers テーブルを重複838件削除し163件に正常化
+- 詳細な教訓は `tasks/lessons.md` の2026-04-02エントリに記録済み
+
