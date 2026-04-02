@@ -2585,7 +2585,7 @@ textarea {
             if (!cloudEnabled()) return null;
             try {
                 const base = getSupabaseBase();
-                const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc`, {
+                const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc&limit=10000`, {
                     headers: supabaseHeaders()
                 });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2605,33 +2605,15 @@ textarea {
                 const headers = supabaseHeaders();
                 const safeCustomers = Array.isArray(customers) ? customers : [];
                 
-                // 既存データを取得
-                let existingIds = [];
+                // 全レコードを削除（URLにID一覧を並べると件数が多い場合に400エラーになるため、id=not.is.nullで全件削除）
                 try {
-                    const fetchResp = await cloudFetchRetry(`${base}/customers?select=id`, {
-                        headers: headers
+                    await cloudFetchRetry(`${base}/customers?id=not.is.null`, {
+                        method: 'DELETE',
+                        headers: { ...headers, 'Prefer': 'return=minimal' }
                     }, { retries: 1 });
-                    if (fetchResp.ok) {
-                        const existing = await fetchResp.json();
-                        existingIds = existing.map(r => r.id);
-                    }
-                } catch (fetchErr) {
-                    logInfo('cloudSaveCustomers', 'Could not fetch existing records, skipping delete');
-                }
-                
-                // 既存レコードをIDで削除（バッチ処理）
-                if (existingIds.length > 0) {
-                    try {
-                        // IDのリストを使って一括削除
-                        const idsStr = existingIds.map(id => `"${id}"`).join(',');
-                        await cloudFetchRetry(`${base}/customers?id=in.(${idsStr})`, {
-                            method: 'DELETE',
-                            headers: { ...headers, 'Prefer': 'return=minimal' }
-                        }, { retries: 0 });
-                        logInfo('cloudSaveCustomers', `Deleted ${existingIds.length} existing records`);
-                    } catch (deleteErr) {
-                        logInfo('cloudSaveCustomers', 'Delete failed, continuing with insert');
-                    }
+                    logInfo('cloudSaveCustomers', 'Deleted all existing records');
+                } catch (deleteErr) {
+                    logInfo('cloudSaveCustomers', 'Delete failed, continuing with insert');
                 }
                 
                 // 新しいデータを挿入
