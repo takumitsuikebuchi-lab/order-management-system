@@ -570,6 +570,22 @@
             justify-content: flex-end;
             gap: 0.75rem;
             background: var(--bg-main);
+            position: sticky;
+            bottom: 0;
+            z-index: 20;
+        }
+
+        /* マスタモーダル専用ヘッダー（ツールバー・検索を含む縦並びレイアウト） */
+        .modal-header.master-header {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+            padding-bottom: 1rem;
+        }
+        .modal-header.master-header .master-header-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .close-button {
@@ -1378,11 +1394,12 @@ textarea {
     <!-- 顧客マスタモーダル -->
     <div class="modal" id="customerMasterModal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>顧客マスタ管理</h2>
-                <button class="close-button" onclick="closeCustomerMaster()">&times;</button>
-            </div>
-            <div class="modal-body">
+            <!-- ヘッダー：タイトル・操作ボタン・検索バーをまとめて固定 -->
+            <div class="modal-header master-header">
+                <div class="master-header-title">
+                    <h2>顧客マスタ管理</h2>
+                    <button class="close-button" onclick="closeCustomerMaster()">&times;</button>
+                </div>
                 <!-- ツールバー -->
                 <div class="master-toolbar">
                     <div class="master-toolbar-left">
@@ -1402,11 +1419,13 @@ textarea {
                         oninput="renderCustomerMaster()">
                     <select class="master-sort-select" id="customerSortMode" onchange="renderCustomerMaster()">
                         <option value="date">登録日順</option>
-                        <option value="kana">あいうえお順</option>
+                        <option value="name">名前順</option>
                     </select>
                     <span class="master-count" id="customerMasterCount"></span>
                 </div>
-                <!-- 一覧テーブル -->
+            </div>
+            <!-- ボディ：テーブルのみ（スクロール対象） -->
+            <div class="modal-body">
                 <table class="master-table">
                     <thead>
                         <tr>
@@ -1429,11 +1448,12 @@ textarea {
     <!-- その他のマスタモーダル -->
     <div class="modal" id="simpleMasterModal">
         <div class="modal-content small">
-            <div class="modal-header">
-                <h2 id="simpleMasterTitle">マスタ管理</h2>
-                <button class="close-button" onclick="closeSimpleMaster()">&times;</button>
-            </div>
-            <div class="modal-body">
+            <!-- ヘッダー：タイトル・追加入力・検索バーを固定 -->
+            <div class="modal-header master-header">
+                <div class="master-header-title">
+                    <h2 id="simpleMasterTitle">マスタ管理</h2>
+                    <button class="close-button" onclick="closeSimpleMaster()">&times;</button>
+                </div>
                 <!-- ツールバー：新規追加＋保存 -->
                 <div class="master-toolbar">
                     <div class="master-toolbar-left">
@@ -1454,12 +1474,14 @@ textarea {
                     <span class="master-count" id="simpleMasterCount"></span>
                 </div>
                 <!-- CSV操作 -->
-                <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
+                <div style="display:flex; gap:0.5rem;">
                     <input type="file" id="simpleMasterCsvImport" accept=".csv" style="display:none;" onchange="importSimpleMasterCSV(event)">
                     <button class="btn btn-secondary" onclick="document.getElementById('simpleMasterCsvImport').click()">📁 CSV取込</button>
                     <button class="btn btn-success" onclick="exportSimpleMasterCSV()">📊 CSV出力</button>
                 </div>
-                <!-- 一覧 -->
+            </div>
+            <!-- ボディ：一覧のみ（スクロール対象） -->
+            <div class="modal-body">
                 <div class="master-list" id="simpleMasterList"></div>
             </div>
             <div class="modal-footer">
@@ -3298,10 +3320,12 @@ function updateStatsFromView() {
                 );
             }
 
-            // ソート（あいうえお順の場合のみ並び替え。登録日順はSupabase取得順をそのまま使う）
-            if (sortMode === 'kana') {
+            // ソート（名前順の場合のみ並び替え。登録日順はSupabase取得順をそのまま使う）
+            if (sortMode === 'name') {
+                // （株）㈱㈲ などの会社形態記号を除いた実質的な社名でソート
+                const stripPrefix = n => (n || '').replace(/^[\(（【\[]*[株有合資名Ltd.Co]+[\)）】\]]*\s*/u, '').replace(/^[㈱㈲㈻㈾㈿]\s*/u, '');
                 displayList = [...displayList].sort((a, b) =>
-                    (a.name || '').localeCompare(b.name || '', 'ja')
+                    stripPrefix(a.name).localeCompare(stripPrefix(b.name), 'ja', { sensitivity: 'base' })
                 );
             }
 
