@@ -1458,13 +1458,16 @@ textarea {
                     <h2 id="simpleMasterTitle">マスタ管理</h2>
                     <button class="close-button" onclick="closeSimpleMaster()">&times;</button>
                 </div>
-                <!-- ツールバー：新規追加＋保存 -->
+                <!-- ツールバー：新規追加＋CSV＋保存 -->
                 <div class="master-toolbar">
                     <div class="master-toolbar-left">
                         <input type="text" class="form-input-full jp-input" id="simpleMasterInput"
                             placeholder="新規追加..." lang="ja" inputmode="text"
                             onkeydown="if(event.key==='Enter'){addSimpleMasterItem();}">
                         <button class="btn btn-primary" onclick="addSimpleMasterItem()">追加</button>
+                        <input type="file" id="simpleMasterCsvImport" accept=".csv" style="display:none;" onchange="importSimpleMasterCSV(event)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('simpleMasterCsvImport').click()">📁 CSV取込</button>
+                        <button class="btn btn-success" onclick="exportSimpleMasterCSV()">📊 CSV出力</button>
                     </div>
                     <div class="master-toolbar-right">
                         <button class="btn btn-primary" onclick="saveSimpleMaster()">💾 保存</button>
@@ -1476,12 +1479,6 @@ textarea {
                         placeholder="検索..." lang="ja" inputmode="text"
                         oninput="filterSimpleMaster()">
                     <span class="master-count" id="simpleMasterCount"></span>
-                </div>
-                <!-- CSV操作 -->
-                <div style="display:flex; gap:0.5rem;">
-                    <input type="file" id="simpleMasterCsvImport" accept=".csv" style="display:none;" onchange="importSimpleMasterCSV(event)">
-                    <button class="btn btn-secondary" onclick="document.getElementById('simpleMasterCsvImport').click()">📁 CSV取込</button>
-                    <button class="btn btn-success" onclick="exportSimpleMasterCSV()">📊 CSV出力</button>
                 </div>
             </div>
             <!-- ボディ：一覧のみ（スクロール対象） -->
