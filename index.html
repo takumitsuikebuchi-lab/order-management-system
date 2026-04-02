@@ -719,8 +719,12 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             flex: 1;
+            min-width: 0;
+        }
+        .master-toolbar-left input[type="text"] {
+            min-width: 0; /* 縮小可能にしてボタンが折り返さないようにする */
         }
         .master-toolbar-right {
             display: flex;
@@ -3323,9 +3327,13 @@ function updateStatsFromView() {
             // ソート（名前順の場合のみ並び替え。登録日順はSupabase取得順をそのまま使う）
             if (sortMode === 'name') {
                 // （株）㈱㈲ などの会社形態記号を除いた実質的な社名でソート
-                const stripPrefix = n => (n || '').replace(/^[\(（【\[]*[株有合資名Ltd.Co]+[\)）】\]]*\s*/u, '').replace(/^[㈱㈲㈻㈾㈿]\s*/u, '');
+                // ※漢字はふりがな情報がないためUnicode順。ひらがな・カタカナは正しく五十音順になる
+                const stripPrefix = n => (n || '')
+                    .replace(/^[（(【\[]*[株有合資名][）)】\]]*\s*/u, '')
+                    .replace(/^[㈱㈲㈻㈾㈿]\s*/u, '');
+                const collator = new Intl.Collator('ja', { usage: 'sort' });
                 displayList = [...displayList].sort((a, b) =>
-                    stripPrefix(a.name).localeCompare(stripPrefix(b.name), 'ja', { sensitivity: 'base' })
+                    collator.compare(stripPrefix(a.name), stripPrefix(b.name))
                 );
             }
 
