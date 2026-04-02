@@ -3535,7 +3535,7 @@ function updateStatsFromView() {
         }
 
         // 顧客新規追加を保存
-        function saveNewCustomer() {
+        async function saveNewCustomer() {
             const name = document.getElementById('newCustomerName').value.trim();
             const address = document.getElementById('newCustomerAddress').value.trim();
             const tel = document.getElementById('newCustomerTel').value.trim();
@@ -3552,12 +3552,25 @@ function updateStatsFromView() {
                 return;
             }
 
+            // 保存中はボタンを無効化
+            const saveBtn = document.querySelector('#customerAddModal .btn-primary');
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '保存中...'; }
+
             customerMaster.push({ name, address, tel });
             localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
             renderCustomerMaster();
             setupFilters();
-            // クラウド同期
-            try { if (cloudEnabled()) cloudSaveCustomers(customerMaster).catch(e => logError('CLOUD_SAVE_CUSTOMERS', e)); } catch(_) {}
+
+            // クラウド同期完了を待つ（完了前にリロードされてもデータが消えないように）
+            try {
+                if (cloudEnabled()) await cloudSaveCustomers(customerMaster);
+            } catch(e) {
+                logError('CLOUD_SAVE_CUSTOMERS', e);
+                alert('クラウドへの保存に失敗しました。ローカルには保存されています。');
+            } finally {
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '追加'; }
+            }
+
             closeCustomerAddModal();
             alert('顧客を追加しました');
         }
