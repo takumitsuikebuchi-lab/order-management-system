@@ -36,6 +36,13 @@
 - `.github/workflows/weekly-backup.yml` を追加。毎週水曜深夜0時（JST）に受注明細・顧客マスタをCSV出力し `backups/` フォルダへ自動保存
 - `tasks/todo.md` を追加（タスク管理ログ）
 
+### 2026-04-02
+
+- 顧客マスタの「＋ 新規追加」で、追加直後は見えるがリロード後に消える不具合を修正
+- 原因は、新規追加でも `cloudSaveCustomers()` により `customers` 全件を `DELETE → POST` していたこと
+- `saveNewCustomer()` は全件保存をやめ、`cloudInsertCustomer()` で1件だけクラウドへ追加できたときだけ localStorage と画面へ反映するよう変更
+- これにより、保存途中の一瞬の空状態や、POST失敗後のリロードで古い顧客一覧に戻る競合を避ける
+
 ### 2026-03-19
 
 - Playwright-based UI smoke tests were added outside the app runtime so regression checks do not change production behavior.
@@ -116,3 +123,4 @@
 - UI regression checks should stay external to the app runtime; prefer test files and workflow steps over diagnostic code inside `index.html`.
 - CSV import must not silently duplicate an existing order when `orderNo` matches.
 - Cloud write failures must preserve local data first and recover through the queue when connectivity returns.
+- 顧客マスタの「＋ 新規追加」は全件保存を使わず、1件ずつ安全に追加する。ここを再び `DELETE → POST` に戻さない。

@@ -2579,14 +2579,36 @@ textarea {
         }
 
         // ====== マスタデータ同期機能 ======
-        
+
+        function normalizeCustomerRecord(src) {
+            return {
+                id: src.id || '',
+                name: src.customer_name || src.name || src.customerName || '',
+                address: src.pickup_address || src.address || src.pickupAddress || '',
+                deliveryAddress: src.delivery_address || src.deliveryAddress || '',
+                tel: src.phone_number || src.tel || src.phoneNumber || ''
+            };
+        }
+
+        function serializeCustomerForCloud(src) {
+            const row = {
+                customer_name: src.name || src.customer_name || src.customerName || '',
+                pickup_address: src.address || src.pickup_address || src.pickupAddress || '',
+                delivery_address: src.deliveryAddress || src.delivery_address || '',
+                phone_number: src.tel || src.phone_number || src.phoneNumber || ''
+            };
+            if (src.id) row.id = src.id;
+            return row;
+        }
+
         // 顧客マスタをSupabaseから取得
         async function cloudFetchCustomers() {
             if (!cloudEnabled()) return null;
             try {
                 const base = getSupabaseBase();
                 const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc&limit=10000`, {
-                    headers: supabaseHeaders()
+                    headers: supabaseHeaders(),
+                    cache: 'no-store'
                 });
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 return await resp.json();
@@ -2595,7 +2617,35 @@ textarea {
                 return null;
             }
         }
-        
+
+        async function cloudInsertCustomer(customer) {
+            if (!cloudEnabled()) return normalizeCustomerRecord(customer);
+
+            const base = getSupabaseBase();
+            const customerName = String(customer && (customer.name || customer.customer_name || customer.customerName) || '').trim();
+            if (!customerName) throw new Error('CUSTOMER_NAME_REQUIRED');
+
+            const duplicateResp = await cloudFetchRetry(
+                `${base}/customers?customer_name=eq.${encodeURIComponent(customerName)}&select=*&limit=1`,
+                { headers: supabaseHeaders(), cache: 'no-store' },
+                { retries: 1, timeoutMs: 8000 }
+            );
+            const duplicateRows = await duplicateResp.json();
+            if (Array.isArray(duplicateRows) && duplicateRows.length > 0) {
+                const dupErr = new Error('CUSTOMER_EXISTS');
+                dupErr.code = 'CUSTOMER_EXISTS';
+                throw dupErr;
+            }
+
+            const resp = await cloudFetchRetry(`${base}/customers`, {
+                method: 'POST',
+                headers: { ...supabaseHeaders(), 'Prefer': 'return=representation' },
+                body: JSON.stringify(serializeCustomerForCloud(customer))
+            }, { retries: 2, timeoutMs: 10000 });
+            const rows = await resp.json();
+            return normalizeCustomerRecord(Array.isArray(rows) && rows[0] ? rows[0] : customer);
+        }
+
         // 顧客マスタをSupabaseに保存（全件削除後再挿入）
         async function cloudSaveCustomers(customers) {
             if (!cloudEnabled()) return;
@@ -2621,12 +2671,7 @@ textarea {
                     const resp = await cloudFetchRetry(`${base}/customers`, {
                         method: 'POST',
                         headers: { ...headers, 'Prefer': 'return=minimal' },
-                        body: JSON.stringify(safeCustomers.map(c => ({
-                            customer_name: c.name || c.customerName,
-                            pickup_address: c.address || c.pickupAddress || '',
-                            delivery_address: c.deliveryAddress || '',
-                            phone_number: c.tel || c.phoneNumber || ''
-                        })))
+                        body: JSON.stringify(safeCustomers.map(serializeCustomerForCloud))
                     });
                     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 }
@@ -2695,11 +2740,7 @@ textarea {
                 // クラウド取得が成功したマスターは、空配列でも正しい状態として反映する
                 const cloudCustomers = await cloudFetchCustomers();
                 if (Array.isArray(cloudCustomers)) {
-                    customerMaster = cloudCustomers.map(c => ({
-                        name: c.customer_name,
-                        address: c.pickup_address || '',
-                        tel: c.phone_number || ''
-                    }));
+                    customerMaster = cloudCustomers.map(normalizeCustomerRecord);
                     localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
                 }
 
@@ -3539,6 +3580,7 @@ function updateStatsFromView() {
             const name = document.getElementById('newCustomerName').value.trim();
             const address = document.getElementById('newCustomerAddress').value.trim();
             const tel = document.getElementById('newCustomerTel').value.trim();
+            const draftCustomer = { name, address, tel };
 
             if (!name) {
                 alert('顧客名は必須です');
@@ -3556,23 +3598,27 @@ function updateStatsFromView() {
             const saveBtn = document.querySelector('#customerAddModal .btn-primary');
             if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '保存中...'; }
 
-            customerMaster.push({ name, address, tel });
-            localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
-            renderCustomerMaster();
-            setupFilters();
-
-            // クラウド同期完了を待つ（完了前にリロードされてもデータが消えないように）
             try {
-                if (cloudEnabled()) await cloudSaveCustomers(customerMaster);
+                const savedCustomer = cloudEnabled()
+                    ? await cloudInsertCustomer(draftCustomer)
+                    : draftCustomer;
+
+                customerMaster.push(savedCustomer);
+                localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
+                renderCustomerMaster();
+                setupFilters();
+                closeCustomerAddModal();
+                alert('顧客を追加しました');
             } catch(e) {
                 logError('CLOUD_SAVE_CUSTOMERS', e);
-                alert('クラウドへの保存に失敗しました。ローカルには保存されています。');
+                if (e && e.code === 'CUSTOMER_EXISTS') {
+                    alert('同名の顧客が既に存在します');
+                } else {
+                    alert('クラウドへの保存に失敗しました。ページを再読み込みせず、接続状態を確認してから再度お試しください。');
+                }
             } finally {
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '追加'; }
             }
-
-            closeCustomerAddModal();
-            alert('顧客を追加しました');
         }
 
         // セレクトオプション更新
