@@ -2606,12 +2606,24 @@ textarea {
             if (!cloudEnabled()) return null;
             try {
                 const base = getSupabaseBase();
-                const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc&limit=10000`, {
-                    headers: supabaseHeaders(),
-                    cache: 'no-store'
-                });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                return await resp.json();
+                const pageSize = 1000;
+                const rows = [];
+                let start = 0;
+
+                while (true) {
+                    const end = start + pageSize - 1;
+                    const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc`, {
+                        headers: { ...supabaseHeaders(), 'Range': `${start}-${end}`, 'Prefer': 'count=exact' },
+                        cache: 'no-store'
+                    });
+                    const chunk = await resp.json();
+                    if (!Array.isArray(chunk) || chunk.length === 0) break;
+                    rows.push(...chunk);
+                    if (chunk.length < pageSize) break;
+                    start += pageSize;
+                }
+
+                return rows;
             } catch (err) {
                 logError('cloudFetchCustomers', err);
                 return null;

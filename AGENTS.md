@@ -42,6 +42,9 @@
 - 原因は、新規追加でも `cloudSaveCustomers()` により `customers` 全件を `DELETE → POST` していたこと
 - `saveNewCustomer()` は全件保存をやめ、`cloudInsertCustomer()` で1件だけクラウドへ追加できたときだけ localStorage と画面へ反映するよう変更
 - これにより、保存途中の一瞬の空状態や、POST失敗後のリロードで古い顧客一覧に戻る競合を避ける
+- 追加調査で、Supabase REST の `customers` 取得はプロジェクト上限により 1 回で 1000 件までしか返らず、画面に出ていない顧客名でも重複判定だけに引っかかる状態があった
+- `cloudFetchCustomers()` は `Range` ヘッダでページングして全件取得するよう修正
+- 本番の `customers` テーブルに溜まっていた同名重複 838 件を、事前バックアップ後に削除して 163 件へ整理
 
 ### 2026-03-19
 
@@ -124,3 +127,4 @@
 - CSV import must not silently duplicate an existing order when `orderNo` matches.
 - Cloud write failures must preserve local data first and recover through the queue when connectivity returns.
 - 顧客マスタの「＋ 新規追加」は全件保存を使わず、1件ずつ安全に追加する。ここを再び `DELETE → POST` に戻さない。
+- 顧客マスタ取得は `limit` だけに頼らず、Supabase の 1000 件上限を前提にページングする。
