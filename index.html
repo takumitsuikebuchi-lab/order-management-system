@@ -1421,7 +1421,7 @@ textarea {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeCustomerMaster()">閉じる</button>
-                <button class="btn btn-primary" onclick="saveCustomerMaster()">💾 保存</button>
+                <button class="btn btn-primary" onclick="saveCustomerMaster()">保存</button>
             </div>
         </div>
     </div>
@@ -1464,7 +1464,7 @@ textarea {
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeSimpleMaster()">閉じる</button>
-                <button class="btn btn-primary" onclick="saveSimpleMaster()">💾 保存</button>
+                <button class="btn btn-primary" onclick="saveSimpleMaster()">保存</button>
             </div>
         </div>
     </div>
@@ -3314,8 +3314,11 @@ function updateStatsFromView() {
             }
 
             // テーブル描画（data-indexは元の配列の位置を使うことで保存・削除が正しく動く）
+            // 検索中で0件のときだけ「該当なし」行を表示（マスタ自体が空の場合は空のtbodyのまま）
             if (displayList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="master-no-results">該当する顧客が見つかりません</td></tr>`;
+                tbody.innerHTML = searchTerm
+                    ? `<tr><td colspan="4" class="master-no-results">該当する顧客が見つかりません</td></tr>`
+                    : '';
                 return;
             }
             tbody.innerHTML = displayList.map(customer => `
