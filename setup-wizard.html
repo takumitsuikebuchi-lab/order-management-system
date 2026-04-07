@@ -346,11 +346,11 @@
                     <p><strong>所要時間:</strong> 約3〜5分</p>
                 </div>
                 <p>まず、どのように利用しますか？</p>
-                <div class="option-card" onclick="selectOption('local')">
+                <div class="option-card" onclick="selectOption('local', event)">
                     <h3>💻 このPCだけで使う（スタンドアロン）</h3>
                     <p>インターネット接続は不要です。データはすべてお使いのPCのブラウザ内に安全に保存されます。</p>
                 </div>
-                <div class="option-card" onclick="selectOption('cloud')">
+                <div class="option-card" onclick="selectOption('cloud', event)">
                     <h3>☁️ 複数のPCで共有する（クラウド同期）</h3>
                     <p>インターネット経由で複数のPCや同僚とデータをリアルタイムに共有します。無料のSupabaseアカウントが必要です。</p>
                 </div>
@@ -541,12 +541,12 @@
             }
         }
 
-        function selectOption(option) {
+        function selectOption(option, e) {
             selectedOption = option;
             document.querySelectorAll('.option-card').forEach(card => {
                 card.classList.remove('selected');
             });
-            event.currentTarget.classList.add('selected');
+            e.currentTarget.classList.add('selected');
             document.getElementById('step1Next').disabled = false;
         }
 

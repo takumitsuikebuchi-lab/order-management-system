@@ -276,41 +276,6 @@
             border-radius: 8px;
             overflow: hidden;
         }
-/* === 受注一覧の横幅を“強制”で戻す（勝てる指定） === */
-.container .table-wrapper {
-  max-width: 1200px !important;  /* ここで上限を決める：お好みで 1100/1300 に調整OK */
-  width: 100% !important;        /* ラッパー自体はコンテナ幅に対して100% */
-  margin-left: auto !important;  /* 中央寄せ */
-  margin-right: auto !important;
-}
-
-/* 横スクロールは維持 */
-.container .table-wrapper .table-scroll {
-  overflow-x: auto !important;
-}
-
-/* テーブル本体はラッパーの中で100%に収める */
-#orderTable {
-  width: 100% !important;
-  border-collapse: collapse;
-}
-
-
-/* 受注一覧の横幅を戻して中央寄せにする */
-.table-wrapper {
-  max-width: 1400px;   /* 画面いっぱいに広がらない上限。好みで調整可（例: 1100, 1300） */
-  margin: 0 auto;      /* 中央寄せ */
-}
-
-.table-scroll {
-  overflow-x: auto;    /* 横スクロール維持 */
-}
-
-#orderTable {          /* ＝ .data-table と同義で、この画面ではこちらが確実 */
-  width: 100%;         /* ラッパーの中でフィット */
-  border-collapse: collapse;
-}
-
         .table-scroll {
             overflow-x: auto;
         }
@@ -407,22 +372,6 @@
             background: #dbeafe;
             color: #1e40af;
         }
-
-        /* 積荷カラー */
-        .cargo-tomato { background: #fee2e2; color: #991b1b; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-potato { background: #fef3c7; color: #92400e; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-onion { background: #f3e8ff; color: #6b21a8; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-cabbage { background: #dcfce7; color: #166534; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-carrot { background: #fed7aa; color: #7c2d12; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-melon { background: #fce7f3; color: #9f1239; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-corn { background: #fef9c3; color: #713f12; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-pumpkin { background: #ffedd5; color: #9a3412; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-squid { background: #dbeafe; color: #1e40af; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-salmon { background: #ffe4e6; color: #881337; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-scallop { background: #e0e7ff; color: #3730a3; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-fish { background: #cffafe; color: #155e75; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-frozen { background: #ede9fe; color: #5b21b6; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
-        .cargo-other { background: #f3f4f6; color: #374151; padding: 0.05rem 0.35rem; border-radius: 3px; font-weight: 500; font-size: 0.75rem; }
 
         /* ドライバーカラー */
         .driver-1 {
@@ -962,27 +911,7 @@ textarea {
   .data-table th { font-size: 0.8rem; }
   .data-table td { font-size: 0.8rem; }
 }
-/* ===== 受注一覧を上部コンテナと同じ幅で中央寄せ ===== */
-.table-wrapper {
-  max-width: 1800px !important;  /* 上部の .container と同じ幅 */
-  width: 100%;
-  margin-left: auto !important;
-  margin-right: auto !important;
-  border-radius: 8px;
-  background: var(--bg-card);
-}
-
-.table-scroll {
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
 /* ===== 上部アクションバーと受注一覧の白枠幅を統一 ===== */
-
-/* 上部ボタン群（action-bar）と受注一覧（table-wrapper）の横幅を同一に */
 .action-bar,
 .table-wrapper {
   max-width: 1800px;          /* 上限を統一。必要に応じて 1600px などに調整 */
@@ -1967,23 +1896,21 @@ textarea {
 
         // マスタデータ読み込み
         function loadMasters() {
-            const savedCustomers = localStorage.getItem('customerMaster');
-            if (savedCustomers) customerMaster = JSON.parse(savedCustomers);
-            
-            const savedCargo = localStorage.getItem('cargoMaster');
-            if (savedCargo) cargoMaster = JSON.parse(savedCargo);
-            
-            const savedPackaging = localStorage.getItem('packagingMaster');
-            if (savedPackaging) packagingMaster = JSON.parse(savedPackaging);
-            
-            const savedUnit = localStorage.getItem('unitMaster');
-            if (savedUnit) unitMaster = JSON.parse(savedUnit);
-            
-            const savedDriver = localStorage.getItem('driverMaster');
-            if (savedDriver) driverMaster = JSON.parse(savedDriver);
-            
-            const savedVehicle = localStorage.getItem('vehicleMaster');
-            if (savedVehicle) vehicleMaster = JSON.parse(savedVehicle);
+            function safeParse(key, fallback) {
+                try {
+                    var raw = localStorage.getItem(key);
+                    if (raw) return JSON.parse(raw);
+                } catch (e) {
+                    logWarn('loadMasters', key + ' の読み込みに失敗（データ破損の可能性）', e);
+                }
+                return fallback;
+            }
+            customerMaster = safeParse('customerMaster', customerMaster);
+            cargoMaster = safeParse('cargoMaster', cargoMaster);
+            packagingMaster = safeParse('packagingMaster', packagingMaster);
+            unitMaster = safeParse('unitMaster', unitMaster);
+            driverMaster = safeParse('driverMaster', driverMaster);
+            vehicleMaster = safeParse('vehicleMaster', vehicleMaster);
         }
 
         // データ保存
@@ -2870,6 +2797,7 @@ textarea {
                 logInfo('cloudSaveSimpleMaster', masterType, `Saved ${items.length} items`);
             } catch (err) {
                 logError('cloudSaveSimpleMaster', masterType, err);
+                throw err;
             }
         }
         
@@ -3416,52 +3344,50 @@ function updateStatsFromView() {
                 const field = input.dataset.field;
                 customerMaster[index][field] = input.value.trim();
             });
-            
+
             localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
-            
+
             // Supabaseにも保存
-            await cloudSaveCustomers(customerMaster);
-            
-            setupFilters(); // フィルターを更新
+            try {
+                await cloudSaveCustomers(customerMaster);
+            } catch (e) {
+                logError('saveCustomerMaster', e);
+                alert('クラウドへの保存に失敗しました。ローカルには保存済みです。\n接続状態を確認してから再度お試しください。');
+                return;
+            }
+
+            setupFilters();
             closeCustomerMaster();
             alert('顧客マスタを保存しました');
         }
 
-        // シンプルマスタモーダル開く
-        function openCargoMaster() {
-            currentMasterType = 'cargo';
-            document.getElementById('simpleMasterTitle').textContent = '積荷マスタ管理';
-            renderSimpleMaster(cargoMaster);
+        // シンプルマスタモーダル開く（共通）
+        function getSimpleMasterByType(type) {
+            switch (type) {
+                case 'cargo': return { data: cargoMaster, title: '積荷マスタ管理' };
+                case 'packaging': return { data: packagingMaster, title: '荷姿マスタ管理' };
+                case 'unit': return { data: unitMaster, title: '単位マスタ管理' };
+                case 'driver': return { data: driverMaster, title: 'ドライバーマスタ管理' };
+                case 'vehicle': return { data: vehicleMaster, title: '車両マスタ管理' };
+                default: return null;
+            }
+        }
+
+        function openSimpleMaster(type) {
+            var info = getSimpleMasterByType(type);
+            if (!info) return;
+            currentMasterType = type;
+            document.getElementById('simpleMasterTitle').textContent = info.title;
+            renderSimpleMaster(info.data);
             document.getElementById('simpleMasterModal').style.display = 'block';
         }
 
-        function openPackagingMaster() {
-            currentMasterType = 'packaging';
-            document.getElementById('simpleMasterTitle').textContent = '荷姿マスタ管理';
-            renderSimpleMaster(packagingMaster);
-            document.getElementById('simpleMasterModal').style.display = 'block';
-        }
-
-        function openUnitMaster() {
-            currentMasterType = 'unit';
-            document.getElementById('simpleMasterTitle').textContent = '単位マスタ管理';
-            renderSimpleMaster(unitMaster);
-            document.getElementById('simpleMasterModal').style.display = 'block';
-        }
-
-        function openDriverMaster() {
-            currentMasterType = 'driver';
-            document.getElementById('simpleMasterTitle').textContent = 'ドライバーマスタ管理';
-            renderSimpleMaster(driverMaster);
-            document.getElementById('simpleMasterModal').style.display = 'block';
-        }
-
-        function openVehicleMaster() {
-            currentMasterType = 'vehicle';
-            document.getElementById('simpleMasterTitle').textContent = '車両マスタ管理';
-            renderSimpleMaster(vehicleMaster);
-            document.getElementById('simpleMasterModal').style.display = 'block';
-        }
+        // 後方互換（HTML onclick から呼ばれるため残す）
+        function openCargoMaster() { openSimpleMaster('cargo'); }
+        function openPackagingMaster() { openSimpleMaster('packaging'); }
+        function openUnitMaster() { openSimpleMaster('unit'); }
+        function openDriverMaster() { openSimpleMaster('driver'); }
+        function openVehicleMaster() { openSimpleMaster('vehicle'); }
 
         // シンプルマスタ描画（検索フィルター対応）
         function renderSimpleMaster(masterData) {
@@ -3660,12 +3586,18 @@ function updateStatsFromView() {
             }
             
             // Supabaseにも保存
-            await cloudSaveSimpleMaster(currentMasterType, masterData);
-            
+            try {
+                await cloudSaveSimpleMaster(currentMasterType, masterData);
+            } catch (e) {
+                logError('saveSimpleMaster', e);
+                alert('クラウドへの保存に失敗しました。ローカルには保存済みです。\n接続状態を確認してから再度お試しください。');
+                return;
+            }
+
             updateSelectOptions();
-            setupFilters(); // フィルターを更新
+            setupFilters();
             closeSimpleMaster();
-            alert(`${document.getElementById('simpleMasterTitle').textContent.replace('管理', '')}を保存しました`);
+            alert(document.getElementById('simpleMasterTitle').textContent.replace('管理', '') + 'を保存しました');
         }
 
         // シンプルマスタCSV出力
@@ -4068,100 +4000,77 @@ function updateStatsFromView() {
             if (savedOk) { showToast(editingId ? '編集を保存しました' : '新規受注を保存しました'); } else { showToast('ローカル保存に失敗しました', 'error'); }
         }
 
-        // 受注編集（idが取れない場合は行のdata-order-idからフォールバック）
-        function editOrder(id, el) {
-            let order = orders.find(o => String(o.id) === String(id));
+        // 受注フォームにデータを流し込む共通ヘルパー
+        // overrides: フィールドごとに上書きしたい値（例: { orderDate: '', driver: '' }）
+        function populateOrderForm(order, overrides) {
+            var fields = [
+                ['orderNo', 'orderNo'], ['orderDate', 'date'],
+                ['customerName', 'customerName'], ['pickupLocation', 'pickupLocation'],
+                ['pickupAddress', 'pickupAddress'], ['deliveryLocation', 'deliveryLocation'],
+                ['deliveryAddress', 'deliveryAddress'], ['deliveryTel', 'deliveryTel'],
+                ['cargo', 'cargo'], ['quantity', 'quantity'], ['unit', 'unit'],
+                ['packaging', 'packaging'], ['unitPrice', 'unitPrice'],
+                ['amountNet', 'amountNet'], ['amountGross', 'amountGross'],
+                ['instructions', 'instructions'], ['driver', 'driver'], ['vehicle', 'vehicle']
+            ];
+            var ov = overrides || {};
+            fields.forEach(function(pair) {
+                var elId = pair[0], key = pair[1];
+                var val = (elId in ov) ? ov[elId] : (order[key] || '');
+                document.getElementById(elId).value = val;
+            });
+        }
+
+        // idが取れない場合は行のdata-order-idからフォールバック
+        function findOrderById(id, el) {
+            var order = orders.find(function(o) { return String(o.id) === String(id); });
             if (!order) {
-                const btn = el || document.activeElement;
-                const tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
-                const idAttr = tr ? tr.getAttribute('data-order-id') : null;
+                var btn = el || document.activeElement;
+                var tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
+                var idAttr = tr ? tr.getAttribute('data-order-id') : null;
                 if (idAttr != null) {
-                    order = orders.find(o => String(o.id) === String(idAttr));
+                    order = orders.find(function(o) { return String(o.id) === String(idAttr); });
                 }
             }
+            return order || null;
+        }
+
+        // 受注編集
+        function editOrder(id, el) {
+            var order = findOrderById(id, el);
             if (!order) {
                 showToast('受注データが見つかりません（id:' + id + '）', 'error');
                 return;
             }
-            
+
             editingId = order.id;
             setEditSessionBaseline(order);
             document.getElementById('modalTitle').textContent = '受注編集';
-            
-            document.getElementById('orderNo').value = order.orderNo;
-            document.getElementById('orderDate').value = order.date;
-            document.getElementById('customerName').value = order.customerName;
-            document.getElementById('pickupLocation').value = order.pickupLocation;
-            document.getElementById('pickupAddress').value = order.pickupAddress || '';
-            document.getElementById('deliveryLocation').value = order.deliveryLocation;
-            document.getElementById('deliveryAddress').value = order.deliveryAddress || '';
-            document.getElementById('deliveryTel').value = order.deliveryTel || '';
-            document.getElementById('cargo').value = order.cargo;
-            document.getElementById('quantity').value = order.quantity;
-            document.getElementById('unit').value = order.unit;
-            document.getElementById('packaging').value = order.packaging || '';
-            document.getElementById('unitPrice').value = order.unitPrice;
-            document.getElementById('amountNet').value = order.amountNet;
-            document.getElementById('amountGross').value = order.amountGross;
-            document.getElementById('instructions').value = order.instructions || '';
-            document.getElementById('driver').value = order.driver || '';
-            document.getElementById('vehicle').value = order.vehicle || '';
-            
+            populateOrderForm(order);
+
             document.getElementById('orderModal').style.display = 'block';
-            const content = document.querySelector('#orderModal .modal-content');
+            var content = document.querySelector('#orderModal .modal-content');
             if (content) content.scrollTop = 0;
         }
-// === 受注複製機能（idが取れない場合は行のdata-order-idからフォールバック） ===
-function duplicateOrder(id, el) {
-    let o = orders.find(x => String(x.id) === String(id));
-    if (!o) {
-        const btn = el || document.activeElement;
-        const tr = btn && typeof btn.closest === 'function' ? btn.closest('tr') : null;
-        const idAttr = tr ? tr.getAttribute('data-order-id') : null;
-        if (idAttr != null) {
-            o = orders.find(x => String(x.id) === String(idAttr));
+
+        // 受注複製
+        function duplicateOrder(id, el) {
+            var order = findOrderById(id, el);
+            if (!order) return;
+
+            editingId = null;
+            clearEditSessionBaseline();
+            document.getElementById('modalTitle').textContent = '受注複製';
+            document.getElementById('orderForm').reset();
+
+            populateOrderForm(order, { orderDate: '', orderNo: '', driver: '', vehicle: '' });
+            generateOrderNo();
+
+            document.getElementById('orderModal').style.display = 'block';
+            var content = document.querySelector('#orderModal .modal-content');
+            if (content) content.scrollTop = 0;
+            document.querySelectorAll('.autocomplete-list').forEach(function(list) { list.classList.remove('active'); });
         }
-    }
-    if (!o) return;
-
-    // 編集IDは新規として扱う
-    editingId = null;
-    clearEditSessionBaseline();
-
-    // モーダルタイトルを変更
-    document.getElementById('modalTitle').textContent = '受注複製';
-
-    // モーダルを開く
-    document.getElementById('orderForm').reset();
-    document.getElementById('orderModal').style.display = 'block';
-    const content = document.querySelector('#orderModal .modal-content');
-    if (content) content.scrollTop = 0;
-
-    // 元データをフォームに流し込み（必要箇所だけ引き継ぐ）
-    document.getElementById('orderDate').value = '';
-    document.getElementById('customerName').value = o.customerName || '';
-    document.getElementById('pickupLocation').value = o.pickupLocation || '';
-    document.getElementById('pickupAddress').value = o.pickupAddress || '';
-    document.getElementById('deliveryLocation').value = o.deliveryLocation || '';
-    document.getElementById('deliveryAddress').value = o.deliveryAddress || '';
-    document.getElementById('deliveryTel').value = o.deliveryTel || '';
-    document.getElementById('cargo').value = o.cargo || '';
-    document.getElementById('quantity').value = o.quantity || '';
-    document.getElementById('unit').value = o.unit || '';
-    document.getElementById('packaging').value = o.packaging || '';
-    document.getElementById('unitPrice').value = o.unitPrice || '';
-    document.getElementById('amountNet').value = o.amountNet || '';
-    document.getElementById('amountGross').value = o.amountGross || '';
-    document.getElementById('instructions').value = o.instructions || '';
-    document.getElementById('driver').value = '';
-    document.getElementById('vehicle').value = '';
-
-    // 新しい受注Noを採番（現在の注文日入力値に基づく）
-    generateOrderNo();
-
-    // オートコンプリートの候補を閉じる
-    document.querySelectorAll('.autocomplete-list').forEach(list => list.classList.remove('active'));
-}
 
 
         // 受注削除
@@ -5508,8 +5417,8 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
 
 // マネーフォワード請求書CSVを当月受注から生成（列順固定・源泉徴収一括指定）
 async function exportInvoiceCSV() {
-  const orders = (typeof getMonthOrders === 'function') ? getMonthOrders() : [];
-  if (!orders || orders.length === 0) {
+  var monthOrders = (typeof getMonthOrders === 'function') ? getMonthOrders() : [];
+  if (!monthOrders || monthOrders.length === 0) {
     alert('出力するデータがありません（当月の受注が0件）');
     return;
   }
@@ -5526,10 +5435,8 @@ async function exportInvoiceCSV() {
 
   // 共有定数を使用（CSV改行・BOM・源泉徴収指定）
 
-  // 常時クォート
-  const q = (v) => '"' + String(v != null ? v : '').replace(/"/g,'""') + '"';
-
   // 数値変換は共有ユーティリティ toNumber を使用
+  // CSV引用符は共有ユーティリティ csvQ を使用
 
   const y = currentMonth.getFullYear();
   const m = currentMonth.getMonth() + 1;
@@ -5549,7 +5456,7 @@ async function exportInvoiceCSV() {
 
   // 顧客ごとに集計
   const byCustomer = {};
-  orders.forEach(o => {
+  monthOrders.forEach(o => {
     const key = o.customerName || '(不明顧客)';
     if (!byCustomer[key]) byCustomer[key] = { items: [], net:0, gross:0, tax:0 };
     const item = {
@@ -5572,10 +5479,10 @@ async function exportInvoiceCSV() {
   });
 
   // 行生成：オブジェクト → HEADERS順に並べて出力（ズレ防止）
-  const rowFrom = (obj) => HEADERS.map(h => q(obj[h]));
+  const rowFrom = (obj) => HEADERS.map(h => csvQ(obj[h]));
 
   const rows = [];
-  rows.push(HEADERS.map(q));
+  rows.push(HEADERS.map(csvQ));
 
   let invSeq = 0;
   let detailCount = 0;
@@ -5660,9 +5567,7 @@ async function exportInvoiceCSV() {
   alert(`請求書CSVを出力しました（明細 ${detailCount} 行）。MFへインポートしてください。`);
 }
        // （仕様変更）モーダル外クリックでは閉じない
-window.onclick = function(event) {
-    // 何もしない（×ボタン or ESC だけで閉じます）
-};
+
 
 
         // キーボードショートカット
