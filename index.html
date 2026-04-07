@@ -2412,9 +2412,26 @@ textarea {
         async function cloudFetchOrders(opts = {}) {
             const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 20000;
             const retries = typeof opts.retries === 'number' ? opts.retries : 3;
-            const url = getSupabaseBase() + '/orders?select=*&order=date.asc&order=order_no.asc';
-            const res = await cloudFetchRetry(url, { headers: supabaseHeaders(), cache: 'no-store' }, { retries, timeoutMs });
-            return await res.json();
+            const base = getSupabaseBase();
+            const pageSize = 1000;
+            var rows = [];
+            var start = 0;
+
+            while (true) {
+                var end = start + pageSize - 1;
+                var res = await cloudFetchRetry(
+                    base + '/orders?select=*&order=date.asc&order=order_no.asc',
+                    { headers: Object.assign({}, supabaseHeaders(), { 'Range': start + '-' + end, 'Prefer': 'count=exact' }), cache: 'no-store' },
+                    { retries: retries, timeoutMs: timeoutMs }
+                );
+                var chunk = await res.json();
+                if (!Array.isArray(chunk) || chunk.length === 0) break;
+                rows = rows.concat(chunk);
+                if (chunk.length < pageSize) break;
+                start += pageSize;
+            }
+
+            return rows;
         }
 
         async function cloudFetchOrderByOrderNo(orderNo) {
@@ -2604,18 +2621,23 @@ textarea {
         async function cloudBatchUpdate(localIds, patch) {
             if (!cloudEnabled() || !localIds || localIds.length === 0) return;
             updateCloudStatusUI();
-            const base = getSupabaseBase();
-            const orderNos = localIds.map(id => {
-                const o = orders.find(x => String(x.id) === String(id));
+            var base = getSupabaseBase();
+            var orderNos = localIds.map(function(id) {
+                var o = orders.find(function(x) { return String(x.id) === String(id); });
                 return o ? o.orderNo : null;
-            }).filter(v => v);
+            }).filter(function(v) { return v; });
             if (orderNos.length === 0) return;
-            const inParam = 'in.(' + orderNos.map(x => encodeURIComponent(String(x))).join(',') + ')';
-            const url = `${base}/orders?order_no=${inParam}`;
-            const body = serializeOrderForCloud(patch);
+            var body = serializeOrderForCloud(patch);
             delete body.id;
             try {
-                await cloudFetchRetry(url, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                // URL長超過を防ぐため、50件ずつチャンク分割して送信
+                var chunkSize = 50;
+                for (var i = 0; i < orderNos.length; i += chunkSize) {
+                    var chunk = orderNos.slice(i, i + chunkSize);
+                    var inParam = 'in.(' + chunk.map(function(x) { return encodeURIComponent(String(x)); }).join(',') + ')';
+                    var url = base + '/orders?order_no=' + inParam;
+                    await cloudFetchRetry(url, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                }
                 updateCloudStatusUI(true);
                 try { flushCloudQueue(2); } catch(_){}
             } catch(e) {
@@ -2765,15 +2787,12 @@ textarea {
                 const safeCustomers = Array.isArray(customers) ? customers : [];
                 
                 // 全レコードを削除（URLにID一覧を並べると件数が多い場合に400エラーになるため、id=not.is.nullで全件削除）
-                try {
-                    await cloudFetchRetry(`${base}/customers?id=not.is.null`, {
-                        method: 'DELETE',
-                        headers: { ...headers, 'Prefer': 'return=minimal' }
-                    }, { retries: 1 });
-                    logInfo('cloudSaveCustomers', 'Deleted all existing records');
-                } catch (deleteErr) {
-                    logInfo('cloudSaveCustomers', 'Delete failed, continuing with insert');
-                }
+                // DELETE失敗時はINSERTせずに中止する（重複蓄積の防止）
+                await cloudFetchRetry(`${base}/customers?id=not.is.null`, {
+                    method: 'DELETE',
+                    headers: { ...headers, 'Prefer': 'return=minimal' }
+                }, { retries: 2 });
+                logInfo('cloudSaveCustomers', 'Deleted all existing records');
                 
                 // 新しいデータを挿入
                 if (safeCustomers.length > 0) {
@@ -2792,17 +2811,30 @@ textarea {
             }
         }
         
-        // シンプルマスタをSupabaseから取得
+        // シンプルマスタをSupabaseから取得（ページング対応）
         async function cloudFetchSimpleMaster(masterType) {
             if (!cloudEnabled()) return null;
             try {
-                const base = getSupabaseBase();
-                const resp = await cloudFetchRetry(`${base}/simple_masters?master_type=eq.${masterType}&select=*&order=sort_order.asc`, {
-                    headers: supabaseHeaders()
-                });
-                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                const data = await resp.json();
-                return data.map(item => item.name);
+                var base = getSupabaseBase();
+                var pageSize = 1000;
+                var rows = [];
+                var start = 0;
+
+                while (true) {
+                    var end = start + pageSize - 1;
+                    var resp = await cloudFetchRetry(
+                        base + '/simple_masters?master_type=eq.' + masterType + '&select=*&order=sort_order.asc',
+                        { headers: Object.assign({}, supabaseHeaders(), { 'Range': start + '-' + end, 'Prefer': 'count=exact' }) }
+                    );
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                    var chunk = await resp.json();
+                    if (!Array.isArray(chunk) || chunk.length === 0) break;
+                    rows = rows.concat(chunk);
+                    if (chunk.length < pageSize) break;
+                    start += pageSize;
+                }
+
+                return rows.map(function(item) { return item.name; });
             } catch (err) {
                 logError('cloudFetchSimpleMaster', masterType, err);
                 return null;
@@ -3306,8 +3338,10 @@ function updateStatsFromView() {
         // 顧客マスタ描画（検索・ソート対応）
         function renderCustomerMaster() {
             const tbody = document.getElementById('customerMasterBody');
-            const searchTerm = (document.getElementById('customerSearchBox')?.value || '').toLowerCase().trim();
-            const sortMode = document.getElementById('customerSortMode')?.value || 'date';
+            var customerSearchEl = document.getElementById('customerSearchBox');
+            const searchTerm = (customerSearchEl ? customerSearchEl.value : '').toLowerCase().trim();
+            var customerSortEl = document.getElementById('customerSortMode');
+            const sortMode = (customerSortEl ? customerSortEl.value : '') || 'date';
 
             // 元の配列インデックスを保持したまま表示リストを作る
             let displayList = customerMaster.map((c, i) => ({ ...c, _origIndex: i }));
@@ -3432,7 +3466,8 @@ function updateStatsFromView() {
         // シンプルマスタ描画（検索フィルター対応）
         function renderSimpleMaster(masterData) {
             const list = document.getElementById('simpleMasterList');
-            const searchTerm = (document.getElementById('simpleMasterSearchBox')?.value || '').toLowerCase().trim();
+            var simpleMasterSearchEl = document.getElementById('simpleMasterSearchBox');
+            const searchTerm = (simpleMasterSearchEl ? simpleMasterSearchEl.value : '').toLowerCase().trim();
 
             // 元インデックスを保持したリスト
             let displayItems = masterData.map((item, index) => ({
@@ -5391,13 +5426,13 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         function importCustomerCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
+
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const text = e.target.result;
                     const lines = text.split('\n');
-                    
+
                     // ヘッダー行をスキップ
                     const hasHeader = lines[0].includes('顧客名') || lines[0].includes('住所') || lines[0].includes('電話番号');
                     const startIndex = hasHeader ? 1 : 0;
@@ -5438,20 +5473,26 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                     renderCustomerMaster();
                     setupFilters(); // フィルターを更新
                     
-                    // Supabaseに保存
+                    // Supabaseに保存（完了を待ってから結果表示。途中でページを閉じるとDELETEだけ実行される危険を防ぐ）
+                    var cloudSaveOk = true;
                     if (cloudEnabled()) {
-                        cloudSaveCustomers(customerMaster).then(() => {
+                        try {
+                            await cloudSaveCustomers(customerMaster);
                             logInfo('importCustomerCSV', 'Saved to Supabase');
-                        }).catch(err => {
+                        } catch (err) {
+                            cloudSaveOk = false;
                             logError('importCustomerCSV', 'Failed to save to Supabase', err);
-                        });
+                        }
                     }
-                    
+
                     // 結果を表示
-                    let message = `CSVインポート完了\n`;
-                    message += `追加: ${importCount}件`;
+                    var message = 'CSVインポート完了\n';
+                    message += '追加: ' + importCount + '件';
                     if (skipCount > 0) {
-                        message += `\nスキップ: ${skipCount}件（重複または不正なデータ）`;
+                        message += '\nスキップ: ' + skipCount + '件（重複または不正なデータ）';
+                    }
+                    if (!cloudSaveOk) {
+                        message += '\n\n⚠ クラウド保存に失敗しました。ローカルには保存済みです。\n次回の同期で自動的に反映されます。';
                     }
                     alert(message);
                     
