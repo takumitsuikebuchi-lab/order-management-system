@@ -3414,7 +3414,7 @@ function updateStatsFromView() {
             inputs.forEach(input => {
                 const index = parseInt(input.dataset.index);
                 const field = input.dataset.field;
-                customerMaster[index][field] = input.value;
+                customerMaster[index][field] = input.value.trim();
             });
             
             localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
