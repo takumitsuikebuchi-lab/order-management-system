@@ -1411,6 +1411,31 @@ test('pickup slip print output uses only the selected orders', async ({ page }) 
   }).not.toContain('テスト青果');
 });
 
+test('pickup slip without selection opens a blank printable slip', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await installPrintCapture(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /引取書/ }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites.length);
+  }).toBe(1);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('貨物引取書・荷渡書');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).not.toContain('テスト青果');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).not.toContain('NaN/NaN/NaN');
+});
+
 test('date and driver filters narrow the table and stats, then clear safely', async ({ page }) => {
   await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);

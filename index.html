@@ -4686,6 +4686,38 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             }
         }
 
+        function createBlankPickupSlipOrder() {
+            return {
+                date: '',
+                vehicle: '',
+                driver: '',
+                pickupLocation: '',
+                pickupAddress: '',
+                deliveryLocation: '',
+                deliveryAddress: '',
+                customerName: '',
+                cargo: '',
+                packaging: '',
+                quantity: '',
+                unit: ''
+            };
+        }
+
+        function formatPickupSlipDate(dateValue) {
+            if (!dateValue) return '';
+            const orderDate = new Date(dateValue);
+            if (Number.isNaN(orderDate.getTime())) return '';
+            return `${orderDate.getFullYear()}/${(orderDate.getMonth() + 1).toString().padStart(2, '0')}/${orderDate.getDate().toString().padStart(2, '0')}`;
+        }
+
+        function formatPickupSlipParty(name, address) {
+            const safeName = escHtml(name || '');
+            const safeAddress = escHtml(address || '');
+            const suffix = safeName ? ' 様' : '';
+            const addressLine = safeAddress ? `<br><span style="font-size: 8pt;">${safeAddress}</span>` : '';
+            return `${safeName}${suffix}${addressLine}`;
+        }
+
         // 引取書印刷
         function printPickupSlips() {
             const checkboxes = document.querySelectorAll('#tableBody .order-checkbox:checked');
@@ -4696,12 +4728,9 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                 if (id) selected.push(String(id));
             });
 
-            if (selected.length === 0) {
-                alert('印刷する受注を選択してください');
-                return;
-            }
-
-            const printOrders = orders.filter(o => selected.includes(String(o.id)));
+            const printOrders = selected.length === 0
+                ? [createBlankPickupSlipOrder()]
+                : orders.filter(o => selected.includes(String(o.id)));
             
             // 貨物引取書・荷渡書の生成
             let printContent = `
@@ -4835,8 +4864,7 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
             
             // 各受注ごとに貨物引取書・荷渡書を生成
             printOrders.forEach((order, index) => {
-                const orderDate = new Date(order.date);
-                const formattedDate = `${orderDate.getFullYear()}/${(orderDate.getMonth() + 1).toString().padStart(2, '0')}/${orderDate.getDate().toString().padStart(2, '0')}`;
+                const formattedDate = formatPickupSlipDate(order.date);
                 
                 printContent += `
                     <div class="page">
@@ -4866,21 +4894,21 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">引取先</td>
-                                    <td>${escHtml(order.pickupLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.pickupAddress || '')}</span></td>
+                                    <td>${formatPickupSlipParty(order.pickupLocation, order.pickupAddress)}</td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">荷渡先</td>
-                                    <td>${escHtml(order.deliveryLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.deliveryAddress || '')}</span></td>
+                                    <td>${formatPickupSlipParty(order.deliveryLocation, order.deliveryAddress)}</td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 8px;">
                                 <tr>
                                     <td class="address-label">ご依頼主</td>
-                                    <td>${escHtml(order.customerName)} 様</td>
+                                    <td>${order.customerName ? `${escHtml(order.customerName)} 様` : ''}</td>
                                 </tr>
                             </table>
                             
@@ -4945,21 +4973,21 @@ updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">引取先</td>
-                                    <td>${escHtml(order.pickupLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.pickupAddress || '')}</span></td>
+                                    <td>${formatPickupSlipParty(order.pickupLocation, order.pickupAddress)}</td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 4px;">
                                 <tr>
                                     <td class="address-label">荷渡先</td>
-                                    <td>${escHtml(order.deliveryLocation)} 様<br><span style="font-size: 8pt;">${escHtml(order.deliveryAddress || '')}</span></td>
+                                    <td>${formatPickupSlipParty(order.deliveryLocation, order.deliveryAddress)}</td>
                                 </tr>
                             </table>
                             
                             <table class="address-table" style="margin-bottom: 8px;">
                                 <tr>
                                     <td class="address-label">ご依頼主</td>
-                                    <td>${escHtml(order.customerName)} 様</td>
+                                    <td>${order.customerName ? `${escHtml(order.customerName)} 様` : ''}</td>
                                 </tr>
                             </table>
                             
