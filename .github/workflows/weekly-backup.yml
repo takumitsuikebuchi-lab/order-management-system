@@ -27,23 +27,36 @@ jobs:
 
           mkdir -p backups
 
+          export_csv_with_bom() {
+            local url="$1"
+            local output_path="$2"
+            local tmp_file
+
+            tmp_file=$(mktemp)
+
+            curl -sf "${url}" \
+              -H "apikey: ${SUPABASE_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_KEY}" \
+              -H "Accept: text/csv" \
+              -H "Range: 0-99999" \
+              -o "${tmp_file}"
+
+            printf '\xEF\xBB\xBF' > "${output_path}"
+            cat "${tmp_file}" >> "${output_path}"
+            rm -f "${tmp_file}"
+          }
+
           # 受注明細（全件・日付昇順）※Supabase REST上限1000件を回避するためRangeヘッダ付き
-          curl -sf "${SUPABASE_URL}/rest/v1/orders?select=*&order=date.asc,order_no.asc" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            -H "Accept: text/csv" \
-            -H "Range: 0-99999" \
-            -o "backups/${DATE}_受注明細.csv"
+          export_csv_with_bom \
+            "${SUPABASE_URL}/rest/v1/orders?select=*&order=date.asc,order_no.asc" \
+            "backups/${DATE}_受注明細.csv"
 
           echo "受注明細: $(wc -l < backups/${DATE}_受注明細.csv) 行（ヘッダー含む）"
 
           # 顧客マスタ ※同様にRangeヘッダで上限回避
-          curl -sf "${SUPABASE_URL}/rest/v1/customers?select=*&order=customer_name.asc" \
-            -H "apikey: ${SUPABASE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_KEY}" \
-            -H "Accept: text/csv" \
-            -H "Range: 0-99999" \
-            -o "backups/${DATE}_顧客マスタ.csv"
+          export_csv_with_bom \
+            "${SUPABASE_URL}/rest/v1/customers?select=*&order=customer_name.asc" \
+            "backups/${DATE}_顧客マスタ.csv"
 
           echo "顧客マスタ: $(wc -l < backups/${DATE}_顧客マスタ.csv) 行（ヘッダー含む）"
 
