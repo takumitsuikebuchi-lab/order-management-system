@@ -844,8 +844,17 @@
             background: var(--bg-card);
             line-height: 1.25;
         }
+        .filter-input:focus-visible {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+        }
         .filter-group[data-filter-group="customer"] .filter-input {
             min-width: 220px;
+        }
+        .filter-group[data-filter-group="driver"] .filter-input,
+        .filter-group[data-filter-group="vehicle"] .filter-input {
+            min-width: 180px;
         }
         .filter-group.is-active .filter-input {
             border-color: var(--primary);
@@ -855,20 +864,25 @@
             color: var(--primary);
         }
         .filter-group.is-active .filter-label::after {
-            content: " ●";
+            content: "●";
             color: var(--primary);
+            margin-left: 0.25rem;
+            font-size: 0.65em;
+            vertical-align: middle;
         }
         .filter-group--sort {
+            padding-left: 0.75rem;
             margin-left: 0.25rem;
+            border-left: 1px solid var(--border);
         }
         .filter-clear {
             align-self: flex-end;
             white-space: nowrap;
             background: var(--warning);
-            color: #ffffff;
-            border-color: var(--warning);
-            font-weight: 600;
-            box-shadow: 0 1px 2px rgba(245, 158, 11, 0.35);
+            color: #1f2937;
+            border-color: #b45309;
+            font-weight: 700;
+            box-shadow: 0 1px 2px rgba(180, 83, 9, 0.35);
             height: 38px;
             box-sizing: border-box;
             padding: 0 0.875rem;
@@ -877,19 +891,27 @@
         }
         .filter-clear:hover {
             background: #d97706;
-            border-color: #d97706;
-            color: #ffffff;
+            border-color: #92400e;
+            color: #1f2937;
         }
         .filter-clear:focus-visible {
-            outline: 2px solid var(--primary);
-            outline-offset: 2px;
+            outline: 3px solid var(--primary);
+            outline-offset: 3px;
+            box-shadow: 0 0 0 1px #ffffff inset, 0 1px 2px rgba(180, 83, 9, 0.35);
         }
         @media (max-width: 768px) {
             .filter-clear {
                 width: 100%;
+                height: 44px;
+                font-size: 0.875rem;
             }
             .filter-input {
                 min-width: 140px;
+            }
+            .filter-group--sort {
+                padding-left: 0;
+                margin-left: 0;
+                border-left: none;
             }
         }
 
@@ -1227,7 +1249,7 @@ textarea {
 <div class="action-row filter-bar" role="search" aria-label="受注の絞り込み">
     <div class="filter-group" data-filter-group="customer">
         <label class="filter-label" for="searchInput">顧客検索</label>
-        <input type="text" class="form-input filter-input" id="searchInput" list="customerFilterList" placeholder="顧客名で絞り込み" oninput="filterTable()">
+        <input type="text" class="form-input filter-input" id="searchInput" list="customerFilterList" placeholder="顧客名で絞り込み" oncompositionstart="this.dataset.composing='1'" oncompositionend="this.dataset.composing='';filterTable()" oninput="if(this.dataset.composing!=='1')filterTable()">
     </div>
     <div class="filter-group" data-filter-group="date">
         <label class="filter-label" for="dateFilter">日付指定</label>
@@ -1252,7 +1274,7 @@ textarea {
             <option value="id-asc">登録順</option>
         </select>
     </div>
-    <button type="button" class="btn btn-sm filter-clear" onclick="clearAllFilters()"><span aria-hidden="true">🗑</span> すべてクリア</button>
+    <button type="button" class="btn btn-sm filter-clear" aria-label="すべてクリア：絞り込み条件をすべて解除" onclick="clearAllFilters()"><span aria-hidden="true">🗑</span> すべてクリア</button>
     <datalist id="customerFilterList"></datalist>
 </div>
 
@@ -3437,10 +3459,23 @@ function updateStatsFromView() {
     const count      = visibleOrders.length;
     const incomplete = visibleOrders.filter(o => !o.orderCompleted).length;
 
+    // 本日・翌日配送も「表示中」の一覧から集計する
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    const todayDeliveries = visibleOrders.filter(o => o.date === todayStr && !o.orderCompleted).length;
+    const tomorrowDeliveries = visibleOrders.filter(o => o.date === tomorrowStr && !o.orderCompleted).length;
+
     document.getElementById('totalGross').textContent = `¥${totalGross.toLocaleString()}`;
     document.getElementById('totalNet').textContent   = `¥${totalNet.toLocaleString()}`;
     document.getElementById('orderCount').textContent = `${count}件`;
     document.getElementById('incompleteCount').textContent = `${incomplete}件`;
+    const todayEl = document.getElementById('todayDeliveryCount');
+    const tomorrowEl = document.getElementById('tomorrowDeliveryCount');
+    if (todayEl) todayEl.textContent = `${todayDeliveries}件`;
+    if (tomorrowEl) tomorrowEl.textContent = `${tomorrowDeliveries}件`;
 }
 
 
@@ -4212,25 +4247,12 @@ function updateStatsFromView() {
             currentMonth = new Date(orderDateObj.getFullYear(), orderDateObj.getMonth(), 1);
             updateMonth();
             
+            const prevFilterState = captureTableFilterState();
             const prevScrollY = window.scrollY;
             renderTable();
-            var _el;
-            _el = document.getElementById('searchInput'); var prevSearch = _el ? _el.value : '';
-            _el = document.getElementById('dateFilter'); var prevDateFilter = _el ? _el.value : '';
-            _el = document.getElementById('driverFilter'); var prevDriverFilter = _el ? _el.value : '';
-            
             updateStats();
             setupFilters();
-            
-            if (document.getElementById('searchInput')) document.getElementById('searchInput').value = prevSearch;
-            if (document.getElementById('dateFilter')) document.getElementById('dateFilter').value = prevDateFilter;
-            if (document.getElementById('driverFilter')) {
-                const driverSel = document.getElementById('driverFilter');
-                const exists = Array.from(driverSel.options).some(opt => opt.value === prevDriverFilter);
-                driverSel.value = exists ? prevDriverFilter : '';
-            }
-            
-            filterTable();
+            restoreTableFilterState(prevFilterState);
             // 編集した行へスクロール＆フォーカス（行が非表示ならスクロール位置を復元）
             try {
                 const targetId = editingId ? editingId : formData.id;
@@ -4421,8 +4443,8 @@ function updateStatsFromView() {
                     const rowDateStr = `${filterDate.getMonth() + 1}`.padStart(2, '0') + '/' + `${filterDate.getDate()}`.padStart(2, '0');
                     if (dateText !== rowDateStr) show = false;
                 }
-                if (driverFilter && !driver.includes(driverFilter)) show = false;
-                if (vehicleFilter && !vehicle.includes(vehicleFilter)) show = false;
+                if (driverFilter && driver.trim() !== driverFilter) show = false;
+                if (vehicleFilter && vehicle.trim() !== vehicleFilter) show = false;
 
                 row.style.display = show ? '' : 'none';
             });

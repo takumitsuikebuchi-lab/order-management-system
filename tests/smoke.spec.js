@@ -254,7 +254,9 @@ async function seedRefreshCloudMode(page, updatedOrders) {
       contentType: 'application/json',
       body: JSON.stringify([
         { master_type: 'driver', name: '混載流通', sort_order: 0 },
-        { master_type: 'driver', name: '門脇悟大', sort_order: 1 }
+        { master_type: 'driver', name: '門脇悟大', sort_order: 1 },
+        { master_type: 'vehicle', name: '札幌100あ12-34', sort_order: 0 },
+        { master_type: 'vehicle', name: '帯広500た56-78', sort_order: 1 }
       ])
     });
   });
@@ -363,7 +365,9 @@ async function seedQueueRecoveryCloudMode(page) {
       contentType: 'application/json',
       body: JSON.stringify([
         { master_type: 'driver', name: '混載流通', sort_order: 0 },
-        { master_type: 'driver', name: '門脇悟大', sort_order: 1 }
+        { master_type: 'driver', name: '門脇悟大', sort_order: 1 },
+        { master_type: 'vehicle', name: '札幌100あ12-34', sort_order: 0 },
+        { master_type: 'vehicle', name: '帯広500た56-78', sort_order: 1 }
       ])
     });
   });

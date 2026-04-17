@@ -60,6 +60,31 @@ jobs:
 
           echo "顧客マスタ: $(wc -l < backups/${DATE}_顧客マスタ.csv) 行（ヘッダー含む）"
 
+          # シンプルマスタ（種類ごとにCSV分割） ※全件一括も別途保存
+          export_simple_master() {
+            local type_key="$1"
+            local type_label="$2"
+
+            export_csv_with_bom \
+              "${SUPABASE_URL}/rest/v1/simple_masters?master_type=eq.${type_key}&select=*&order=sort_order.asc" \
+              "backups/${DATE}_${type_label}マスタ.csv"
+
+            echo "${type_label}マスタ: $(wc -l < backups/${DATE}_${type_label}マスタ.csv) 行（ヘッダー含む）"
+          }
+
+          export_simple_master "cargo"     "品名"
+          export_simple_master "packaging" "荷姿"
+          export_simple_master "unit"      "単位"
+          export_simple_master "driver"    "ドライバー"
+          export_simple_master "vehicle"   "車両"
+
+          # シンプルマスタ全体（万一のためのフル複製）
+          export_csv_with_bom \
+            "${SUPABASE_URL}/rest/v1/simple_masters?select=*&order=master_type.asc,sort_order.asc" \
+            "backups/${DATE}_シンプルマスタ全体.csv"
+
+          echo "シンプルマスタ全体: $(wc -l < backups/${DATE}_シンプルマスタ全体.csv) 行（ヘッダー含む）"
+
       - name: バックアップをコミット
         run: |
           DATE=$(TZ='Asia/Tokyo' date +%Y-%m-%d)
@@ -73,4 +98,4 @@ jobs:
           git commit -m "backup: ${DATE} 週次自動バックアップ"
           git push origin main
 
-          echo "バックアップ完了: backups/${DATE}_受注明細.csv / backups/${DATE}_顧客マスタ.csv"
+          echo "バックアップ完了: backups/${DATE}_*.csv （受注明細・顧客マスタ・品名/荷姿/単位/ドライバー/車両マスタ・シンプルマスタ全体）"
