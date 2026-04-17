@@ -177,6 +177,17 @@
             transform: scale(0.98);
         }
 
+        .btn:focus-visible,
+        .btn-nav:focus-visible,
+        .form-select:focus-visible,
+        .close-button:focus-visible,
+        .checkbox:focus-visible,
+        .checkbox-small:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, 0.22);
+            outline-offset: 2px;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+        }
+
         .btn-primary {
             background: var(--primary);
             color: white;
@@ -453,6 +464,11 @@
 
         .autocomplete-item:hover {
             background: var(--bg-main);
+        }
+
+        .autocomplete-item.is-active {
+            background: #dbeafe;
+            color: #1e40af;
         }
 
         .autocomplete-item:last-child {
@@ -833,6 +849,17 @@
             }
         }
 
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+
         /* 印刷用スタイル */
         @media print {
             body * {
@@ -1183,100 +1210,100 @@ textarea {
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modalTitle">新規受注登録</h2>
-                <button class="close-button" onclick="closeModal()">&times;</button>
+                <button class="close-button" aria-label="受注登録モーダルを閉じる" onclick="closeModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="orderForm">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label class="form-label">受注No <span style="color: red;">*必須</span></label>
+                            <label class="form-label" for="orderNo">受注No <span style="color: red;">*必須</span></label>
                             <input type="text" class="form-input-full numeric-input" id="orderNo" required lang="en" inputmode="text">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">日付 <span style="color: red;">*必須</span></label>
+                            <label class="form-label" for="orderDate">日付 <span style="color: red;">*必須</span></label>
                             <input type="date" class="form-input-full" id="orderDate" required>
                         </div>
                         <div class="form-group full-width">
-                            <label class="form-label">顧客名 <span style="color: red;">*必須</span></label>
+                            <label class="form-label" for="customerName">顧客名 <span style="color: red;">*必須</span></label>
                             <div class="autocomplete-wrapper">
-                                <input type="text" class="form-input-full jp-input" id="customerName" required oninput="filterMaster(this.value, 'customer')" lang="ja" inputmode="text">
-                                <div class="autocomplete-list" id="customerAutocomplete"></div>
+                                <input type="text" class="form-input-full jp-input" id="customerName" required oninput="filterMaster(this.value, 'customer')" lang="ja" inputmode="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="customerAutocomplete">
+                                <div class="autocomplete-list" id="customerAutocomplete" role="listbox" aria-label="顧客名候補"></div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">引取先 <span style="color: red;">*必須</span></label>
+                            <label class="form-label" for="pickupLocation">引取先 <span style="color: red;">*必須</span></label>
                             <div class="autocomplete-wrapper">
-                                <input type="text" class="form-input-full jp-input" id="pickupLocation" required oninput="filterMaster(this.value, 'pickup')" lang="ja" inputmode="text">
-                                <div class="autocomplete-list" id="pickupAutocomplete"></div>
+                                <input type="text" class="form-input-full jp-input" id="pickupLocation" required oninput="filterMaster(this.value, 'pickup')" lang="ja" inputmode="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="pickupAutocomplete">
+                                <div class="autocomplete-list" id="pickupAutocomplete" role="listbox" aria-label="引取先候補"></div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">引取先住所</label>
+                            <label class="form-label" for="pickupAddress">引取先住所</label>
                             <input type="text" class="form-input-full jp-input" id="pickupAddress" lang="ja" inputmode="text">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">配送先 <span style="color: red;">*必須</span></label>
+                            <label class="form-label" for="deliveryLocation">配送先 <span style="color: red;">*必須</span></label>
                             <div class="autocomplete-wrapper">
-                                <input type="text" class="form-input-full jp-input" id="deliveryLocation" required oninput="filterMaster(this.value, 'delivery')" lang="ja" inputmode="text">
-                                <div class="autocomplete-list" id="deliveryAutocomplete"></div>
+                                <input type="text" class="form-input-full jp-input" id="deliveryLocation" required oninput="filterMaster(this.value, 'delivery')" lang="ja" inputmode="text" autocomplete="off" role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="deliveryAutocomplete">
+                                <div class="autocomplete-list" id="deliveryAutocomplete" role="listbox" aria-label="配送先候補"></div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">配送先住所</label>
+                            <label class="form-label" for="deliveryAddress">配送先住所</label>
                             <input type="text" class="form-input-full jp-input" id="deliveryAddress" lang="ja" inputmode="text">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">積荷 <span style="color: red;">*必須</span></label>
+                            <label class="form-label" for="cargo">積荷 <span style="color: red;">*必須</span></label>
                             <select class="form-input-full" id="cargo" required>
                                 <option value="">選択してください</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">数量</label>
+                            <label class="form-label" for="quantity">数量</label>
                             <input type="number" class="form-input-full numeric-input" id="quantity" onchange="calculateAmount()" inputmode="decimal">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">単位</label>
+                            <label class="form-label" for="unit">単位</label>
                             <select class="form-input-full" id="unit">
                                 <option value="">選択してください</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">荷姿</label>
+                            <label class="form-label" for="packaging">荷姿</label>
                             <select class="form-input-full" id="packaging">
                                 <option value="">選択してください</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">単価（税抜）</label>
+                            <label class="form-label" for="unitPrice">単価（税抜）</label>
                             <input type="number" class="form-input-full numeric-input" id="unitPrice" onchange="calculateAmount()" inputmode="decimal">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">金額（税別）</label>
+                            <label class="form-label" for="amountNet">金額（税別）</label>
                             <input type="number" class="form-input-full numeric-input" id="amountNet" onchange="calculateGrossFromNet()" inputmode="decimal">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">金額（税込）</label>
+                            <label class="form-label" for="amountGross">金額（税込）</label>
                             <input type="number" class="form-input-full numeric-input" id="amountGross" readonly inputmode="decimal">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">配送先電話番号</label>
+                            <label class="form-label" for="deliveryTel">配送先電話番号</label>
                             <input type="tel" class="form-input-full numeric-input" id="deliveryTel" inputmode="tel">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">ドライバー</label>
+                            <label class="form-label" for="driver">ドライバー</label>
                             <select class="form-input-full" id="driver">
                                 <option value="">選択してください</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">車両</label>
+                            <label class="form-label" for="vehicle">車両</label>
                             <select class="form-input-full" id="vehicle">
                                 <option value="">選択してください</option>
                             </select>
                         </div>
                         <div class="form-group full-width">
-                            <label class="form-label">特記事項</label>
+                            <label class="form-label" for="instructions">特記事項</label>
                             <textarea class="form-textarea jp-input" id="instructions" lang="ja" inputmode="text"></textarea>
                         </div>
                     </div>
@@ -1294,18 +1321,18 @@ textarea {
         <div class="modal-content small">
             <div class="modal-header">
                 <h2>クラウド設定（Supabase）</h2>
-                <button class="close-button" onclick="closeCloudSettings()">&times;</button>
+                <button class="close-button" aria-label="クラウド設定モーダルを閉じる" onclick="closeCloudSettings()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="note" id="cloudConfigLockNotice" style="display: none; margin-bottom: 12px; padding: 10px 12px; border-radius: 4px; border: 1px solid #f0cf85; background: #fff4db; color: #8a5a00; font-size: 0.9rem;">
                     共有クラウド設定が適用されています。通常運用ではこの画面から変更できません。保守時のみ <code>?manualCloudConfig=1</code> を付けて開いてください。
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Project URL</label>
+                    <label class="form-label" for="cloudProjectUrl">Project URL</label>
                     <input type="text" class="form-input-full" id="cloudProjectUrl" placeholder="https://xxxx.supabase.co">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">anon key</label>
+                    <label class="form-label" for="cloudAnonKey">anon key</label>
                     <input type="text" class="form-input-full" id="cloudAnonKey" placeholder="長い英数字のキー">
                 </div>
                 <div class="form-group">
@@ -1331,7 +1358,7 @@ textarea {
             <div class="modal-header master-header">
                 <div class="master-header-title">
                     <h2>顧客マスタ管理</h2>
-                    <button class="close-button" onclick="closeCustomerMaster()">&times;</button>
+                    <button class="close-button" aria-label="顧客マスタモーダルを閉じる" onclick="closeCustomerMaster()">&times;</button>
                 </div>
                 <!-- ツールバー -->
                 <div class="master-toolbar">
@@ -1385,7 +1412,7 @@ textarea {
             <div class="modal-header master-header">
                 <div class="master-header-title">
                     <h2 id="simpleMasterTitle">マスタ管理</h2>
-                    <button class="close-button" onclick="closeSimpleMaster()">&times;</button>
+                    <button class="close-button" aria-label="マスタ管理モーダルを閉じる" onclick="closeSimpleMaster()">&times;</button>
                 </div>
                 <!-- ツールバー：新規追加＋CSV＋保存 -->
                 <div class="master-toolbar">
@@ -1426,20 +1453,20 @@ textarea {
         <div class="modal-content small">
             <div class="modal-header">
                 <h2>顧客を新規追加</h2>
-                <button class="close-button" onclick="closeCustomerAddModal()">&times;</button>
+                <button class="close-button" aria-label="顧客追加モーダルを閉じる" onclick="closeCustomerAddModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="customerAddForm">
                     <div class="form-group">
-                        <label class="form-label">顧客名 <span style="color: var(--danger);">*必須</span></label>
+                        <label class="form-label" for="newCustomerName">顧客名 <span style="color: var(--danger);">*必須</span></label>
                         <input type="text" class="form-input-full jp-input" id="newCustomerName" placeholder="例）山田商事" required lang="ja" inputmode="text">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">住所</label>
+                        <label class="form-label" for="newCustomerAddress">住所</label>
                         <input type="text" class="form-input-full jp-input" id="newCustomerAddress" placeholder="例）東京都港区..." lang="ja" inputmode="text">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">電話番号</label>
+                        <label class="form-label" for="newCustomerTel">電話番号</label>
                         <input type="tel" class="form-input-full numeric-input" id="newCustomerTel" placeholder="例）03-xxxx-xxxx" inputmode="tel">
                     </div>
                 </form>
@@ -1455,11 +1482,11 @@ textarea {
         <div class="modal-content">
             <div class="modal-header">
                 <h2>運行指示書の設定</h2>
-                <button class="close-button" onclick="closeInstructionSettingsModal()">&times;</button>
+                <button class="close-button" aria-label="運行指示書設定モーダルを閉じる" onclick="closeInstructionSettingsModal()">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label class="form-label" style="font-size: 14pt; font-weight: bold;">1件目の配車時間 <span style="color: var(--danger);">*必須</span></label>
+                    <label class="form-label" for="dispatchTime" style="font-size: 14pt; font-weight: bold;">1件目の配車時間 <span style="color: var(--danger);">*必須</span></label>
                     <input type="time" class="form-input-full" id="dispatchTime" required style="font-size: 16pt; padding: 12px;">
                 </div>
                 
@@ -1491,6 +1518,17 @@ textarea {
             name: 'きょうしん輸送株式会社',
             address: '夕張郡栗山町字旭台23番地129',
             tel: '0123-76-9950'
+        };
+
+        const MASTER_AUTOCOMPLETE_FIELDS = {
+            customer: { inputId: 'customerName', listId: 'customerAutocomplete' },
+            pickup: { inputId: 'pickupLocation', listId: 'pickupAutocomplete' },
+            delivery: { inputId: 'deliveryLocation', listId: 'deliveryAutocomplete' }
+        };
+        const autocompleteState = {
+            customer: { activeIndex: -1 },
+            pickup: { activeIndex: -1 },
+            delivery: { activeIndex: -1 }
         };
 
         // 顧客マスタ
@@ -1739,10 +1777,21 @@ textarea {
             // クリックイベントでオートコンプリートを閉じる
             document.addEventListener('click', function(e) {
                 if (!e.target.closest('.autocomplete-wrapper')) {
-                    document.querySelectorAll('.autocomplete-list').forEach(list => {
-                        list.classList.remove('active');
-                    });
+                    closeAllAutocompleteLists();
                 }
+            });
+
+            Object.keys(MASTER_AUTOCOMPLETE_FIELDS).forEach(type => {
+                const config = getMasterAutocompleteElements(type);
+                if (!config.input) return;
+                config.input.addEventListener('keydown', function(e) {
+                    handleMasterAutocompleteKeydown(e, type);
+                });
+                config.input.addEventListener('blur', function() {
+                    setTimeout(function() {
+                        if (!config.list.matches(':hover')) closeMasterAutocomplete(type);
+                    }, 100);
+                });
             });
 
         });
@@ -1777,14 +1826,109 @@ textarea {
             document.getElementById('todayDate').textContent = `${month}/${date} ${day}`;
         }
 
+        function getMasterAutocompleteElements(type) {
+            const config = MASTER_AUTOCOMPLETE_FIELDS[type];
+            return {
+                input: config ? document.getElementById(config.inputId) : null,
+                list: config ? document.getElementById(config.listId) : null
+            };
+        }
+
+        function setAutocompleteActiveIndex(type, newIndex) {
+            const state = autocompleteState[type];
+            const elements = getMasterAutocompleteElements(type);
+            if (!state || !elements.input || !elements.list) return;
+            const options = Array.from(elements.list.querySelectorAll('.autocomplete-item'));
+            if (!options.length) {
+                state.activeIndex = -1;
+                elements.input.removeAttribute('aria-activedescendant');
+                return;
+            }
+
+            state.activeIndex = newIndex;
+            options.forEach(function(option, index) {
+                const isActive = index === newIndex;
+                option.classList.toggle('is-active', isActive);
+                option.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                if (isActive) {
+                    elements.input.setAttribute('aria-activedescendant', option.id);
+                    option.scrollIntoView({ block: 'nearest' });
+                }
+            });
+
+            if (newIndex < 0) {
+                elements.input.removeAttribute('aria-activedescendant');
+            }
+        }
+
+        function closeMasterAutocomplete(type) {
+            const state = autocompleteState[type];
+            const elements = getMasterAutocompleteElements(type);
+            if (!elements.list || !elements.input || !state) return;
+            elements.list.classList.remove('active');
+            elements.list.innerHTML = '';
+            elements.input.setAttribute('aria-expanded', 'false');
+            elements.input.removeAttribute('aria-activedescendant');
+            state.activeIndex = -1;
+        }
+
+        function closeAllAutocompleteLists() {
+            Object.keys(MASTER_AUTOCOMPLETE_FIELDS).forEach(closeMasterAutocomplete);
+        }
+
+        function handleMasterAutocompleteKeydown(event, type) {
+            const state = autocompleteState[type];
+            const elements = getMasterAutocompleteElements(type);
+            if (!state || !elements.input || !elements.list) return;
+            const options = Array.from(elements.list.querySelectorAll('.autocomplete-item'));
+            const isOpen = elements.list.classList.contains('active');
+
+            if (event.key === 'Escape' && isOpen) {
+                event.preventDefault();
+                closeMasterAutocomplete(type);
+                return;
+            }
+
+            if (event.key === 'Tab') {
+                closeMasterAutocomplete(type);
+                return;
+            }
+
+            if (!options.length) return;
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                const nextIndex = state.activeIndex >= options.length - 1 ? 0 : state.activeIndex + 1;
+                setAutocompleteActiveIndex(type, nextIndex);
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                const nextIndex = state.activeIndex <= 0 ? options.length - 1 : state.activeIndex - 1;
+                setAutocompleteActiveIndex(type, nextIndex);
+                return;
+            }
+
+            if (event.key === 'Enter' && state.activeIndex >= 0) {
+                event.preventDefault();
+                const activeOption = options[state.activeIndex];
+                if (activeOption) {
+                    selectMasterItem(activeOption.dataset.value, type);
+                }
+            }
+        }
+
         // マスタフィルタリング
         function filterMaster(keyword, type) {
-            const listId = type === 'customer' ? 'customerAutocomplete' : 
-                          type === 'pickup' ? 'pickupAutocomplete' : 'deliveryAutocomplete';
-            const list = document.getElementById(listId);
+            const elements = getMasterAutocompleteElements(type);
+            const list = elements.list;
+            const input = elements.input;
             
+            if (!list || !input || !autocompleteState[type]) return;
+
             if (!keyword) {
-                list.classList.remove('active');
+                closeMasterAutocomplete(type);
                 return;
             }
             
@@ -1794,39 +1938,53 @@ textarea {
             
             if (filtered.length > 0) {
                 list.innerHTML = '';
-                filtered.forEach(item => {
+                filtered.forEach(function(item, index) {
                     const div = document.createElement('div');
                     div.className = 'autocomplete-item';
+                    div.id = `${list.id}-option-${index}`;
+                    div.setAttribute('role', 'option');
+                    div.setAttribute('aria-selected', 'false');
+                    div.dataset.value = item.name;
                     div.textContent = item.name;
-                    div.addEventListener('click', () => selectMasterItem(item.name, type));
+                    div.addEventListener('mousedown', function(e) {
+                        e.preventDefault();
+                    });
+                    div.addEventListener('click', function() {
+                        selectMasterItem(item.name, type);
+                    });
                     list.appendChild(div);
                 });
                 list.classList.add('active');
+                input.setAttribute('aria-expanded', 'true');
+                setAutocompleteActiveIndex(type, -1);
             } else {
-                list.classList.remove('active');
+                closeMasterAutocomplete(type);
             }
         }
 
         // マスタアイテム選択
         function selectMasterItem(name, type) {
             const selectedItem = customerMaster.find(item => item.name === name);
+            const elements = getMasterAutocompleteElements(type);
             
             if (type === 'customer') {
                 document.getElementById('customerName').value = name;
-                document.getElementById('customerAutocomplete').classList.remove('active');
             } else if (type === 'pickup') {
                 document.getElementById('pickupLocation').value = name;
-                document.getElementById('pickupAutocomplete').classList.remove('active');
                 if (selectedItem) {
                     document.getElementById('pickupAddress').value = selectedItem.address;
                 }
             } else if (type === 'delivery') {
                 document.getElementById('deliveryLocation').value = name;
-                document.getElementById('deliveryAutocomplete').classList.remove('active');
                 if (selectedItem) {
                     document.getElementById('deliveryAddress').value = selectedItem.address;
                     document.getElementById('deliveryTel').value = selectedItem.tel;
                 }
+            }
+
+            closeMasterAutocomplete(type);
+            if (elements.input) {
+                elements.input.focus();
             }
         }
 
@@ -3245,9 +3403,7 @@ function updateStatsFromView() {
             document.getElementById('orderModal').style.display = 'none';
             editingId = null;
             clearEditSessionBaseline();
-            document.querySelectorAll('.autocomplete-list').forEach(list => {
-                list.classList.remove('active');
-            });
+            closeAllAutocompleteLists();
         }
 
         // 顧客マスタモーダル開く
@@ -5602,9 +5758,12 @@ async function exportInvoiceCSV() {
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeModal();
+                closeCloudSettings();
                 closeCustomerMaster();
                 closeSimpleMaster();
                 closeCustomerAddModal();
+                closeInstructionSettingsModal();
+                closeAllAutocompleteLists();
             }
             if (e.ctrlKey && e.key === 'n') {
                 e.preventDefault();

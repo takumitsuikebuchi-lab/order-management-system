@@ -564,6 +564,51 @@ test('shared cloud config keeps cloud settings locked in normal mode', async ({ 
   await expect(page.locator('#cloudSettingsSaveButton')).toBeDisabled();
 });
 
+test('Escape closes cloud settings and instruction settings dialogs', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /クラウド設定/ }).click();
+  await expect(page.locator('#cloudSettingsModal')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#cloudSettingsModal')).toBeHidden();
+
+  await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
+  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await expect(page.locator('#instructionSettingsModal')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#instructionSettingsModal')).toBeHidden();
+});
+
+test('labels focus fields and autocomplete supports keyboard selection', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.keyboard.press('Tab');
+  const buttonBoxShadow = await page.evaluate(() => getComputedStyle(document.activeElement).boxShadow);
+  expect(buttonBoxShadow).not.toBe('none');
+
+  await page.getByRole('button', { name: /新規受注/ }).click();
+
+  await page.locator('label[for="orderNo"]').click();
+  await expect(page.locator('#orderNo')).toBeFocused();
+
+  await page.locator('label[for="customerName"]').click();
+  await expect(page.locator('#customerName')).toBeFocused();
+
+  await page.locator('#customerName').fill('テ');
+  await expect(page.locator('#customerAutocomplete')).toBeVisible();
+  await expect(page.locator('#customerName')).toHaveAttribute('aria-expanded', 'true');
+
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#customerAutocomplete .autocomplete-item').first()).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Enter');
+
+  await expect(page.locator('#customerName')).toHaveValue('テスト青果');
+  await expect(page.locator('#customerAutocomplete')).toBeHidden();
+});
+
 test('customer master add flow updates the master list', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
