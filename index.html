@@ -1765,6 +1765,21 @@ textarea {
             }
         }
 
+        // ローカルID生成（UUID v4）。クラウド同期後はSupabaseのUUIDに上書きされる。
+        function generateLocalId() {
+            try {
+                if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                    return crypto.randomUUID();
+                }
+            } catch(_) {}
+            // フォールバック: 旧ブラウザ用の簡易UUID
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16 | 0;
+                var v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
         // HTML特殊文字エスケープ（XSS防止）
         function escHtml(s) {
             return String(s == null ? '' : s)
@@ -2117,9 +2132,9 @@ textarea {
                 orders = JSON.parse(saved);
                 // ID欠損の補完（CSV取込や旧データ対策）
                 let changed = false;
-                orders.forEach((o, idx) => {
+                orders.forEach((o) => {
                     if (o.id === undefined || o.id === null || o.id === '') {
-                        o.id = Date.now() + idx;
+                        o.id = generateLocalId();
                         changed = true;
                     }
                 });
@@ -2689,10 +2704,9 @@ textarea {
             const prevFilterState = captureTableFilterState();
             orders = fetched.map(row => normalizeOrderRow(row));
             // ID欠損の受注に一意なIDを補完
-            const base = Date.now();
-            orders.forEach((o, idx) => {
+            orders.forEach((o) => {
                 if (o.id === undefined || o.id === null || o.id === '') {
-                    o.id = base + idx;
+                    o.id = generateLocalId();
                 }
             });
             saveData();
@@ -3320,14 +3334,14 @@ function getTagStyle(ns, name) {
                     const dateA = new Date(a.date);
                     const dateB = new Date(b.date);
                     if (dateA.getTime() === dateB.getTime()) {
-                        // 同じ日付の場合はIDで並び替え
-                        return a.id - b.id;
+                        // 同じ日付の場合は受注Noで並び替え（UUID化後もIDは数値比較できないため）
+                        return String(a.orderNo || '').localeCompare(String(b.orderNo || ''), 'ja');
                     }
                     return dateA - dateB;
                 });
             } else if (sortOrder === 'id-asc') {
-                // 登録順（ID順）
-                monthOrders.sort((a, b) => a.id - b.id);
+                // 登録順（受注No順）
+                monthOrders.sort((a, b) => String(a.orderNo || '').localeCompare(String(b.orderNo || ''), 'ja'));
             }
             
 tbody.innerHTML = monthOrders.map(function(o) {
@@ -4221,7 +4235,7 @@ function updateStatsFromView() {
                 }
             } else {
                 // 新規データの追加（フラグは初期値false）
-                formData.id = Date.now();
+                formData.id = generateLocalId();
                 formData.instructionSheet = false;
                 formData.invoiceSent = false;
                 formData.paymentReceived = false;
@@ -5561,7 +5575,7 @@ function updateStatsFromView() {
                     
                     // マッピングされたデータオブジェクトを作成
                     const order = {
-                        id: Date.now() + i,
+                        id: generateLocalId(),
                         orderNo: '',
                         date: '',
                         customerName: '',
