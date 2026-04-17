@@ -809,11 +809,68 @@
             line-height: 1;
         }
 
-        /* 日付選択 */
+        /* 日付選択（旧：他画面で使用中の可能性があるため残置） */
         .date-filter {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+        }
+
+        /* 絞り込みバー */
+        .filter-bar {
+            align-items: flex-end;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            min-width: 0;
+        }
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            letter-spacing: 0.02em;
+        }
+        .filter-input {
+            min-width: 160px;
+            background: var(--bg-card);
+        }
+        .filter-group[data-filter-group="customer"] .filter-input {
+            min-width: 220px;
+        }
+        .filter-group.is-active .filter-input {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+        }
+        .filter-group.is-active .filter-label {
+            color: var(--primary);
+        }
+        .filter-group.is-active .filter-label::after {
+            content: " ●";
+            color: var(--primary);
+        }
+        .filter-group--sort {
+            margin-left: 0.25rem;
+        }
+        .filter-clear {
+            margin-left: auto;
+            align-self: flex-end;
+            white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+            .filter-clear {
+                margin-left: 0;
+                width: 100%;
+            }
+            .filter-input {
+                min-width: 140px;
+            }
         }
 
         /* アニメーション */
@@ -1147,25 +1204,35 @@ textarea {
     <button class="btn btn-secondary" onclick="openVehicleMaster()">🚚 車両マスタ</button>
 </div>
 
-<div class="action-row">
-    <!-- 3行目：検索/フィルタ（元のまま移設） -->
-    <div class="date-filter">
-        <label style="font-size: 0.875rem;">顧客検索:</label>
-        <input type="text" class="form-input" id="searchInput" list="customerFilterList" placeholder="顧客名を入力または選択" oninput="filterTable()" style="width: 220px;">
+<div class="action-row filter-bar" role="search" aria-label="受注の絞り込み">
+    <div class="filter-group" data-filter-group="customer">
+        <label class="filter-label" for="searchInput">顧客検索</label>
+        <input type="text" class="form-input filter-input" id="searchInput" list="customerFilterList" placeholder="顧客名で絞り込み" oninput="filterTable()">
     </div>
-    <div class="date-filter">
-        <label style="font-size: 0.875rem;">日付指定:</label>
-        <input type="date" class="form-input" id="dateFilter" onchange="filterTable()">
-        <button class="btn btn-sm btn-secondary" onclick="clearDateFilter()">日付解除</button>
+    <div class="filter-group" data-filter-group="date">
+        <label class="filter-label" for="dateFilter">日付指定</label>
+        <input type="date" class="form-input filter-input" id="dateFilter" onchange="filterTable()">
     </div>
-    <select class="form-select" id="sortOrder" onchange="sortTable()" style="width: 120px;">
-        <option value="date-asc">日付順</option>
-        <option value="id-asc">登録順</option>
-    </select>
-    <select class="form-select" id="driverFilter" onchange="filterTable()">
-        <option value="">全ドライバー</option>
-    </select>
-    <button class="btn btn-sm btn-secondary" onclick="clearCustomerFilter()">クリア</button>
+    <div class="filter-group" data-filter-group="driver">
+        <label class="filter-label" for="driverFilter">ドライバー</label>
+        <select class="form-select filter-input" id="driverFilter" onchange="filterTable()">
+            <option value="">全ドライバー</option>
+        </select>
+    </div>
+    <div class="filter-group" data-filter-group="vehicle">
+        <label class="filter-label" for="vehicleFilter">車両</label>
+        <select class="form-select filter-input" id="vehicleFilter" onchange="filterTable()">
+            <option value="">全車両</option>
+        </select>
+    </div>
+    <div class="filter-group filter-group--sort">
+        <label class="filter-label" for="sortOrder">並び順</label>
+        <select class="form-select filter-input" id="sortOrder" onchange="sortTable()">
+            <option value="date-asc">日付順</option>
+            <option value="id-asc">登録順</option>
+        </select>
+    </div>
+    <button type="button" class="btn btn-sm btn-secondary filter-clear" onclick="clearAllFilters()"><span aria-hidden="true">🗑</span> すべてクリア</button>
     <datalist id="customerFilterList"></datalist>
 </div>
 
@@ -2545,6 +2612,7 @@ textarea {
                 search: getValue('searchInput'),
                 dateFilter: getValue('dateFilter'),
                 driverFilter: getValue('driverFilter'),
+                vehicleFilter: getValue('vehicleFilter'),
                 scrollY: window.scrollY
             };
         }
@@ -2555,6 +2623,7 @@ textarea {
             const searchInput = document.getElementById('searchInput');
             const dateFilter = document.getElementById('dateFilter');
             const driverFilter = document.getElementById('driverFilter');
+            const vehicleFilter = document.getElementById('vehicleFilter');
 
             if (searchInput) searchInput.value = state.search || '';
             if (dateFilter) dateFilter.value = state.dateFilter || '';
@@ -2562,6 +2631,11 @@ textarea {
                 const desired = state.driverFilter || '';
                 const exists = Array.from(driverFilter.options).some(opt => opt.value === desired);
                 driverFilter.value = exists ? desired : '';
+            }
+            if (vehicleFilter) {
+                const desired = state.vehicleFilter || '';
+                const exists = Array.from(vehicleFilter.options).some(opt => opt.value === desired);
+                vehicleFilter.value = exists ? desired : '';
             }
 
             filterTable();
@@ -3373,17 +3447,22 @@ function updateStatsFromView() {
             updateStats();
         }
 
-        // 日付フィルタクリア
-        function clearDateFilter() {
-            document.getElementById('dateFilter').value = '';
+        // 全フィルタをクリア（顧客検索・日付・ドライバー・車両をすべて初期状態へ）
+        function clearAllFilters() {
+            const searchInput = document.getElementById('searchInput');
+            const dateFilter = document.getElementById('dateFilter');
+            const driverFilter = document.getElementById('driverFilter');
+            const vehicleFilter = document.getElementById('vehicleFilter');
+            if (searchInput) searchInput.value = '';
+            if (dateFilter) dateFilter.value = '';
+            if (driverFilter) driverFilter.value = '';
+            if (vehicleFilter) vehicleFilter.value = '';
             filterTable();
         }
 
-        function clearCustomerFilter() {
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) searchInput.value = '';
-            filterTable();
-        }
+        // 後方互換（他所から呼ばれていても壊れないよう残す）
+        function clearDateFilter() { clearAllFilters(); }
+        function clearCustomerFilter() { clearAllFilters(); }
 
         // モーダル開く
         function openModal() {
@@ -4254,15 +4333,49 @@ function updateStatsFromView() {
 
         // フィルタ設定
         function setupFilters() {
-            // ドライバーフィルターをマスタデータから生成
-            document.getElementById('driverFilter').innerHTML = '<option value="">全ドライバー</option>' +
-                driverMaster.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+            // ドライバーフィルターをマスタデータから生成（現在値を維持）
+            const driverSel = document.getElementById('driverFilter');
+            if (driverSel) {
+                const prev = driverSel.value;
+                driverSel.innerHTML = '<option value="">全ドライバー</option>' +
+                    driverMaster.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+                if (Array.from(driverSel.options).some(o => o.value === prev)) driverSel.value = prev;
+            }
+
+            // 車両フィルターをマスタデータから生成（現在値を維持）
+            const vehicleSel = document.getElementById('vehicleFilter');
+            if (vehicleSel) {
+                const prev = vehicleSel.value;
+                vehicleSel.innerHTML = '<option value="">全車両</option>' +
+                    vehicleMaster.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+                if (Array.from(vehicleSel.options).some(o => o.value === prev)) vehicleSel.value = prev;
+            }
 
             // 顧客キーワード検索候補（datalist）を生成
             const customerList = document.getElementById('customerFilterList');
             if (customerList) {
                 customerList.innerHTML = customerMaster.map(c => `<option value="${escHtml(c.name)}"></option>`).join('');
             }
+
+            updateFilterActiveState();
+        }
+
+        // 絞り込み中の項目に視覚ハイライトを付ける
+        function updateFilterActiveState() {
+            const map = {
+                customer: document.getElementById('searchInput'),
+                date: document.getElementById('dateFilter'),
+                driver: document.getElementById('driverFilter'),
+                vehicle: document.getElementById('vehicleFilter'),
+            };
+            Object.keys(map).forEach(key => {
+                const input = map[key];
+                if (!input) return;
+                const group = document.querySelector('.filter-group[data-filter-group="' + key + '"]');
+                if (!group) return;
+                const hasValue = (input.value || '').trim() !== '';
+                group.classList.toggle('is-active', hasValue);
+            });
         }
 
         // テーブルフィルタ
@@ -4270,15 +4383,18 @@ function updateStatsFromView() {
             const customerSearch = document.getElementById('searchInput').value.toLowerCase();
             const dateFilter = document.getElementById('dateFilter').value;
             const driverFilter = document.getElementById('driverFilter').value;
-            
+            const vehicleEl = document.getElementById('vehicleFilter');
+            const vehicleFilter = vehicleEl ? vehicleEl.value : '';
+
             const rows = document.querySelectorAll('#tableBody tr');
             rows.forEach(row => {
                 const dateText = row.cells[1].textContent;
-                const driver = row.cells[11].textContent;
                 const customer = row.cells[2].textContent.toLowerCase();
-                
+                const driver = row.cells[11].textContent;
+                const vehicle = row.cells[12] ? row.cells[12].textContent : '';
+
                 let show = true;
-                
+
                 if (customerSearch && !customer.includes(customerSearch)) show = false;
                 if (dateFilter) {
                     const filterDate = new Date(dateFilter);
@@ -4286,11 +4402,12 @@ function updateStatsFromView() {
                     if (dateText !== rowDateStr) show = false;
                 }
                 if (driverFilter && !driver.includes(driverFilter)) show = false;
-                
+                if (vehicleFilter && !vehicle.includes(vehicleFilter)) show = false;
+
                 row.style.display = show ? '' : 'none';
             });
-updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
-
+            updateFilterActiveState();
+            updateStatsFromView();  // ★フィルタ適用後の可視行で再集計
         }
 
         // 全選択切り替え

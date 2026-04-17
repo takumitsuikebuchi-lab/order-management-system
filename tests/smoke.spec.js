@@ -1481,31 +1481,57 @@ test('pickup slip without selection opens a blank printable slip', async ({ page
   }).not.toContain('NaN/NaN/NaN');
 });
 
-test('date and driver filters narrow the table and stats, then clear safely', async ({ page }) => {
+test('all four filters narrow the table and a single clear button reverts every field', async ({ page }) => {
   await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
 
+  await page.locator('#searchInput').fill('サンプル');
+  await page.locator('#dateFilter').fill('2026-03-20');
   await page.selectOption('#driverFilter', '門脇悟大');
+  await page.selectOption('#vehicleFilter', '帯広500た56-78');
 
   await expect(page.locator('#orderCount')).toHaveText('1件');
   await expect(page.locator('#totalGross')).toHaveText('¥1,870');
   await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
   await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeHidden();
 
-  await page.locator('#dateFilter').fill('2026-03-19');
+  // 絞り込み中はハイライトクラスが付く
+  await expect(page.locator('.filter-group[data-filter-group="customer"]')).toHaveClass(/is-active/);
+  await expect(page.locator('.filter-group[data-filter-group="date"]')).toHaveClass(/is-active/);
+  await expect(page.locator('.filter-group[data-filter-group="driver"]')).toHaveClass(/is-active/);
+  await expect(page.locator('.filter-group[data-filter-group="vehicle"]')).toHaveClass(/is-active/);
 
-  await expect(page.locator('#orderCount')).toHaveText('0件');
-  await expect(page.locator('#totalGross')).toHaveText('¥0');
-  await expect(page.locator('#incompleteCount')).toHaveText('0件');
+  await page.getByRole('button', { name: /すべてクリア/ }).click();
 
-  await page.getByRole('button', { name: '日付解除' }).click();
-
+  await expect(page.locator('#searchInput')).toHaveValue('');
   await expect(page.locator('#dateFilter')).toHaveValue('');
-  await expect(page.locator('#driverFilter')).toHaveValue('門脇悟大');
-  await expect(page.locator('#orderCount')).toHaveText('1件');
-  await expect(page.locator('#totalGross')).toHaveText('¥1,870');
+  await expect(page.locator('#driverFilter')).toHaveValue('');
+  await expect(page.locator('#vehicleFilter')).toHaveValue('');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalGross')).toHaveText('¥2,970');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeVisible();
   await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
+  await expect(page.locator('.filter-group[data-filter-group="driver"]')).not.toHaveClass(/is-active/);
+  await expect(page.locator('.filter-group[data-filter-group="vehicle"]')).not.toHaveClass(/is-active/);
+});
+
+test('vehicle filter narrows the table to rows with the selected vehicle', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  // 初期状態：2件
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+
+  await page.selectOption('#vehicleFilter', '札幌100あ12-34');
+
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeVisible();
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeHidden();
+
+  await page.selectOption('#vehicleFilter', '');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
 });
 
 test('cloud refresh keeps search, date, and driver filters while applying new data', async ({ page }) => {
