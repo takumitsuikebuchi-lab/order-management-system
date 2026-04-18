@@ -171,7 +171,7 @@ GitHub Actions の週次バックアップで保存された CSV を Excel で�
 - [x] 1. `Date.now()` ID撤廃 → Supabase `gen_random_uuid()` に一本化
 - [x] 2. orders テーブルに `updated_at` 追加＋競合検知強化（スキーマ変更は事前確認）
 - [x] 3. 削除系・1,500件ページング・部分障害テストの追加
-- [ ] 4. IME・印刷内容・月跨ぎのテスト追加
+- [x] 4. IME・印刷内容・月跨ぎのテスト追加
 - [ ] 5. 受注一覧デフォルトを「当月＋前月」に、全件ボタン追加
 - [ ] 6. localStorage 容量監視（3MB超で警告）
 - [ ] 7. 週次バックアップの3年超自動削除
@@ -184,6 +184,7 @@ GitHub Actions の週次バックアップで保存された CSV を Excel で�
 - 1. `generateLocalId()` ヘルパー（`crypto.randomUUID()` + フォールバック）を追加し、ID生成4箇所（loadData補完・applyFetchedOrders補完・saveOrder新規・CSV取込）を UUID 化。同時に UUID 文字列では壊れる `a.id - b.id` ソートを `orderNo` の日本語 localeCompare に修正。Playwright 37件 通過。
 - 2. Supabase `orders` に `updated_at timestamptz not null default now()` を追加＋`set_updated_at()` トリガー設定（SQL Editor で実行確認済み）。`normalizeOrderRow` に `updatedAt` を取り込み、`editSessionBaseline` に保存。`saveOrder` の競合検知を「updated_at が前進 OR 署名相違」で判定する二重チェックに強化。`schema.sql` も同期。Playwright 37件 通過。
 - 3. スモークテストを 37件 → 40件 に拡張。追加: (a) クラウドモードで削除ボタンが DELETE リクエストを発行する、(b) 1,500件のデータが Range ヘッダーで 2 ページに分けて全件取得される、(c) DELETE 失敗時にキューへ積まれ `flushCloudQueue()` で復旧する。
+- 4. さらに3件追加して 43件 に。(a) IME 変換中は顧客検索が絞り込まれず、compositionend で初めて適用される、(b) 運行指示書の印刷 HTML に積地/卸地住所・品名・数量・車両が含まれる、(c) 12月→翌年1月の月送り/戻りで受注が混ざらない。
 
 ---
 

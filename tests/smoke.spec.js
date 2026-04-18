@@ -1851,6 +1851,112 @@ test('cloud fetch collects all orders across 1500 rows via Range pagination', as
   expect(rangeCalls[1]).toBe('1000-1999');
 });
 
+test('customer filter defers during IME composition and applies after compositionend', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await expect(page.locator('#tableBody tr')).toHaveCount(2);
+
+  // IME変換中（data-composing=1）は input 発火でも filterTable が走らない（inline handler のガード）
+  await page.evaluate(() => {
+    const el = document.getElementById('searchInput');
+    el.dataset.composing = '1';
+    el.value = 'テスト';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect.poll(async () => await visibleCustomers(page)).toEqual(['テスト青果', 'サンプル運送']);
+
+  // compositionend 相当（フラグ解除 → filterTable）で初めて絞り込みが適用される
+  await page.evaluate(() => {
+    const el = document.getElementById('searchInput');
+    el.dataset.composing = '';
+    filterTable();
+  });
+  await expect.poll(async () => await visibleCustomers(page)).toEqual(['テスト青果']);
+});
+
+test('instruction sheet print output includes addresses, cargo, and quantity details', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await installPrintCapture(page);
+  await page.goto('/');
+
+  await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
+  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await expect(page.locator('#instructionSettingsModal')).toBeVisible();
+  await page.locator('#dispatchTime').fill('09:15');
+  await page.getByRole('button', { name: '運行指示書を出力' }).click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__printWrites[0]?.html || '');
+  }).toContain('札幌市中央区北12条西20丁目');
+
+  const html = await page.evaluate(() => window.__printWrites[0]?.html || '');
+  expect(html).toContain('旭川市永山2条5丁目');
+  expect(html).toContain('トマト');
+  expect(html).toMatch(/10\s*ケース/);
+  expect(html).toContain('札幌100あ12-34');
+});
+
+test('month navigation across year boundary keeps december and january orders separated', async ({ page }) => {
+  await freezePageDate(page, '2026-12-20T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  const decemberOrder = {
+    id: 'test-dec',
+    orderNo: 'R261230-001',
+    date: '2026-12-28',
+    customerName: '年末物流',
+    pickupLocation: '札幌市場',
+    pickupAddress: '札幌市中央区',
+    deliveryLocation: '函館市場',
+    deliveryAddress: '函館市',
+    deliveryTel: '0138-00-0000',
+    cargo: 'りんご',
+    quantity: 30,
+    unit: 'ケース',
+    packaging: 'ダンボール',
+    unitPrice: 500,
+    amountNet: 15000,
+    amountGross: 16500,
+    instructions: '',
+    driver: '混載流通',
+    vehicle: '札幌100あ12-34',
+    instructionSheet: false,
+    invoiceSent: false,
+    paymentReceived: false,
+    orderCompleted: false
+  };
+  const januaryOrder = {
+    ...decemberOrder,
+    id: 'test-jan',
+    orderNo: 'R270105-001',
+    date: '2027-01-05',
+    customerName: '年始物流',
+    cargo: 'みかん',
+    quantity: 20,
+    amountNet: 10000,
+    amountGross: 11000
+  };
+
+  await replaceOrdersAndRefresh(page, [decemberOrder, januaryOrder]);
+
+  await expect(page.locator('#currentMonth')).toHaveText('2026年12月');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect.poll(async () => await visibleCustomers(page)).toEqual(['年末物流']);
+
+  await page.getByRole('button', { name: '→' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2027年1月');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect.poll(async () => await visibleCustomers(page)).toEqual(['年始物流']);
+
+  await page.getByRole('button', { name: '←' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年12月');
+  await expect.poll(async () => await visibleCustomers(page)).toEqual(['年末物流']);
+});
+
 test('cloud delete failure enqueues and recovers via queue flush', async ({ page }) => {
   let deleteAttempts = 0;
 
