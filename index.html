@@ -2558,7 +2558,8 @@ textarea {
                 instructionSheet: !!row.instruction_sheet || !!row.instructionSheet,
                 invoiceSent: !!row.invoice_sent || !!row.invoiceSent,
                 paymentReceived: !!row.payment_received || !!row.paymentReceived,
-                orderCompleted: !!row.order_completed || !!row.orderCompleted
+                orderCompleted: !!row.order_completed || !!row.orderCompleted,
+                updatedAt: row.updated_at || row.updatedAt || null
             };
         }
 
@@ -2598,7 +2599,8 @@ textarea {
             const normalized = normalizeOrderRow(order);
             editSessionBaseline = {
                 orderNo: normalized.orderNo || '',
-                signature: buildOrderConflictSignature(normalized)
+                signature: buildOrderConflictSignature(normalized),
+                updatedAt: normalized.updatedAt || null
             };
         }
 
@@ -4216,8 +4218,13 @@ function updateStatsFromView() {
             if (editingId && cloudEnabled() && editSessionBaseline && editSessionBaseline.orderNo) {
                 const latest = await cloudFetchOrderByOrderNo(editSessionBaseline.orderNo);
                 if (latest.ok && latest.order) {
+                    // updated_at が前進していれば別端末で更新された可能性が高い（一次判定）
+                    const latestUpdatedAt = latest.order.updatedAt || null;
+                    const baselineUpdatedAt = editSessionBaseline.updatedAt || null;
+                    const updatedAtAdvanced = !!(latestUpdatedAt && baselineUpdatedAt && latestUpdatedAt > baselineUpdatedAt);
                     const latestSignature = buildOrderConflictSignature(latest.order);
-                    if (latestSignature !== editSessionBaseline.signature) {
+                    const signatureDiffers = latestSignature !== editSessionBaseline.signature;
+                    if (updatedAtAdvanced || signatureDiffers) {
                         alert('別の端末でこの受注が更新されています。いったん閉じて最新の内容を開き直してください。');
                         return;
                     }

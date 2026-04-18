@@ -169,7 +169,7 @@ GitHub Actions の週次バックアップで保存された CSV を Excel で�
 
 ### 計画（優先順）
 - [x] 1. `Date.now()` ID撤廃 → Supabase `gen_random_uuid()` に一本化
-- [ ] 2. orders テーブルに `updated_at` 追加＋競合検知強化（スキーマ変更は事前確認）
+- [x] 2. orders テーブルに `updated_at` 追加＋競合検知強化（スキーマ変更は事前確認）
 - [ ] 3. 削除系・1,500件ページング・部分障害テストの追加
 - [ ] 4. IME・印刷内容・月跨ぎのテスト追加
 - [ ] 5. 受注一覧デフォルトを「当月＋前月」に、全件ボタン追加
@@ -182,6 +182,7 @@ GitHub Actions の週次バックアップで保存された CSV を Excel で�
 
 ### 結果
 - 1. `generateLocalId()` ヘルパー（`crypto.randomUUID()` + フォールバック）を追加し、ID生成4箇所（loadData補完・applyFetchedOrders補完・saveOrder新規・CSV取込）を UUID 化。同時に UUID 文字列では壊れる `a.id - b.id` ソートを `orderNo` の日本語 localeCompare に修正。Playwright 37件 通過。
+- 2. Supabase `orders` に `updated_at timestamptz not null default now()` を追加＋`set_updated_at()` トリガー設定（SQL Editor で実行確認済み）。`normalizeOrderRow` に `updatedAt` を取り込み、`editSessionBaseline` に保存。`saveOrder` の競合検知を「updated_at が前進 OR 署名相違」で判定する二重チェックに強化。`schema.sql` も同期。Playwright 37件 通過。
 
 ---
 
