@@ -27,33 +27,68 @@ jobs:
 
           mkdir -p backups
 
+          # Range-Unit: items + Prefer: count=exact のレスポンスヘッダ Content-Range: 0-N/TOTAL から
+          # 総件数を取得し、page_size 単位で分割取得して CSV を連結する。10万件を超えても欠損しない設計。
           export_csv_with_bom() {
             local url="$1"
             local output_path="$2"
-            local tmp_file
+            local tmp_file page_tmp headers_file cr_line parsed_total
+            local offset=0
+            local page_size=10000
+            local total=999999
+            local is_first=1
 
             tmp_file=$(mktemp)
 
-            curl -sf "${url}" \
-              -H "apikey: ${SUPABASE_KEY}" \
-              -H "Authorization: Bearer ${SUPABASE_KEY}" \
-              -H "Accept: text/csv" \
-              -H "Range: 0-99999" \
-              -o "${tmp_file}"
+            while [ $offset -lt $total ]; do
+              local range_end=$((offset + page_size - 1))
+              page_tmp=$(mktemp)
+              headers_file=$(mktemp)
+
+              curl -sf "${url}" \
+                -H "apikey: ${SUPABASE_KEY}" \
+                -H "Authorization: Bearer ${SUPABASE_KEY}" \
+                -H "Accept: text/csv" \
+                -H "Range-Unit: items" \
+                -H "Range: ${offset}-${range_end}" \
+                -H "Prefer: count=exact" \
+                -D "${headers_file}" \
+                -o "${page_tmp}"
+
+              cr_line=$(grep -i '^content-range:' "${headers_file}" | head -n1 | tr -d '\r\n')
+              parsed_total=$(echo "$cr_line" | sed -nE 's|.*/([0-9]+).*|\1|p')
+              if [ -n "$parsed_total" ]; then total="$parsed_total"; fi
+
+              if [ "$is_first" -eq 1 ]; then
+                cat "${page_tmp}" > "${tmp_file}"
+                is_first=0
+              else
+                tail -n +2 "${page_tmp}" >> "${tmp_file}"
+              fi
+
+              rm -f "${page_tmp}" "${headers_file}"
+              offset=$((offset + page_size))
+
+              # 安全装置: 100万件を超える異常値で中断
+              if [ $offset -ge 1000000 ]; then
+                echo "警告: 100万件を超える取得を検出、中断します" >&2
+                break
+              fi
+            done
 
             printf '\xEF\xBB\xBF' > "${output_path}"
             cat "${tmp_file}" >> "${output_path}"
             rm -f "${tmp_file}"
           }
 
-          # 受注明細（全件・日付昇順）※Supabase REST上限1000件を回避するためRangeヘッダ付き
+          # 受注明細（全件・日付昇順）※Supabase REST上限1000件を回避するため Range + count=exact でページング
           export_csv_with_bom \
             "${SUPABASE_URL}/rest/v1/orders?select=*&order=date.asc,order_no.asc" \
             "backups/${DATE}_受注明細.csv"
 
           echo "受注明細: $(wc -l < backups/${DATE}_受注明細.csv) 行（ヘッダー含む）"
 
-          # 顧客マスタ ※同様にRangeヘッダで上限回避
+          # 顧客マスタ ※同様にページングで上限回避
           export_csv_with_bom \
             "${SUPABASE_URL}/rest/v1/customers?select=*&order=customer_name.asc" \
             "backups/${DATE}_顧客マスタ.csv"

@@ -227,11 +227,12 @@
 
         .btn-warning {
             background: var(--warning);
-            color: white;
+            color: #1f2937;
         }
 
         .btn-warning:hover {
             background: #d97706;
+            color: #1f2937;
         }
 
         .btn-sm {
@@ -818,6 +819,8 @@
 
         /* 絞り込みバー */
         .filter-bar {
+            display: flex;
+            flex-wrap: wrap;
             align-items: flex-end;
             gap: 0.75rem;
             padding: 0.75rem 1rem;
@@ -841,8 +844,9 @@
             min-width: 160px;
             height: 38px;
             box-sizing: border-box;
-            background: var(--bg-card);
+            background-color: var(--bg-card);
             line-height: 1.25;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .filter-input:focus-visible {
             outline: none;
@@ -876,18 +880,33 @@
             border-left: 1px solid var(--border);
         }
         .filter-clear {
-            align-self: flex-end;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
             white-space: nowrap;
             background: var(--warning);
             color: #1f2937;
-            border-color: #b45309;
+            border: 1px solid #b45309;
             font-weight: 700;
+            font-size: 0.8rem;
             box-shadow: 0 1px 2px rgba(180, 83, 9, 0.35);
             height: 38px;
             box-sizing: border-box;
             padding: 0 0.875rem;
-            font-size: 0.8rem;
             line-height: 1.25;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+        .filter-clear-icon {
+            display: inline-flex;
+            align-items: center;
+        }
+        /* type="search" のネイティブクリアボタンを非表示（独自クリアボタンと重複防止） */
+        input[type="search"].filter-input::-webkit-search-cancel-button,
+        input[type="search"].filter-input::-webkit-search-decoration {
+            -webkit-appearance: none;
+            appearance: none;
         }
         .filter-clear:hover {
             background: #d97706;
@@ -895,18 +914,24 @@
             color: #1f2937;
         }
         .filter-clear:focus-visible {
-            outline: 3px solid var(--primary);
-            outline-offset: 3px;
+            outline: 2px solid var(--primary-dark);
+            outline-offset: 2px;
             box-shadow: 0 0 0 1px #ffffff inset, 0 1px 2px rgba(180, 83, 9, 0.35);
         }
         @media (max-width: 768px) {
+            .filter-group {
+                flex: 1 1 100%;
+            }
+            .filter-input {
+                width: 100%;
+                min-width: 0;
+                height: 44px;
+                font-size: 0.95rem;
+            }
             .filter-clear {
                 width: 100%;
                 height: 44px;
                 font-size: 0.875rem;
-            }
-            .filter-input {
-                min-width: 140px;
             }
             .filter-group--sort {
                 padding-left: 0;
@@ -1226,7 +1251,7 @@ textarea {
     <button class="btn btn-warning" onclick="printPickupSlips()">📋 引取書</button>
 
     <button class="btn btn-warning" onclick="exportInvoiceCSV()">💰 請求書CSV（MF用）</button>
-    <button class="btn btn-success" onclick="exportCSV()">📊 CSV出力</button>
+    <button class="btn btn-success" onclick="exportCSV()" title="表示中の月（絞り込みは反映されません）の全受注をCSV出力">📊 当月CSV出力</button>
     <button id="csvDirBtn" class="btn btn-secondary" onclick="chooseExportDir()">💾 CSV保存先フォルダ設定</button>
     <button class="btn btn-secondary" onclick="openCloudSettings()">☁️ クラウド設定（Supabase）</button>
     <span id="cloudStatus" style="margin-left: 8px; font-size: 0.85rem; padding: 2px 6px; border-radius: 12px; background: #eee;">接続: ローカル</span>
@@ -1249,7 +1274,8 @@ textarea {
 <div class="action-row filter-bar" role="search" aria-label="受注の絞り込み">
     <div class="filter-group" data-filter-group="customer">
         <label class="filter-label" for="searchInput">顧客検索</label>
-        <input type="text" class="form-input filter-input" id="searchInput" list="customerFilterList" placeholder="顧客名で絞り込み" oncompositionstart="this.dataset.composing='1'" oncompositionend="this.dataset.composing='';filterTable()" oninput="if(this.dataset.composing!=='1')filterTable()">
+        <input type="search" class="form-input filter-input" id="searchInput" list="customerFilterList" placeholder="顧客名で絞り込み" maxlength="100" autocomplete="off" oncompositionstart="this.dataset.composing='1'" oncompositionend="this.dataset.composing='';requestAnimationFrame(filterTable)" oninput="if(this.dataset.composing!=='1')filterTable()">
+        <datalist id="customerFilterList"></datalist>
     </div>
     <div class="filter-group" data-filter-group="date">
         <label class="filter-label" for="dateFilter">日付指定</label>
@@ -1274,8 +1300,7 @@ textarea {
             <option value="id-asc">登録順</option>
         </select>
     </div>
-    <button type="button" class="btn btn-sm filter-clear" aria-label="すべてクリア：絞り込み条件をすべて解除" onclick="clearAllFilters()"><span aria-hidden="true">🗑</span> すべてクリア</button>
-    <datalist id="customerFilterList"></datalist>
+    <button type="button" class="filter-clear" title="絞り込み条件をすべて解除" onclick="clearAllFilters()"><span class="filter-clear-icon" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M8.75 1.5a.75.75 0 0 0-.75.75V3H4.25a.75.75 0 0 0 0 1.5h.2l.86 11.18A2.25 2.25 0 0 0 7.557 17.75h4.886a2.25 2.25 0 0 0 2.247-2.07L15.55 4.5h.2a.75.75 0 0 0 0-1.5H12v-.75A.75.75 0 0 0 11.25 1.5h-2.5ZM8.5 7.75a.75.75 0 0 1 1.5 0v6.5a.75.75 0 0 1-1.5 0v-6.5ZM10.75 7a.75.75 0 0 1 .75.75v6.5a.75.75 0 0 1-1.5 0v-6.5A.75.75 0 0 1 10.75 7Z"/></svg></span>すべてクリア</button>
 </div>
 
             </div>
@@ -2672,6 +2697,7 @@ textarea {
                 dateFilter: getValue('dateFilter'),
                 driverFilter: getValue('driverFilter'),
                 vehicleFilter: getValue('vehicleFilter'),
+                sortOrder: getValue('sortOrder'),
                 scrollY: window.scrollY
             };
         }
@@ -2683,6 +2709,7 @@ textarea {
             const dateFilter = document.getElementById('dateFilter');
             const driverFilter = document.getElementById('driverFilter');
             const vehicleFilter = document.getElementById('vehicleFilter');
+            const sortOrderEl = document.getElementById('sortOrder');
 
             if (searchInput) searchInput.value = state.search || '';
             if (dateFilter) dateFilter.value = state.dateFilter || '';
@@ -2696,6 +2723,15 @@ textarea {
                 const exists = Array.from(vehicleFilter.options).some(opt => opt.value === desired);
                 vehicleFilter.value = exists ? desired : '';
             }
+            let sortChanged = false;
+            if (sortOrderEl && state.sortOrder) {
+                const exists = Array.from(sortOrderEl.options).some(opt => opt.value === state.sortOrder);
+                if (exists && sortOrderEl.value !== state.sortOrder) {
+                    sortOrderEl.value = state.sortOrder;
+                    sortChanged = true;
+                }
+            }
+            if (sortChanged) renderTable();
 
             filterTable();
             window.scrollTo({ top: typeof state.scrollY === 'number' ? state.scrollY : window.scrollY, behavior: 'auto' });
@@ -3120,8 +3156,11 @@ textarea {
                 
                 logInfo('loadMastersFromCloud', 'All masters loaded from cloud');
                 updateSelectOptions();
+                // H3: マスタ再取得でドロップダウンが再構築される際も絞り込み状態を維持する
+                const prevFilterState = captureTableFilterState();
                 setupFilters();
-                
+                restoreTableFilterState(prevFilterState);
+
                 // 顧客マスタの表示を更新
                 if (typeof renderCustomerMaster === 'function') {
                     renderCustomerMaster();
@@ -4395,29 +4434,71 @@ function updateStatsFromView() {
         }
 
         // フィルタ設定
+        // M12: options 集合が変わっていなければ innerHTML を触らず、操作中の select が閉じる副作用を避ける
+        // M3: 選択中の値がマスタから消えた場合はトーストで通知して解除
+        // M6/L2: driver/vehicle/顧客候補に orders 側のマスタ外値も合流する
         function setupFilters() {
-            // ドライバーフィルターをマスタデータから生成（現在値を維持）
+            const driverSet = new Set();
+            (driverMaster || []).forEach(d => { if (d) driverSet.add(d); });
+            if (Array.isArray(orders)) orders.forEach(o => { if (o && o.driver) driverSet.add(o.driver); });
+            const driverOptions = Array.from(driverSet);
+            driverOptions.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+
+            const vehicleSet = new Set();
+            (vehicleMaster || []).forEach(v => { if (v) vehicleSet.add(v); });
+            if (Array.isArray(orders)) orders.forEach(o => { if (o && o.vehicle) vehicleSet.add(o.vehicle); });
+            const vehicleOptions = Array.from(vehicleSet);
+            vehicleOptions.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+
+            const customerSet = new Set();
+            (customerMaster || []).forEach(c => { if (c && c.name) customerSet.add(c.name); });
+            if (Array.isArray(orders)) orders.forEach(o => { if (o && o.customerName) customerSet.add(o.customerName); });
+            const customerOptions = Array.from(customerSet);
+            customerOptions.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+
             const driverSel = document.getElementById('driverFilter');
             if (driverSel) {
                 const prev = driverSel.value;
-                driverSel.innerHTML = '<option value="">全ドライバー</option>' +
-                    driverMaster.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
-                if (Array.from(driverSel.options).some(o => o.value === prev)) driverSel.value = prev;
+                const desired = [''].concat(driverOptions);
+                const currentVals = Array.from(driverSel.options).map(o => o.value);
+                const sameSet = currentVals.length === desired.length && currentVals.every((v, i) => v === desired[i]);
+                if (!sameSet) {
+                    driverSel.innerHTML = '<option value="">全ドライバー</option>' +
+                        driverOptions.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
+                }
+                if (Array.from(driverSel.options).some(o => o.value === prev)) {
+                    driverSel.value = prev;
+                } else if (prev) {
+                    driverSel.value = '';
+                    try { showToast('選択中のドライバー「' + prev + '」が候補から消えたため絞り込みを解除しました', 'warn'); } catch(_) {}
+                }
             }
 
-            // 車両フィルターをマスタデータから生成（現在値を維持）
             const vehicleSel = document.getElementById('vehicleFilter');
             if (vehicleSel) {
                 const prev = vehicleSel.value;
-                vehicleSel.innerHTML = '<option value="">全車両</option>' +
-                    vehicleMaster.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
-                if (Array.from(vehicleSel.options).some(o => o.value === prev)) vehicleSel.value = prev;
+                const desired = [''].concat(vehicleOptions);
+                const currentVals = Array.from(vehicleSel.options).map(o => o.value);
+                const sameSet = currentVals.length === desired.length && currentVals.every((v, i) => v === desired[i]);
+                if (!sameSet) {
+                    vehicleSel.innerHTML = '<option value="">全車両</option>' +
+                        vehicleOptions.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+                }
+                if (Array.from(vehicleSel.options).some(o => o.value === prev)) {
+                    vehicleSel.value = prev;
+                } else if (prev) {
+                    vehicleSel.value = '';
+                    try { showToast('選択中の車両「' + prev + '」が候補から消えたため絞り込みを解除しました', 'warn'); } catch(_) {}
+                }
             }
 
-            // 顧客キーワード検索候補（datalist）を生成
             const customerList = document.getElementById('customerFilterList');
             if (customerList) {
-                customerList.innerHTML = customerMaster.map(c => `<option value="${escHtml(c.name)}"></option>`).join('');
+                const currentVals = Array.from(customerList.options).map(o => o.value);
+                const sameSet = currentVals.length === customerOptions.length && currentVals.every((v, i) => v === customerOptions[i]);
+                if (!sameSet) {
+                    customerList.innerHTML = customerOptions.map(c => `<option value="${escHtml(c)}"></option>`).join('');
+                }
             }
 
             updateFilterActiveState();
@@ -4442,30 +4523,43 @@ function updateStatsFromView() {
         }
 
         // テーブルフィルタ
+        // row.cells[n] のインデックス依存を避け、orders 配列から order_id で直接参照する。
+        // これにより列の追加・削除で絞り込みが無音で壊れる事故と、日付比較の TZ 依存を同時に回避。
+        // L3: 顧客検索は NFKC 正規化で半角/全角カナ・英数字の揺れを吸収する。
+        function normalizeForSearch(s) {
+            try { return String(s == null ? '' : s).normalize('NFKC').toLowerCase(); }
+            catch(_) { return String(s == null ? '' : s).toLowerCase(); }
+        }
         function filterTable() {
-            const customerSearch = document.getElementById('searchInput').value.toLowerCase();
+            const searchEl = document.getElementById('searchInput');
+            const customerSearch = normalizeForSearch(searchEl && searchEl.value);
             const dateFilter = document.getElementById('dateFilter').value;
             const driverFilter = document.getElementById('driverFilter').value;
             const vehicleEl = document.getElementById('vehicleFilter');
             const vehicleFilter = vehicleEl ? vehicleEl.value : '';
 
+            const hasAnyFilter = !!(customerSearch || dateFilter || driverFilter || vehicleFilter);
+            const orderMap = new Map();
+            if (Array.isArray(orders)) {
+                orders.forEach(o => { if (o && o.id !== undefined && o.id !== null) orderMap.set(String(o.id), o); });
+            }
+
             const rows = document.querySelectorAll('#tableBody tr');
             rows.forEach(row => {
-                const dateText = row.cells[1].textContent;
-                const customer = row.cells[2].textContent.toLowerCase();
-                const driver = row.cells[11].textContent;
-                const vehicle = row.cells[12] ? row.cells[12].textContent : '';
+                if (!hasAnyFilter) { row.style.display = ''; return; }
+                const order = orderMap.get(String(row.dataset.orderId || ''));
+                if (!order) { row.style.display = ''; return; }
+
+                const customer = normalizeForSearch(order.customerName);
+                const driver = order.driver || '';
+                const vehicle = order.vehicle || '';
+                const orderDate = order.date || '';
 
                 let show = true;
-
                 if (customerSearch && !customer.includes(customerSearch)) show = false;
-                if (dateFilter) {
-                    const filterDate = new Date(dateFilter);
-                    const rowDateStr = `${filterDate.getMonth() + 1}`.padStart(2, '0') + '/' + `${filterDate.getDate()}`.padStart(2, '0');
-                    if (dateText !== rowDateStr) show = false;
-                }
-                if (driverFilter && driver.trim() !== driverFilter) show = false;
-                if (vehicleFilter && vehicle.trim() !== vehicleFilter) show = false;
+                if (dateFilter && orderDate !== dateFilter) show = false;
+                if (driverFilter && driver !== driverFilter) show = false;
+                if (vehicleFilter && vehicle !== vehicleFilter) show = false;
 
                 row.style.display = show ? '' : 'none';
             });

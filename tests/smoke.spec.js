@@ -1669,11 +1669,13 @@ test('cloud master sync accepts empty customer and driver lists as the latest st
   }).toEqual({ customers: 0, drivers: 0 });
 
   await expect(page.locator('#driverFilter')).toHaveValue('');
+  // 仕様: マスタが空でも orders に含まれるドライバー/車両は絞り込み候補に残る。
+  // これにより「マスタ未登録のドライバー」や「過去データの絞り込み」で使えない事故を防ぐ。
   await expect.poll(async () => {
     return await page.locator('#driverFilter option').evaluateAll(options =>
       options.map(option => option.textContent?.trim() || '')
     );
-  }).toEqual(['全ドライバー']);
+  }).toEqual(['全ドライバー', '混載流通', '門脇悟大']);
 
   await page.getByRole('button', { name: /顧客マスタ/ }).click();
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(0);
