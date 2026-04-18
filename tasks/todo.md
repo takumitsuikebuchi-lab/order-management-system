@@ -172,19 +172,27 @@ GitHub Actions の週次バックアップで保存された CSV を Excel で�
 - [x] 2. orders テーブルに `updated_at` 追加＋競合検知強化（スキーマ変更は事前確認）
 - [x] 3. 削除系・1,500件ページング・部分障害テストの追加
 - [x] 4. IME・印刷内容・月跨ぎのテスト追加
-- [ ] 5. 受注一覧デフォルトを「当月＋前月」に、全件ボタン追加
-- [ ] 6. localStorage 容量監視（3MB超で警告）
-- [ ] 7. 週次バックアップの3年超自動削除
-- [ ] 8. CI に cloud-config と index.html フォールバック同期チェック
-- [ ] 9. CSS外部ファイル化（styles.css 切り出し）
-- [ ] 10. 純関数ユーティリティを utils.js に抽出
-- [ ] 11. JSDoc + `// @ts-check` の段階導入
+- [x] 5. 受注一覧デフォルトを「当月＋前月」に、全件ボタン追加
+- [x] 6. localStorage 容量監視（3MB超で警告）
+- [x] 7. 週次バックアップの3年超自動削除
+- [x] 8. CI に cloud-config と index.html フォールバック同期チェック
+- [x] 9. CSS外部ファイル化（styles.css 切り出し）
+- [x] 10. 純関数ユーティリティを utils.js に抽出
+- [x] 11. JSDoc + `// @ts-check` の段階導入
 
 ### 結果
 - 1. `generateLocalId()` ヘルパー（`crypto.randomUUID()` + フォールバック）を追加し、ID生成4箇所（loadData補完・applyFetchedOrders補完・saveOrder新規・CSV取込）を UUID 化。同時に UUID 文字列では壊れる `a.id - b.id` ソートを `orderNo` の日本語 localeCompare に修正。Playwright 37件 通過。
 - 2. Supabase `orders` に `updated_at timestamptz not null default now()` を追加＋`set_updated_at()` トリガー設定（SQL Editor で実行確認済み）。`normalizeOrderRow` に `updatedAt` を取り込み、`editSessionBaseline` に保存。`saveOrder` の競合検知を「updated_at が前進 OR 署名相違」で判定する二重チェックに強化。`schema.sql` も同期。Playwright 37件 通過。
 - 3. スモークテストを 37件 → 40件 に拡張。追加: (a) クラウドモードで削除ボタンが DELETE リクエストを発行する、(b) 1,500件のデータが Range ヘッダーで 2 ページに分けて全件取得される、(c) DELETE 失敗時にキューへ積まれ `flushCloudQueue()` で復旧する。
 - 4. さらに3件追加して 43件 に。(a) IME 変換中は顧客検索が絞り込まれず、compositionend で初めて適用される、(b) 運行指示書の印刷 HTML に積地/卸地住所・品名・数量・車両が含まれる、(c) 12月→翌年1月の月送り/戻りで受注が混ざらない。
+- 5. `viewMode` state（`range`/`all`/`single`）を導入。既定は `range`（当月＋前月）で、一覧の過去参照が1操作で広がる。バッジは「2026年3月〜4月」のように表示し、📚全件表示ボタンで全期間一覧、月ナビで自動的にレンジへ戻る。統計カード（件数・金額・未完了）は従来どおり当月単体を維持。CSV出力・請求書CSVは `single` モードを明示的に指定し、従来どおり選択月のみ出力。
+- 6. `LOCAL_STORAGE_WARN_BYTES = 3MB` 閾値で `saveData` 実行時に UTF-16 バイト長を合算し、初回超過時のみトースト警告。多重通知で業務を妨げないよう `localStorageWarnShown` フラグで一度きり。
+- 7. `.github/workflows/weekly-backup.yml` に「古いバックアップを削除（3年超）」ステップを追加。mtime は git 操作で変わるためファイル名先頭の `YYYY-MM-DD` を正規表現で抽出、3年より古いものだけ `git rm` する安全側設計。
+- 8. `.github/workflows/guard-and-sync.yml` の index.html 検証を強化。`EMBEDDED_SHARED_CLOUD_CONFIG` ブロックだけを抽出して `url` / `anonKey` / `enabled` の3項目すべてが `cloud-config.json` と一致することを CI で担保（フォールバック値のズレを事故前に検知）。
+- 9. `<style>` ブロック約1,190行を `styles.css` に切り出し、`<link rel="stylesheet" href="styles.css">` で読込。ブラウザキャッシュ効率と可読性が向上。
+- 10. 純関数8つ（`generateLocalId` `escHtml` `toNumber` `fmtDate` `formatDate` `parseCsvLine` `csvQ` `normalizeForSearch`）を `utils.js` に抽出。`index.html` 側の重複定義は削除。classic script（`type="module"` は使わない）で inline onclick と衝突しない安全な切り出し。
+- 11. `utils.js` 冒頭に `// @ts-check` を宣言し、抽出した全関数に JSDoc 型注釈（`@param` / `@returns`）を付与。非エンジニアでも VS Code 上で型エラーと補完が効く段階導入。
+- 月ナビボタン（←/→）に `aria-label="前月へ"`/`"次月へ"` を付与し、スモークテストを `getByRole({ name: '前月へ' })` 等の a11y 名でのセレクタに更新（43件すべて通過）。
 
 ---
 
@@ -241,3 +249,24 @@ GitHub Actions の週次バックアップで保存された CSV を Excel で�
 - ドライバー・日付もクリアで必ず解除される（従来のバグ解消）
 - 車両プルダウンで絞り込めるようになった
 - 絞り込み中は枠が青色＋ラベルに●が付いて、何で絞っているか一目で分かる
+
+---
+
+## 2026-04-19: 長期ロードマップ完了・運用観察フェーズ入り
+
+### 背景・目的
+2026-04-17 起案の長期ロードマップ（全11項目）が完了し、ID一本化・更新時刻による競合検知・スモークテスト拡張（37→43件）・
+レンジ表示・容量監視・バックアップ自動削除・CI同期チェック・CSS/utils分離・JSDoc段階導入まで一通り着地した。
+ここで一度立ち止まり、新機能追加を控えて現場での実運用を観察する期間に入る。
+
+### 観察ポイント（1〜2週間）
+- [ ] 📚 全件表示ボタンが実際に使われているか、/一覧の表示範囲が業務感覚とずれていないか
+- [ ] localStorage 3MB 警告トーストが出た端末があれば報告を受け、原因（画像埋め込み・ログ肥大等）を特定
+- [ ] 週次バックアップが正常に走り続けているか（自動削除ステップのログで削除件数を毎週確認）
+- [ ] CI の EMBEDDED_SHARED_CLOUD_CONFIG 検証が意図せぬブロックを起こさないか
+- [ ] styles.css / utils.js 分離後にブラウザキャッシュ由来の表示不整合が起きないか
+
+### 観察中にやらないこと
+- 新しい大型機能・設計変更（小バグ修正と業務追随は別）
+- 壊れていない既存フローのリファクタリング
+- パフォーマンス最適化（実測で問題が見えてから）
