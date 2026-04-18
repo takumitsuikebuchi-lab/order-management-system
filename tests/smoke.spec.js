@@ -1708,3 +1708,225 @@ test('invoice csv export stops safely when the selected month has no orders', as
     return await page.evaluate(() => window.__csvCapture.filename);
   }).toBe('');
 });
+
+test('deleting a row in cloud mode fires a DELETE request to Supabase', async ({ page }) => {
+  const deletedOrderNos = [];
+
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?select=\*.*/, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(seededOrders)
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?order_no=eq\..+/, async route => {
+    if (route.request().method() === 'DELETE') {
+      const match = /order_no=eq\.([^&]+)/.exec(route.request().url());
+      deletedOrderNos.push(match ? decodeURIComponent(match[1]) : '');
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+  });
+
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await page.goto('/');
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await expect(page.locator('#tableBody tr')).toHaveCount(2);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#tableBody tr').nth(1).getByRole('button', { name: '削除' }).click();
+
+  await expect(page.locator('#tableBody tr')).toHaveCount(1);
+  await expect.poll(() => deletedOrderNos).toContain('R260319-002');
+});
+
+test('cloud fetch collects all orders across 1500 rows via Range pagination', async ({ page }) => {
+  const makeOrder = (i) => ({
+    id: `uuid-${String(i).padStart(4, '0')}`,
+    order_no: `R260301-${String(i).padStart(4, '0')}`,
+    date: '2026-03-19',
+    customer_name: `顧客${i}`,
+    pickup_location: '札幌市場',
+    delivery_location: '旭川市場',
+    cargo: 'トマト',
+    quantity: 1,
+    unit: 'ケース',
+    packaging: 'ダンボール',
+    unit_price: 100,
+    amount_net: 100,
+    amount_gross: 110,
+    instructions: '',
+    driver: '',
+    vehicle: '',
+    instruction_sheet: false,
+    invoice_sent: false,
+    payment_received: false,
+    order_completed: false,
+    updated_at: '2026-03-19T00:00:00Z'
+  });
+  const allOrders = Array.from({ length: 1500 }, (_, i) => makeOrder(i + 1));
+  const rangeCalls = [];
+
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?select=\*.*/, async route => {
+    const rangeHeader = route.request().headers()['range'] || '0-999';
+    rangeCalls.push(rangeHeader);
+    const [startStr, endStr] = rangeHeader.split('-');
+    const start = parseInt(startStr, 10) || 0;
+    const end = parseInt(endStr, 10) || start + 999;
+    const chunk = allOrders.slice(start, end + 1);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(chunk)
+    });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+  });
+
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await page.goto('/');
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => (JSON.parse(localStorage.getItem('orders') || '[]')).length);
+  }).toBe(1500);
+
+  expect(rangeCalls.length).toBeGreaterThanOrEqual(2);
+  expect(rangeCalls[0]).toBe('0-999');
+  expect(rangeCalls[1]).toBe('1000-1999');
+});
+
+test('cloud delete failure enqueues and recovers via queue flush', async ({ page }) => {
+  let deleteAttempts = 0;
+
+  await page.route('**/cloud-config.json?*', async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        url: 'https://example.supabase.co',
+        anonKey: 'test-anon-key',
+        enabled: true
+      })
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?select=\*.*/, async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(seededOrders)
+    });
+  });
+
+  await page.route(/https:\/\/example\.supabase\.co\/rest\/v1\/orders\?order_no=eq\..+/, async route => {
+    if (route.request().method() === 'DELETE') {
+      deleteAttempts += 1;
+      if (deleteAttempts <= 3) {
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'temp fail' }) });
+        return;
+      }
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.route('https://example.supabase.co/rest/v1/customers**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await page.route('https://example.supabase.co/rest/v1/simple_masters**', async route => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.setItem('setupCompleted', 'true');
+    localStorage.setItem('setupMode', 'cloud');
+  });
+
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await page.goto('/');
+
+  await expect.poll(async () => {
+    return await page.locator('#cloudStatus').textContent();
+  }).toContain('同期完了');
+
+  await expect(page.locator('#tableBody tr')).toHaveCount(2);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#tableBody tr').nth(1).getByRole('button', { name: '削除' }).click();
+
+  await expect(page.locator('#tableBody tr')).toHaveCount(1);
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length);
+  }).toBe(1);
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const q = JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]');
+      return q[0] && q[0].op;
+    });
+  }).toBe('delete');
+
+  await page.evaluate(() => flushCloudQueue());
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length);
+  }).toBe(0);
+  expect(deleteAttempts).toBeGreaterThan(3);
+});
