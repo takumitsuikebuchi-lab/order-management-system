@@ -1138,13 +1138,15 @@ test('month navigation updates the visible month and monthly stats', async ({ pa
 
   await replaceOrdersAndRefresh(page, [...seededOrders, aprilOrder]);
 
-  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
+  // 既定は「当月＋前月」のレンジ表示。バッジは 2月〜3月、統計カードは当月(3月)ベース。
+  await expect(page.locator('#currentMonth')).toHaveText('2026年2月〜3月');
   await expect(page.locator('#orderCount')).toHaveText('2件');
   await expect(page.locator('#totalGross')).toHaveText('¥2,970');
 
-  await page.getByRole('button', { name: '→' }).click();
+  await page.getByRole('button', { name: '次月へ' }).click();
 
-  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+  // 4月へ進むとバッジは 3月〜4月、統計カードは当月(4月)単体の 1件・¥3,300。
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月〜4月');
   await expect(page.locator('#orderCount')).toHaveText('1件');
   await expect(page.locator('#totalGross')).toHaveText('¥3,300');
 });
@@ -1283,9 +1285,10 @@ test('csv export follows the currently selected month', async ({ page }) => {
 
   await replaceOrdersAndRefresh(page, [...seededOrders, aprilOrder]);
 
-  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
-  await page.getByRole('button', { name: '→' }).click();
-  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+  await expect(page.locator('#currentMonth')).toHaveText('2026年2月〜3月');
+  await page.getByRole('button', { name: '次月へ' }).click();
+  // バッジは 3月〜4月、統計カードは当月(4月)単体の 1件。CSV出力も選択月(4月)のみ。
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月〜4月');
   await expect(page.locator('#orderCount')).toHaveText('1件');
 
   await page.evaluate(() => {
@@ -1687,14 +1690,15 @@ test('invoice csv export stops safely when the selected month has no orders', as
   await installCsvCapture(page);
   await page.goto('/');
 
-  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
-  await page.getByRole('button', { name: '→' }).click();
-  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+  await expect(page.locator('#currentMonth')).toHaveText('2026年2月〜3月');
+  await page.getByRole('button', { name: '次月へ' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月〜4月');
 
   await page.evaluate(() => {
     window.saveCsvToDir = async () => false;
   });
 
+  // 統計カードは当月(4月)単体で 0件。請求書CSVも選択月(4月)のみ対象のため 0件で中断。
   await expect(page.locator('#orderCount')).toHaveText('0件');
 
   let seenAlert = '';
@@ -1945,17 +1949,20 @@ test('month navigation across year boundary keeps december and january orders se
 
   await replaceOrdersAndRefresh(page, [decemberOrder, januaryOrder]);
 
-  await expect(page.locator('#currentMonth')).toHaveText('2026年12月');
+  // 12月選択時は 11月〜12月レンジ。統計カードは当月単体で 1件、表示行も年末物流のみ。
+  await expect(page.locator('#currentMonth')).toHaveText('2026年11月〜12月');
   await expect(page.locator('#orderCount')).toHaveText('1件');
   await expect.poll(async () => await visibleCustomers(page)).toEqual(['年末物流']);
 
-  await page.getByRole('button', { name: '→' }).click();
-  await expect(page.locator('#currentMonth')).toHaveText('2027年1月');
+  await page.getByRole('button', { name: '次月へ' }).click();
+  // 年をまたいで1月を選択すると、レンジは 2026年12月〜2027年1月（年表示も連結）。
+  await expect(page.locator('#currentMonth')).toHaveText('2026年12月〜2027年1月');
+  // 統計カードは当月(1月)単体の 1件だが、一覧は 12月＋1月 が日付昇順で両方見える。
   await expect(page.locator('#orderCount')).toHaveText('1件');
-  await expect.poll(async () => await visibleCustomers(page)).toEqual(['年始物流']);
+  await expect.poll(async () => await visibleCustomers(page)).toEqual(['年末物流', '年始物流']);
 
-  await page.getByRole('button', { name: '←' }).click();
-  await expect(page.locator('#currentMonth')).toHaveText('2026年12月');
+  await page.getByRole('button', { name: '前月へ' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年11月〜12月');
   await expect.poll(async () => await visibleCustomers(page)).toEqual(['年末物流']);
 });
 

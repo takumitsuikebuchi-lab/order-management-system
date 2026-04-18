@@ -33,13 +33,20 @@ jobs:
             const fs = require('fs');
             const cfg = require('./cloud-config.json');
             const html = fs.readFileSync('index.html', 'utf8');
-            const urlMatch = html.match(/url:\s*'(https:\/\/[a-z]+\.supabase\.co)'/);
-            const keyMatch = html.match(/anonKey:\s*'(eyJ[^']{50,})'/);
-            if (!urlMatch) throw new Error('index.html embedded URL not found');
-            if (!keyMatch) throw new Error('index.html embedded anonKey not found');
+            // EMBEDDED_SHARED_CLOUD_CONFIG ブロックだけを対象に抽出して厳密比較する
+            const embMatch = html.match(/EMBEDDED_SHARED_CLOUD_CONFIG\s*=\s*\{([\s\S]*?)\};/);
+            if (!embMatch) throw new Error('EMBEDDED_SHARED_CLOUD_CONFIG block not found in index.html');
+            const block = embMatch[1];
+            const urlMatch = block.match(/url:\s*'(https:\/\/[a-z0-9-]+\.supabase\.co)'/);
+            const keyMatch = block.match(/anonKey:\s*'(eyJ[^']{50,})'/);
+            const enabledMatch = block.match(/enabled:\s*(true|false)/);
+            if (!urlMatch) throw new Error('Embedded URL not found');
+            if (!keyMatch) throw new Error('Embedded anonKey not found');
+            if (!enabledMatch) throw new Error('Embedded enabled flag not found');
             if (urlMatch[1] !== cfg.url) throw new Error('Embedded URL does not match cloud-config.json: ' + urlMatch[1]);
             if (keyMatch[1] !== cfg.anonKey) throw new Error('Embedded anonKey does not match cloud-config.json');
-            console.log('OK: embedded fallback matches cloud-config.json');
+            if ((enabledMatch[1] === 'true') !== cfg.enabled) throw new Error('Embedded enabled flag does not match cloud-config.json');
+            console.log('OK: embedded fallback matches cloud-config.json (url/anonKey/enabled)');
           "
 
       - name: Verify index.html script syntax
