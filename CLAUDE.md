@@ -62,12 +62,15 @@
 
 | ファイル | 役割 |
 |---|---|
-| `index.html` | アプリ本体（約5,400行）。ほぼ全機能がここに |
+| `index.html` | アプリ本体（約4,900行）。ほぼ全機能がここに |
+| `styles.css` | UIスタイル（2026-04-18 に index.html から切り出し） |
+| `utils.js` | 純関数ユーティリティ8つ（`// @ts-check` + JSDoc 型注釈付き） |
 | `setup-wizard.html` | 初回セットアップ画面 |
 | `cloud-config.json` | 共有クラウド設定の**正本** |
 | `schema.sql` | Supabaseのテーブル定義 |
-| `tests/smoke.spec.js` | Playwrightによる自動UIテスト |
-| `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期） |
+| `tests/smoke.spec.js` | Playwrightによる自動UIテスト（43件） |
+| `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
+| `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除） |
 
 ---
 
@@ -113,5 +116,7 @@
 - **`cloudSaveCustomers()` を新規追加1件のために呼ぶな** → 全件DELETE+再INSERTになり、保存中リロードで全顧客消失する。1件追加には `cloudInsertCustomer()` を使う
 - **Supabase REST はデフォルト1,000件上限** → 大量データを取得するときは必ずページング（Range ヘッダ）か limit 指定を入れる
 - **URLにIDを並べる `?id=in.(...)` 方式は件数が増えると壊れる** → 件数が多いDELETEは `?id=not.is.null` などURLに依存しない方式を使う
+- **受注一覧の既定は「当月のみ」** → レンジ表示・複数月同時表示は拒否された履歴あり。情報密度を上げる改善は事前にユーザー確認
+- **`getByRole('button', { name: '←' })` は aria-label で上書きされる** → ボタンにaria-labelを付けたら、テストのセレクタも aria-label 名（`'前月へ'` 等）に合わせる
 
 詳細は `tasks/lessons.md` を参照。
