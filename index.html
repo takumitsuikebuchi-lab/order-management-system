@@ -29,7 +29,7 @@
                 <h1>運送業受注管理システム</h1>
                 <div class="month-navigation">
                     <button class="btn btn-nav" onclick="prevMonth()" aria-label="前月へ">←</button>
-                    <div class="month-badge" id="currentMonth" title="既定では当月と前月を表示します">2024年9月</div>
+                    <div class="month-badge" id="currentMonth" title="現在選択中の月。←／→で移動、📚で全期間表示に切替">2024年9月</div>
                     <button class="btn btn-nav" onclick="nextMonth()" aria-label="次月へ">→</button>
                     <button type="button" id="allOrdersToggle" class="btn btn-nav btn-all-toggle" onclick="toggleAllOrdersView()" aria-pressed="false" title="全期間の受注を一覧表示／月表示に戻す">📚 全件表示</button>
                 </div>
@@ -468,8 +468,8 @@
         // データストレージ
         let orders = [];
         let currentMonth = new Date();
-        // 一覧表示モード: 'range' = 当月＋前月（既定） / 'all' = 全件
-        let viewMode = 'range';
+        // 一覧表示モード: 'single' = 当月のみ（既定） / 'all' = 全件
+        let viewMode = 'single';
         let editingId = null;
         let currentMasterType = null;
         let draggedItem = null;
@@ -2249,7 +2249,7 @@ updateStatsFromView();
         }
 
         // 月別データ取得
-        // viewMode: 'range' = 当月＋前月（既定） / 'all' = 全件 / 'single' = 当月のみ（CSV出力など内部呼出向け）
+        // viewMode: 'single' = 当月のみ（既定） / 'all' = 全件
         function getMonthOrders(forceMode) {
             const mode = forceMode || viewMode;
             if (mode === 'all') {
@@ -2257,9 +2257,7 @@ updateStatsFromView();
             }
             const year = currentMonth.getFullYear();
             const month = currentMonth.getMonth();
-            // range = 前月1日〜翌月1日未満、single = 当月1日〜翌月1日未満
-            const startMonthOffset = (mode === 'range') ? -1 : 0;
-            const startDate = new Date(year, month + startMonthOffset, 1);
+            const startDate = new Date(year, month, 1);
             const endDate = new Date(year, month + 1, 1); // 次月の1日の0時0分
 
             return orders.filter(order => {
@@ -2343,16 +2341,6 @@ function updateStatsFromView() {
             if (!badge) return;
             if (viewMode === 'all') {
                 badge.textContent = '全期間表示';
-            } else if (viewMode === 'range') {
-                // 当月と前月を "YYYY年M月〜M月" 形式で表示（年をまたぐ場合は両方に年を付与）
-                const y = currentMonth.getFullYear();
-                const m = currentMonth.getMonth() + 1; // 1-12
-                const prev = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
-                const py = prev.getFullYear();
-                const pm = prev.getMonth() + 1;
-                badge.textContent = (py === y)
-                    ? `${y}年${pm}月〜${m}月`
-                    : `${py}年${pm}月〜${y}年${m}月`;
             } else {
                 badge.textContent = `${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月`;
             }
@@ -2366,8 +2354,8 @@ function updateStatsFromView() {
 
         // 前月
         function prevMonth() {
-            // 全件モード中に←/→を押したら月表示（range）へ戻す
-            if (viewMode === 'all') viewMode = 'range';
+            // 全件モード中に←/→を押したら月表示（single）へ戻す
+            if (viewMode === 'all') viewMode = 'single';
             currentMonth.setMonth(currentMonth.getMonth() - 1);
             updateMonth();
             renderTable();
@@ -2376,7 +2364,7 @@ function updateStatsFromView() {
 
         // 次月
         function nextMonth() {
-            if (viewMode === 'all') viewMode = 'range';
+            if (viewMode === 'all') viewMode = 'single';
             currentMonth.setMonth(currentMonth.getMonth() + 1);
             updateMonth();
             renderTable();
@@ -2385,7 +2373,7 @@ function updateStatsFromView() {
 
         // 全件表示⇔月表示トグル
         function toggleAllOrdersView() {
-            viewMode = (viewMode === 'all') ? 'range' : 'all';
+            viewMode = (viewMode === 'all') ? 'single' : 'all';
             updateMonth();
             renderTable();
             updateStats();
