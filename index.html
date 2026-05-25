@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>運送業受注明細管理システム</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- 月次レポートPDF出力用ライブラリ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <!-- ブラウザ互換性チェック -->
@@ -75,7 +77,9 @@
 
     <button class="btn btn-warning" onclick="exportInvoiceCSV()">💰 請求書CSV（MF用）</button>
     <button class="btn btn-success" onclick="exportCSV()" title="表示中の月（絞り込みは反映されません）の全受注をCSV出力">📊 当月CSV出力</button>
+    <button class="btn btn-success" onclick="exportMonthlyReportPdf()" title="表示中の月の運行計画・実績一覧PDFを出力（巡回指導用）">📑 月次レポートPDF</button>
     <button id="csvDirBtn" class="btn btn-secondary" onclick="chooseExportDir()">💾 CSV保存先フォルダ設定</button>
+    <button id="pdfDirBtn" class="btn btn-secondary" onclick="chooseExportPdfDir()">📂 PDF保存先フォルダ設定</button>
     <button class="btn btn-secondary" onclick="openCloudSettings()">☁️ クラウド設定（Supabase）</button>
     <span id="cloudStatus" style="margin-left: 8px; font-size: 0.85rem; padding: 2px 6px; border-radius: 12px; background: #eee;">接続: ローカル</span>
 
@@ -617,6 +621,225 @@
             }
         }
 
+        // =================================================================
+        // 月次レポートPDF出力機能（巡回指導・監査用）
+        // =================================================================
+        // PDF保存先（File System Access API で選択されたフォルダ）
+        let exportPdfDirHandle = null;
+        const _IDB_KEY_PDF = 'exportPdfDir';
+
+        async function _savePdfDirHandle(handle) {
+            try {
+                const db = await _openHandleIDB();
+                const tx = db.transaction(_IDB_STORE, 'readwrite');
+                tx.objectStore(_IDB_STORE).put(handle, _IDB_KEY_PDF);
+                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+                db.close();
+            } catch(e) {}
+            try { localStorage.setItem('lastPdfDirName', handle.name); } catch(_) {}
+        }
+        async function _loadPdfDirHandle() {
+            try {
+                const db = await _openHandleIDB();
+                const handle = await new Promise((res, rej) => {
+                    const r = db.transaction(_IDB_STORE, 'readonly').objectStore(_IDB_STORE).get(_IDB_KEY_PDF);
+                    r.onsuccess = e => res(e.target.result || null);
+                    r.onerror = e => rej(e.target.error);
+                });
+                db.close();
+                return handle;
+            } catch(e) { return null; }
+        }
+        function _updatePdfDirBtn() {
+            const btn = document.getElementById('pdfDirBtn');
+            if (!btn) return;
+            btn.textContent = exportPdfDirHandle
+                ? `📂 ${exportPdfDirHandle.name}`
+                : '📂 PDF保存先フォルダ設定';
+        }
+
+        async function chooseExportPdfDir() {
+            if (!window.showDirectoryPicker) {
+                alert('このブラウザはフォルダ保存に未対応です。Chrome/Edge等をご利用ください。\n（未対応の場合は通常のダウンロードで保存します）');
+                return;
+            }
+            if (!exportPdfDirHandle) exportPdfDirHandle = await _loadPdfDirHandle();
+            try {
+                const opts = { mode: 'readwrite' };
+                if (exportPdfDirHandle) opts.startIn = exportPdfDirHandle;
+                exportPdfDirHandle = await window.showDirectoryPicker(opts);
+                await _savePdfDirHandle(exportPdfDirHandle);
+                _updatePdfDirBtn();
+                alert(`PDF保存先を「${exportPdfDirHandle.name}」に設定しました`);
+            } catch(e) {
+                if (e?.name !== 'AbortError') console.error(e);
+            }
+        }
+
+        async function savePdfToDir(blob, filename) {
+            if (!exportPdfDirHandle) {
+                exportPdfDirHandle = await _loadPdfDirHandle();
+                _updatePdfDirBtn();
+            }
+            if (!exportPdfDirHandle) return false;
+            try {
+                const perm = await exportPdfDirHandle.queryPermission({ mode: 'readwrite' });
+                if (perm !== 'granted') {
+                    const req = await exportPdfDirHandle.requestPermission({ mode: 'readwrite' });
+                    if (req !== 'granted') return false;
+                }
+            } catch(e) {
+                exportPdfDirHandle = null;
+                _updatePdfDirBtn();
+                return false;
+            }
+            try {
+                const fileHandle = await exportPdfDirHandle.getFileHandle(filename, { create: true });
+                const writable = await fileHandle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                return true;
+            } catch (err) {
+                console.error('PDF保存に失敗:', err);
+                return false;
+            }
+        }
+
+        function _reiwaLabel(year, month) {
+            // 西暦 → 令和表記
+            const reiwaYear = year - 2018;
+            return `令和${reiwaYear}年${month}月`;
+        }
+
+        function _fmtDateMMDD(dateStr) {
+            if (!dateStr) return '';
+            const s = String(dateStr);
+            if (s.length >= 10) return `${s.slice(5,7)}/${s.slice(8,10)}`;
+            return s;
+        }
+
+        async function exportMonthlyReportPdf() {
+            if (typeof html2pdf === 'undefined') {
+                alert('PDF出力ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。');
+                return;
+            }
+
+            // 当月分の受注を取得（CSV出力と同じロジック）
+            const monthOrders = getMonthOrders('single');
+            if (!monthOrders || monthOrders.length === 0) {
+                alert('当月の受注データがありません。');
+                return;
+            }
+
+            // 日付昇順ソート
+            const rows = [...monthOrders].sort((a, b) => {
+                const da = a.date || '', db = b.date || '';
+                if (da !== db) return da < db ? -1 : 1;
+                return (a.orderNo || '') < (b.orderNo || '') ? -1 : 1;
+            });
+
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth() + 1;
+            const reiwaLabel = _reiwaLabel(year, month);
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+
+            // HTML テンプレート生成
+            const escape = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            let tbody = '';
+            rows.forEach((o, i) => {
+                const zebra = i % 2 === 0 ? '' : 'background:#F2F2F2;';
+                tbody += `<tr style="${zebra}">
+                    <td style="text-align:center;">${i+1}</td>
+                    <td style="text-align:center;">${escape(_fmtDateMMDD(o.date))}</td>
+                    <td>${escape(o.customerName || '')}</td>
+                    <td>${escape(o.pickupLocation || '')}</td>
+                    <td>${escape(o.deliveryLocation || '')}</td>
+                    <td>${escape(o.cargo || '')}</td>
+                    <td style="text-align:center;">${escape(o.quantity || '')}</td>
+                    <td style="text-align:center;">${escape(o.unit || '')}</td>
+                    <td>${escape(o.driver || '')}</td>
+                    <td>${escape(o.vehicle || '')}</td>
+                </tr>`;
+            });
+
+            const container = document.createElement('div');
+            container.style.cssText = 'position:fixed; left:-99999px; top:0; width:1100px; font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif; background:#fff; padding:16px;';
+            container.innerHTML = `
+                <div style="background:#1F4E79; color:#fff; padding:10px 16px; text-align:center; font-weight:bold; font-size:16px;">
+                    きょうしん輸送株式会社  運行計画・実績一覧  ${reiwaLabel}
+                </div>
+                <div style="text-align:center; color:#595959; font-size:10px; padding:6px 0;">
+                    件数: ${rows.length}件  ／  期間: ${reiwaLabel}  ／  出力日: ${todayStr}  ／  出典: 受注管理システム
+                </div>
+                <table style="width:100%; border-collapse:collapse; font-size:9px;">
+                    <thead>
+                        <tr style="background:#2F5496; color:#fff;">
+                            <th style="padding:6px; border:1px solid #999; width:30px;">No.</th>
+                            <th style="padding:6px; border:1px solid #999; width:55px;">日付</th>
+                            <th style="padding:6px; border:1px solid #999;">顧客名</th>
+                            <th style="padding:6px; border:1px solid #999;">引取先</th>
+                            <th style="padding:6px; border:1px solid #999;">配送先</th>
+                            <th style="padding:6px; border:1px solid #999;">積荷</th>
+                            <th style="padding:6px; border:1px solid #999; width:50px;">数量</th>
+                            <th style="padding:6px; border:1px solid #999; width:40px;">単位</th>
+                            <th style="padding:6px; border:1px solid #999; width:80px;">ドライバー</th>
+                            <th style="padding:6px; border:1px solid #999; width:100px;">車両</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tbody}
+                    </tbody>
+                </table>
+            `;
+            // セル共通スタイル（border等）を追加
+            const style = document.createElement('style');
+            style.textContent = `
+                #monthly-pdf-temp td { padding:4px 6px; border:1px solid #BFBFBF; vertical-align:middle; }
+            `;
+            container.id = 'monthly-pdf-temp';
+            document.body.appendChild(style);
+            document.body.appendChild(container);
+
+            const filename = `きょうしん輸送_運行計画実績_${reiwaLabel}.pdf`;
+
+            try {
+                const opt = {
+                    margin: [8, 6, 10, 6], // mm: top, left, bottom, right
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.95 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+
+                // PDF生成（Blob取得）
+                const pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
+
+                // 保存先フォルダがあれば書き込み、なければダウンロード
+                const saved = await savePdfToDir(pdfBlob, filename);
+                if (saved) {
+                    alert(`✅ PDFを保存しました\nファイル名: ${filename}\n保存先: ${exportPdfDirHandle.name}`);
+                } else {
+                    // フォールバック：ダウンロード
+                    const url = URL.createObjectURL(pdfBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    alert(`📥 PDFをダウンロードしました\nファイル名: ${filename}\n\n💡 ヒント: 「📂 PDF保存先フォルダ設定」で保存先を指定すると、次回から自動で同じフォルダに保存されます`);
+                }
+            } catch (err) {
+                console.error('PDF生成エラー:', err);
+                alert('PDF生成中にエラーが発生しました: ' + err.message);
+            } finally {
+                // 後片付け
+                container.remove();
+                style.remove();
+            }
+        }
+
         // 純関数（generateLocalId / escHtml / toNumber / fmtDate / parseCsvLine / csvQ）は utils.js で定義
 
         let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
@@ -678,9 +901,12 @@
             try {
                 const hint = localStorage.getItem('lastCsvDirName');
                 if (hint) { const b = document.getElementById('csvDirBtn'); if (b) b.textContent = `💾 ${hint}`; }
+                const pdfHint = localStorage.getItem('lastPdfDirName');
+                if (pdfHint) { const b = document.getElementById('pdfDirBtn'); if (b) b.textContent = `📂 ${pdfHint}`; }
             } catch(_) {}
             // ② IndexedDB からハンドルを非同期復元して正式更新
             _loadDirHandle().then(h => { if (h) { exportBaseDirHandle = h; _updateCsvDirBtn(); } }).catch(()=>{});
+            _loadPdfDirHandle().then(h => { if (h) { exportPdfDirHandle = h; _updatePdfDirBtn(); } }).catch(()=>{});
 
             // クリックイベントでオートコンプリートを閉じる
             document.addEventListener('click', function(e) {
