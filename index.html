@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>運送業受注明細管理システム</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- 月次レポートPDF出力用ライブラリ -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <!-- ブラウザ互換性チェック -->
@@ -77,9 +75,8 @@
 
     <button class="btn btn-warning" onclick="exportInvoiceCSV()">💰 請求書CSV（MF用）</button>
     <button class="btn btn-success" onclick="exportCSV()" title="表示中の月（絞り込みは反映されません）の全受注をCSV出力">📊 当月CSV出力</button>
-    <button class="btn btn-success" onclick="exportMonthlyReportPdf()" title="表示中の月の運行計画・実績一覧PDFを出力（巡回指導用）">📑 月次レポートPDF</button>
+    <button class="btn btn-success" onclick="exportMonthlyReportPdf()" title="表示中の月の運行計画・実績一覧PDFを出力（印刷ダイアログ→PDF保存）">📑 月次レポートPDF</button>
     <button id="csvDirBtn" class="btn btn-secondary" onclick="chooseExportDir()">💾 CSV保存先フォルダ設定</button>
-    <button id="pdfDirBtn" class="btn btn-secondary" onclick="chooseExportPdfDir()">📂 PDF保存先フォルダ設定</button>
     <button class="btn btn-secondary" onclick="openCloudSettings()">☁️ クラウド設定（Supabase）</button>
     <span id="cloudStatus" style="margin-left: 8px; font-size: 0.85rem; padding: 2px 6px; border-radius: 12px; background: #eee;">接続: ローカル</span>
 
@@ -718,12 +715,7 @@
             return s;
         }
 
-        async function exportMonthlyReportPdf() {
-            if (typeof html2pdf === 'undefined') {
-                alert('PDF出力ライブラリの読み込みに失敗しました。ネットワーク接続を確認してください。');
-                return;
-            }
-
+        function exportMonthlyReportPdf() {
             // 当月分の受注を取得（CSV出力と同じロジック）
             const monthOrders = getMonthOrders('single');
             if (!monthOrders || monthOrders.length === 0) {
@@ -743,116 +735,160 @@
             const reiwaLabel = _reiwaLabel(year, month);
             const today = new Date();
             const todayStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+            const filename = `きょうしん輸送_運行計画実績_${reiwaLabel}`;
 
-            // HTML テンプレート生成
+            // テーブル本体生成
             const escape = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
             let tbody = '';
             rows.forEach((o, i) => {
-                const zebra = i % 2 === 0 ? '' : 'background:#F2F2F2;';
-                tbody += `<tr style="${zebra}">
-                    <td style="text-align:center;">${i+1}</td>
-                    <td style="text-align:center;">${escape(_fmtDateMMDD(o.date))}</td>
+                const zebra = i % 2 === 0 ? '' : 'zebra';
+                tbody += `<tr class="${zebra}">
+                    <td class="center">${i+1}</td>
+                    <td class="center">${escape(_fmtDateMMDD(o.date))}</td>
                     <td>${escape(o.customerName || '')}</td>
                     <td>${escape(o.pickupLocation || '')}</td>
                     <td>${escape(o.deliveryLocation || '')}</td>
                     <td>${escape(o.cargo || '')}</td>
-                    <td style="text-align:center;">${escape(o.quantity || '')}</td>
-                    <td style="text-align:center;">${escape(o.unit || '')}</td>
+                    <td class="center">${escape(o.quantity || '')}</td>
+                    <td class="center">${escape(o.unit || '')}</td>
                     <td>${escape(o.driver || '')}</td>
                     <td>${escape(o.vehicle || '')}</td>
                 </tr>`;
             });
 
-            const container = document.createElement('div');
-            // html2canvas はDOM上にレンダリング済みの要素のみキャプチャ可能。
-            // 画面外配置(-99999px)だとブラウザがレンダリングをスキップするため、
-            // 実DOMに配置しつつ視覚的には見せない（opacity:0 + pointer-events:none）。
-            container.style.cssText = 'position:fixed; left:0; top:0; width:1100px; opacity:0; pointer-events:none; z-index:-9999; font-family:"Yu Gothic","Hiragino Kaku Gothic ProN","Meiryo",sans-serif; background:#fff; padding:16px;';
-            container.innerHTML = `
-                <div style="background:#1F4E79; color:#fff; padding:10px 16px; text-align:center; font-weight:bold; font-size:16px;">
-                    きょうしん輸送株式会社  運行計画・実績一覧  ${reiwaLabel}
-                </div>
-                <div style="text-align:center; color:#595959; font-size:10px; padding:6px 0;">
-                    件数: ${rows.length}件  ／  期間: ${reiwaLabel}  ／  出力日: ${todayStr}  ／  出典: 受注管理システム
-                </div>
-                <table style="width:100%; border-collapse:collapse; font-size:9px;">
-                    <thead>
-                        <tr style="background:#2F5496; color:#fff;">
-                            <th style="padding:6px; border:1px solid #999; width:30px;">No.</th>
-                            <th style="padding:6px; border:1px solid #999; width:55px;">日付</th>
-                            <th style="padding:6px; border:1px solid #999;">顧客名</th>
-                            <th style="padding:6px; border:1px solid #999;">引取先</th>
-                            <th style="padding:6px; border:1px solid #999;">配送先</th>
-                            <th style="padding:6px; border:1px solid #999;">積荷</th>
-                            <th style="padding:6px; border:1px solid #999; width:50px;">数量</th>
-                            <th style="padding:6px; border:1px solid #999; width:40px;">単位</th>
-                            <th style="padding:6px; border:1px solid #999; width:80px;">ドライバー</th>
-                            <th style="padding:6px; border:1px solid #999; width:100px;">車両</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tbody}
-                    </tbody>
-                </table>
-            `;
-            // セル共通スタイル（border等）を追加
-            const style = document.createElement('style');
-            style.textContent = `
-                #monthly-pdf-temp td { padding:4px 6px; border:1px solid #BFBFBF; vertical-align:middle; }
-            `;
-            container.id = 'monthly-pdf-temp';
-            document.body.appendChild(style);
-            document.body.appendChild(container);
+            // 新規ウィンドウで印刷専用のページを開く（既存の運行指示書印刷と同じ方式）
+            const printHtml = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>${filename}</title>
+<style>
+    @page { size: A4 landscape; margin: 8mm 6mm 10mm 6mm; }
+    * { box-sizing: border-box; }
+    body {
+        font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+        margin: 0;
+        padding: 0;
+        color: #000;
+        background: #fff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    .title {
+        background: #1F4E79;
+        color: #fff;
+        padding: 8px 16px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 4px;
+    }
+    .summary {
+        text-align: center;
+        color: #595959;
+        font-size: 9px;
+        padding: 4px 0 8px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 8.5px;
+        page-break-inside: auto;
+    }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    th {
+        background: #2F5496;
+        color: #fff;
+        padding: 5px 4px;
+        border: 1px solid #999;
+        text-align: center;
+        font-weight: bold;
+    }
+    td {
+        padding: 3px 5px;
+        border: 1px solid #BFBFBF;
+        vertical-align: middle;
+    }
+    td.center { text-align: center; }
+    tr.zebra td { background: #F2F2F2; }
+    .col-no { width: 25px; }
+    .col-date { width: 50px; }
+    .col-qty { width: 45px; }
+    .col-unit { width: 35px; }
+    .col-driver { width: 75px; }
+    .col-vehicle { width: 90px; }
+    .footer {
+        text-align: center;
+        font-size: 8px;
+        color: #808080;
+        margin-top: 6px;
+    }
+    .print-tip {
+        background: #FFF4CC;
+        border: 1px solid #FFC107;
+        padding: 12px 16px;
+        margin: 12px;
+        font-size: 13px;
+        color: #5D4037;
+        border-radius: 4px;
+    }
+    @media print {
+        .print-tip { display: none; }
+    }
+</style>
+</head>
+<body>
+    <div class="print-tip">
+        💡 <strong>PDFで保存する方法</strong>：印刷ダイアログが自動で開きます。
+        「送信先」を <strong>「PDFに保存」</strong>（Chromeの場合）または「PDFとして保存」に変更して保存してください。
+        ファイル名は「<strong>${filename}.pdf</strong>」に設定済みです。
+    </div>
+    <div class="title">きょうしん輸送株式会社  運行計画・実績一覧  ${reiwaLabel}</div>
+    <div class="summary">件数: ${rows.length}件  ／  期間: ${reiwaLabel}  ／  出力日: ${todayStr}  ／  出典: 受注管理システム</div>
+    <table>
+        <thead>
+            <tr>
+                <th class="col-no">No.</th>
+                <th class="col-date">日付</th>
+                <th>顧客名</th>
+                <th>引取先</th>
+                <th>配送先</th>
+                <th>積荷</th>
+                <th class="col-qty">数量</th>
+                <th class="col-unit">単位</th>
+                <th class="col-driver">ドライバー</th>
+                <th class="col-vehicle">車両</th>
+            </tr>
+        </thead>
+        <tbody>${tbody}</tbody>
+    </table>
+    <div class="footer">きょうしん輸送㈱ 運行計画・実績  ${reiwaLabel}</div>
+    <script>
+        // ファイル名をデフォルトにするためtitleをセット
+        document.title = "${filename}";
+        // ページロード後に印刷ダイアログを自動表示
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                window.print();
+            }, 300);
+        });
+        // 印刷完了/キャンセル後にウィンドウを閉じる
+        window.addEventListener('afterprint', () => {
+            setTimeout(() => window.close(), 200);
+        });
+    <\/script>
+</body>
+</html>`;
 
-            // ブラウザに2フレーム分のレンダリング時間を与える
-            // （html2canvas が要素サイズを正しく取得できるように）
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-            const filename = `きょうしん輸送_運行計画実績_${reiwaLabel}.pdf`;
-
-            try {
-                const opt = {
-                    margin: [8, 6, 10, 6], // mm: top, left, bottom, right
-                    filename: filename,
-                    image: { type: 'jpeg', quality: 0.95 },
-                    html2canvas: {
-                        scale: 2,
-                        useCORS: true,
-                        letterRendering: true,
-                        backgroundColor: '#ffffff',
-                        width: 1100,
-                        windowWidth: 1100,
-                        logging: false
-                    },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-                };
-
-                // PDF生成（Blob取得）
-                const pdfBlob = await html2pdf().set(opt).from(container).outputPdf('blob');
-
-                // 保存先フォルダがあれば書き込み、なければダウンロード
-                const saved = await savePdfToDir(pdfBlob, filename);
-                if (saved) {
-                    alert(`✅ PDFを保存しました\nファイル名: ${filename}\n保存先: ${exportPdfDirHandle.name}`);
-                } else {
-                    // フォールバック：ダウンロード
-                    const url = URL.createObjectURL(pdfBlob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = filename;
-                    link.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
-                    alert(`📥 PDFをダウンロードしました\nファイル名: ${filename}\n\n💡 ヒント: 「📂 PDF保存先フォルダ設定」で保存先を指定すると、次回から自動で同じフォルダに保存されます`);
-                }
-            } catch (err) {
-                console.error('PDF生成エラー:', err);
-                alert('PDF生成中にエラーが発生しました: ' + err.message);
-            } finally {
-                // 後片付け
-                container.remove();
-                style.remove();
+            const printWin = window.open('', '_blank', 'width=1200,height=800');
+            if (!printWin) {
+                alert('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。');
+                return;
             }
+            printWin.document.open();
+            printWin.document.write(printHtml);
+            printWin.document.close();
         }
 
         // 純関数（generateLocalId / escHtml / toNumber / fmtDate / parseCsvLine / csvQ）は utils.js で定義
