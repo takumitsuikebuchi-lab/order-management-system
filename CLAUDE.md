@@ -62,7 +62,7 @@
 
 | ファイル | 役割 |
 |---|---|
-| `index.html` | アプリ本体（約4,900行）。ほぼ全機能がここに |
+| `index.html` | アプリ本体（約5,100行）。ほぼ全機能がここに |
 | `styles.css` | UIスタイル（2026-04-18 に index.html から切り出し） |
 | `utils.js` | 純関数ユーティリティ8つ（`// @ts-check` + JSDoc 型注釈付き） |
 | `setup-wizard.html` | 初回セットアップ画面 |
@@ -71,6 +71,16 @@
 | `tests/smoke.spec.js` | Playwrightによる自動UIテスト（43件） |
 | `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
 | `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除） |
+
+### 主な機能（ボタン）
+- 📊 当月CSV出力 / 💰 請求書CSV（MF用） / 📁 CSV取込
+- **📑 月次レポートPDF**（2026-05-26追加・巡回指導用）
+  - 実装方式: `window.open()` + `window.print()` （html2pdf.js はバンドル版がhtml2canvasをグローバル公開しないため非採用）
+  - 新規ウィンドウに整形済HTMLを書き込み、`@page A4 landscape` の印刷専用CSSで印刷ダイアログを自動表示
+  - ファイル名: `きょうしん輸送_運行計画実績_令和XX年XX月.pdf` を document.title でデフォルト設定
+  - `afterprint` イベントでウィンドウ自動クローズ
+- 💾 CSV保存先フォルダ設定（File System Access API）
+- 📄 運行指示書印刷 / 📋 引取書印刷
 
 ---
 
