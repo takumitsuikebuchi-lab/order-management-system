@@ -13,10 +13,13 @@
 
 改修・デバッグ・機能追加を行う前に、必ず以下を読むこと（順番通りに）:
 
-1. `AGENTS.md` — 現在の運用構成・重要仕様・よくある事故の防ぎ方
-2. `requirements.md` — 壊してはいけない仕様の一覧
-3. `SETUP.md` — 現在の運用環境・クラウド設定・トラブルシューティング
-4. `tasks/lessons.md` — 過去の失敗から学んだ教訓
+1. `requirements.md` — 壊してはいけない仕様の一覧
+2. `SETUP.md` — 現在の運用環境・クラウド設定・トラブルシューティング
+3. `tasks/lessons.md` — 過去の失敗から学んだ教訓
+
+（旧 `AGENTS.md` にあった運用構成・重要仕様・緊急メンテ手順は、2026-07-02 に本ファイル末尾の「運用構成・緊急メンテナンス」セクションへ統合した）
+
+その他の参考ファイル: `README.md` / `RUNBOOK.md` / `TEST_CHECKLIST.md` / `package.json` / `tests/smoke.spec.js` / `cloud-config.json` / `index.html`
 
 ---
 
@@ -55,6 +58,10 @@
 - クラウド同期の仕様（受注・マスタデータが複数端末に伝わる仕組み）
 - 一覧フィルタの保持仕様（バックグラウンド同期でも絞り込み条件が消えないこと）
 - 空マスタは有効データとして扱う仕様
+- 受注編集の軽量な競合検知（同じ受注が他所で変更されていたら保存時に警告して止める仕様）
+- 通常運用時にアプリ内クラウド設定モーダルがロックされる仕様（解除は `?manualCloudConfig=1` のみ・メンテ専用）
+- CSV取込は `orderNo` が一致する既存受注を黙って重複登録しない仕様
+- クラウド書込失敗時はローカルデータを先に保全し、接続回復後にキュー経由でリカバリする仕様
 
 ---
 
@@ -130,3 +137,57 @@
 - **`getByRole('button', { name: '←' })` は aria-label で上書きされる** → ボタンにaria-labelを付けたら、テストのセレクタも aria-label 名（`'前月へ'` 等）に合わせる
 
 詳細は `tasks/lessons.md` を参照。
+
+---
+
+## 運用構成・緊急メンテナンス（2026-07-02 に旧 AGENTS.md から統合）
+
+### 運用構成
+- 既定ブランチは `main`。GitHub Pages から配信される静的サイト（サーバーなし）
+- 共有クラウド接続設定は `cloud-config.json` に保存
+- 共有 Supabase Project ID: `xrmczawpwpctbpuebddi`（URL: `https://xrmczawpwpctbpuebddi.supabase.co`）
+- ブラウザは localStorage も保持するが、日常運用は共有 Supabase データに収束する設計
+- `index.html` には `cloud-config.json` 欠落時に備えた埋め込みフォールバック設定がある（新規ブラウザが起動に失敗しないための安全網）
+
+### 通常運用
+- 新しいPC・ブラウザは本番URLを開くだけでよい
+- 右上のステータスが `接続: Cloud（同期完了）` になることを確認する
+- 通常業務中はUIからクラウド設定を再設定しない（共有設定が有効な間、アプリ内のクラウド設定モーダルはロックされる）
+
+### 緊急メンテナンス
+
+**Supabase URL / anon key を変更する場合**
+1. `cloud-config.json` を編集
+2. `main` にコミット＆プッシュ
+3. GitHub Pages の更新を待つ
+4. ブラウザをハードリロード（Windows: `Ctrl+F5` / Mac: `Cmd+Shift+R`）
+
+**ロックを一時的に回避する場合**
+- `index.html?manualCloudConfig=1` で開くとモーダルから設定変更できる
+- 診断・一時復旧専用。終わったら正しい最終値を `cloud-config.json` に反映する
+
+**端末ごとにデータが違って見える場合**
+1. 右上のステータス表示を確認
+2. `接続: Cloud（同期完了）` でなければ、まず接続と共有設定を調査
+3. ページをハードリロード
+4. `cloud-config.json` が意図したSupabaseプロジェクトを指しているか確認
+5. 1ブラウザだけおかしい場合は、そのセッションが手動オーバーライドされていないか確認
+
+### バックアップ
+- 週次自動バックアップ: `.github/workflows/weekly-backup.yml`（毎週火曜 15:00 UTC ＝ 日本時間 水曜 0:00。workflow の cron は `0 15 * * 2`。旧 AGENTS.md の「水曜 15:00 UTC」表記は誤りだった）
+- `orders`・`customers` を `backups/YYYY-MM-DD_受注明細.csv`・`backups/YYYY-MM-DD_顧客マスタ.csv` へCSV出力
+- 手動実行は GitHub Actions タブ → "Weekly Backup" → "Run workflow"
+- 受注データに触れる改修の前に、`backups/` に最近のバックアップがあることを必ず確認する
+
+### 設計上の意図（変更時に壊さないこと）
+- Supabase への書込はリトライ／キューのガード付き
+- 共有設定はブラウザごとの設定ドリフトをなくすために導入した
+- クラウド設定UIの制限は、誤ってローカルのみの運用になる事故を減らすための意図的な設計
+- UIのリグレッション確認はアプリ実行系の外に置く（`index.html` に診断コードを入れず、テストファイルとworkflowで行う）
+
+### 変更履歴（旧 AGENTS.md の記録）
+- **2026-03-17**: 既定ブランチを `main` へ変更。誤revert後に `main`/`master` を同一コミットへ手動再同期。`guard-and-sync.yml` を追加（push時に検証して `master` へミラー）
+- **2026-03-18**: 定期クラウド更新でテーブルフィルタ状態を保持するよう修正。受注一覧の検索UIを `顧客検索` 1フィールド（自由入力＋datalist両対応）に簡素化。顧客フィルタ解除は右側の `クリア` ボタン、日付フィルタ解除は `日付解除` ボタンに整理
+- **2026-03-19**: Playwright UIスモークテストを追加（アプリ実行系の外）。guard workflow が `master` へのミラー前にスモークテストを実行。カバレッジ＝受注CRUD・フィルタ保持・月切替・ダッシュボード統計・選択受注印刷・CSV入出力・顧客/簡易マスタCSV・クラウドキュー回復・空マスタ同期伝播
+- **2026-04-01**: `CLAUDE.md` 新設。`weekly-backup.yml`（週次CSVバックアップ）追加。`tasks/todo.md`（タスク管理ログ）追加
+- **2026-04-02**: 顧客マスタ「＋ 新規追加」がリロードで消える不具合を修正（全件 `DELETE→POST` の `cloudSaveCustomers()` をやめ、`cloudInsertCustomer()` で1件だけ追加成功時に反映）。`cloudFetchCustomers()` を `Range` ヘッダのページング化（Supabase REST の1,000件上限対策）。本番 `customers` の同名重複838件を事前バックアップ後に削除し163件へ整理
