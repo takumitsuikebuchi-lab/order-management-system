@@ -1302,3 +1302,20 @@ textarea {
             margin-left: auto;
             margin-right: auto;
         }
+
+        /* 一覧の見出し行: ページ背景（グレー）と同化しないダークネイビーで見出しらしく */
+        .data-table th {
+            background: #334155;
+            color: #ffffff;
+            border-bottom: 2px solid #1e293b;
+        }
+
+        /* 列と列の間に薄い仕切りを入れて、各列タイトルの区切りを分かりやすく */
+        .data-table th + th {
+            border-left: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        /* 見出し行の全選択チェックボックスはダーク背景でも見やすく */
+        .data-table th .checkbox {
+            accent-color: var(--primary);
+        }
