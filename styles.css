@@ -1261,3 +1261,44 @@ textarea {
                 display: none;
             }
         }
+
+        /* ====== 2026-07-17 UI調整 ====== */
+
+        /* 「先頭へ」は右上に浮かぶ円形ボタン（クイックバーと同時に表示・非表示） */
+        .quick-bar .quick-bar-top {
+            position: fixed;
+            top: 12px;
+            right: 16px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            padding: 0;
+            margin-left: 0;
+            font-size: 1.3rem;
+            font-weight: 700;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+            z-index: 901;
+        }
+
+        /* ボタン列が円形ボタンの下に潜り込まないよう右側を空ける */
+        .quick-bar {
+            padding-right: 80px;
+        }
+
+        /* 受注一覧の白枠を上のボックス類と同じ左右余白に揃える */
+        .table-wrapper {
+            width: calc(100% - 2rem) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+        }
+
+        /* 統計カード4枚も超ワイド画面で他のボックスと同じ1800px上限に揃える */
+        .stats-grid {
+            max-width: 1800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
