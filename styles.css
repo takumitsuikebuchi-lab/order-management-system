@@ -1188,3 +1188,28 @@ textarea {
             font-size: 14px;
         }
 
+
+        /* クイックバー（スクロール時のみ上部に固定表示） */
+        .quick-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 900; /* モーダル(1000)より下、テーブル装飾より上 */
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .quick-bar[hidden] {
+            display: none;
+        }
+
+        .quick-bar .quick-bar-top {
+            margin-left: auto;
+        }

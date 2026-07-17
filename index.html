@@ -38,6 +38,14 @@
         </div>
     </div>
 
+    <!-- クイックバー（アクションバーが画面外に出たときだけ上部に固定表示） -->
+    <div class="quick-bar" id="quickBar" hidden>
+        <button class="btn btn-primary btn-sm" onclick="openModal()">＋ 新規受注</button>
+        <button class="btn btn-warning btn-sm" onclick="printInstructions()">📄 運行指示書（選択分）</button>
+        <button class="btn btn-warning btn-sm" onclick="printPickupSlips()">📋 引取書</button>
+        <button class="btn btn-secondary btn-sm quick-bar-top" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })">⬆ 先頭へ</button>
+    </div>
+
     <!-- メインコンテナ -->
     <div class="container">
         <!-- 統計情報 -->
@@ -1557,6 +1565,26 @@
         setInterval(() => { try { flushCloudQueue(3); } catch(_){} }, 30000);
         setInterval(() => { try { refreshCloudData({ includeMasters: false, showStatus: false }); } catch(_){} }, 60000);
 
+        // クイックバー表示制御: アクションバー（業務ボタン行）が画面の上に消えたときだけ表示する
+        (function setupQuickBar() {
+            const bar = document.getElementById('quickBar');
+            // 判定基準は業務ボタンの1行目（モバイルではアクションバー全体が縦長になるため）
+            const anchor = document.querySelector('.action-bar .action-row');
+            if (!bar || !anchor) return;
+            let ticking = false;
+            function updateQuickBarVisibility() {
+                ticking = false;
+                const show = anchor.getBoundingClientRect().bottom < 0;
+                if (bar.hidden !== !show) bar.hidden = !show;
+            }
+            function onScrollOrResize() {
+                if (!ticking) { ticking = true; requestAnimationFrame(updateQuickBarVisibility); }
+            }
+            window.addEventListener('scroll', onScrollOrResize, { passive: true });
+            window.addEventListener('resize', onScrollOrResize, { passive: true });
+            updateQuickBarVisibility();
+        })();
+
         function updateCloudStatusUI(connected) {
             const el = document.getElementById('cloudStatus');
             if (!el) return;
@@ -2437,6 +2465,10 @@ function getTagStyle(ns, name) {
         // テーブル描画
         function renderTable() {
             const tbody = document.getElementById('tableBody');
+            // 再描画（60秒ごとのクラウド同期を含む）で行選択チェックが消えないよう退避する
+            const selectedOrderIds = new Set(
+                Array.from(tbody.querySelectorAll('.order-checkbox:checked')).map(cb => String(cb.dataset.id))
+            );
             let monthOrders = getMonthOrders();
             
             // 並び替え処理
@@ -2493,6 +2525,14 @@ tbody.innerHTML = monthOrders.map(function(o) {
 
       '</tr>';
 }).join('');
+
+// 退避した行選択チェックを復元する（表示中に残っている受注のみ）
+if (selectedOrderIds.size > 0) {
+    tbody.querySelectorAll('.order-checkbox').forEach(cb => {
+        if (selectedOrderIds.has(String(cb.dataset.id))) cb.checked = true;
+    });
+    updateRowSelection();
+}
 
 updateStatsFromView();
         }

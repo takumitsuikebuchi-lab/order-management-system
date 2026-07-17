@@ -519,9 +519,9 @@ test('basic order row actions open the expected UI', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.locator('#tableBody tr')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: /新規受注/ })).toBeVisible();
+  await expect(page.locator('.action-bar').getByRole('button', { name: /新規受注/ })).toBeVisible();
 
-  await page.getByRole('button', { name: /新規受注/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /新規受注/ }).click();
   await expect(page.locator('#modalTitle')).toHaveText('新規受注登録');
   await page.locator('#orderModal .close-button').click();
 
@@ -579,7 +579,7 @@ test('Escape closes cloud settings and instruction settings dialogs', async ({ p
   await expect(page.locator('#cloudSettingsModal')).toBeHidden();
 
   await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
-  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /運行指示書/ }).click();
   await expect(page.locator('#instructionSettingsModal')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#instructionSettingsModal')).toBeHidden();
@@ -593,7 +593,7 @@ test('labels focus fields and autocomplete supports keyboard selection', async (
   const buttonBoxShadow = await page.evaluate(() => getComputedStyle(document.activeElement).boxShadow);
   expect(buttonBoxShadow).not.toBe('none');
 
-  await page.getByRole('button', { name: /新規受注/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /新規受注/ }).click();
 
   await page.locator('label[for="orderNo"]').click();
   await expect(page.locator('#orderNo')).toBeFocused();
@@ -660,10 +660,10 @@ test('print entry points still respond as expected', async ({ page }) => {
   await page.goto('/');
 
   page.once('dialog', dialog => dialog.accept());
-  await page.getByRole('button', { name: /引取書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /引取書/ }).click();
 
   await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
-  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /運行指示書/ }).click();
   await expect(page.locator('#instructionSettingsModal')).toBeVisible();
   await expect(page.locator('#instructionSettingsModal h2')).toHaveText('運行指示書の設定');
   await expect(page.locator('#orderSequenceList .order-sequence-item')).toHaveCount(1);
@@ -677,7 +677,7 @@ test('instruction sheet and pickup slip write printable HTML', async ({ page }) 
 
   await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
 
-  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /運行指示書/ }).click();
   await page.locator('#instructionSettingsModal .modal-footer').getByRole('button', { name: /運行指示書を出力/ }).click();
 
   await expect.poll(async () => {
@@ -693,7 +693,7 @@ test('instruction sheet and pickup slip write printable HTML', async ({ page }) 
   }).toContain('運行指示書');
 
   await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
-  await page.getByRole('button', { name: /引取書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /引取書/ }).click();
 
   await expect.poll(async () => {
     return await page.evaluate(() => window.__printWrites.length);
@@ -961,7 +961,7 @@ test('new order save adds a row locally', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /新規受注/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /新規受注/ }).click();
   await expect(page.locator('#modalTitle')).toHaveText('新規受注登録');
 
   await page.locator('#orderNo').fill('R260319-010');
@@ -1406,7 +1406,7 @@ test('instruction sheet modal and print output use only the selected orders', as
   await page.goto('/');
 
   await page.locator('#tableBody tr').nth(1).locator('.order-checkbox').check();
-  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /運行指示書/ }).click();
 
   await expect(page.locator('#instructionSettingsModal')).toBeVisible();
   await expect(page.locator('#orderSequenceList')).toContainText('サンプル運送');
@@ -1441,7 +1441,7 @@ test('pickup slip print output uses only the selected orders', async ({ page }) 
   await page.goto('/');
 
   await page.locator('#tableBody tr').nth(1).locator('.order-checkbox').check();
-  await page.getByRole('button', { name: /引取書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /引取書/ }).click();
 
   await expect.poll(async () => {
     return await page.evaluate(() => window.__printWrites.length);
@@ -1466,7 +1466,7 @@ test('pickup slip without selection opens a blank printable slip', async ({ page
   await installPrintCapture(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /引取書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /引取書/ }).click();
 
   await expect.poll(async () => {
     return await page.evaluate(() => window.__printWrites.length);
@@ -1609,7 +1609,7 @@ test('cloud save failure keeps the local order and retries from the queue later'
     return await page.locator('#cloudStatus').textContent();
   }).toContain('同期完了');
 
-  await page.getByRole('button', { name: /新規受注/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /新規受注/ }).click();
   await page.locator('#orderNo').fill('R260319-020');
   await page.locator('#orderDate').fill('2026-03-23');
   await page.locator('#customerName').fill('クラウド失敗テスト');
@@ -1885,7 +1885,7 @@ test('instruction sheet print output includes addresses, cargo, and quantity det
   await page.goto('/');
 
   await page.locator('#tableBody tr').nth(0).locator('.order-checkbox').check();
-  await page.getByRole('button', { name: /運行指示書/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /運行指示書/ }).click();
   await expect(page.locator('#instructionSettingsModal')).toBeVisible();
   await page.locator('#dispatchTime').fill('09:15');
   await page.getByRole('button', { name: '運行指示書を出力' }).click();
@@ -2037,4 +2037,49 @@ test('cloud delete failure enqueues and recovers via queue flush', async ({ page
     return await page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length);
   }).toBe(0);
   expect(deleteAttempts).toBeGreaterThan(3);
+});
+
+test('row selection checkboxes survive the periodic table refresh', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await expect(page.locator('#tableBody tr')).toHaveCount(2);
+  await page.locator('#tableBody .order-checkbox').first().check();
+  await expect(page.locator('#tableBody tr').first()).toHaveClass(/row-selected/);
+
+  // 60秒ごとのクラウド同期と同じ再描画経路を直接呼ぶ
+  await page.evaluate((orders) => {
+    window.applyFetchedOrders(orders);
+  }, seededOrders);
+
+  await expect(page.locator('#tableBody .order-checkbox').first()).toBeChecked();
+  await expect(page.locator('#tableBody tr').first()).toHaveClass(/row-selected/);
+  await expect(page.locator('#tableBody .order-checkbox').nth(1)).not.toBeChecked();
+});
+
+test('quick bar appears after scrolling and returns to top', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  // 一覧が画面より確実に長くなるよう、同月の受注30件で上書きする
+  const manyOrders = Array.from({ length: 30 }, (_, i) => ({
+    ...seededOrders[0],
+    id: `scroll-${i}`,
+    orderNo: `R260319-${String(i + 10).padStart(3, '0')}`
+  }));
+  await page.addInitScript((orders) => {
+    localStorage.setItem('orders', JSON.stringify(orders));
+  }, manyOrders);
+  await page.setViewportSize({ width: 1280, height: 320 });
+  await page.goto('/');
+
+  await expect(page.locator('#quickBar')).toBeHidden();
+
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(page.locator('#quickBar')).toBeVisible();
+  await expect(page.locator('#quickBar').getByRole('button', { name: /新規受注/ })).toBeVisible();
+
+  await page.locator('#quickBar').getByRole('button', { name: /先頭へ/ }).click();
+  await expect.poll(async () => await page.evaluate(() => window.scrollY)).toBe(0);
+  await expect(page.locator('#quickBar')).toBeHidden();
 });
