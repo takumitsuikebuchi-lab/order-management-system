@@ -75,7 +75,7 @@
 | `setup-wizard.html` | 初回セットアップ画面 |
 | `cloud-config.json` | 共有クラウド設定の**正本** |
 | `schema.sql` | Supabaseのテーブル定義 |
-| `tests/smoke.spec.js` | Playwrightによる自動UIテスト（43件） |
+| `tests/smoke.spec.js` | Playwrightによる自動UIテスト（45件） |
 | `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
 | `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除） |
 
@@ -88,6 +88,13 @@
   - `afterprint` イベントでウィンドウ自動クローズ
 - 💾 CSV保存先フォルダ設定（File System Access API）
 - 📄 運行指示書印刷 / 📋 引取書印刷
+- **クイックバー**（2026-07-17追加）: 業務ボタン1行目が画面外に出るとページ上部に固定表示される2段バー（業務3ボタン＋マスタ6ボタン＋絞り込み一式＋右上の円形「先頭へ」）
+  - 絞り込みバーは複製せず**本物のDOMをバー内に移動**する方式（IDと入力値の二重化を避ける）。バー内にフォーカスがある間は隠れないガード付き
+  - モバイル（<768px）はコンパクト表示（業務3ボタン＋先頭へのみ）
+  - 一覧の行選択チェックは `renderTable()` が退避・復元する（60秒ごとのクラウド同期で消えない）
+
+### CSS/JS更新時のキャッシュ対策（必須）
+`styles.css` / `utils.js` を変更したら、`index.html` の読み込みタグの `?v=` 番号（例 `styles.css?v=20260717b`）を必ず上げる。上げないと利用端末に古いキャッシュが残り「反映されない」問い合わせになる。
 
 ---
 
@@ -135,6 +142,10 @@
 - **URLにIDを並べる `?id=in.(...)` 方式は件数が増えると壊れる** → 件数が多いDELETEは `?id=not.is.null` などURLに依存しない方式を使う
 - **受注一覧の既定は「当月のみ」** → レンジ表示・複数月同時表示は拒否された履歴あり。情報密度を上げる改善は事前にユーザー確認
 - **`getByRole('button', { name: '←' })` は aria-label で上書きされる** → ボタンにaria-labelを付けたら、テストのセレクタも aria-label 名（`'前月へ'` 等）に合わせる
+- **クイックバーに同名ボタンが複製されている** → テストで業務・マスタボタンを掴むときは `page.locator('.action-bar').getByRole(...)` のようにスコープする（素の `page.getByRole` は strict mode 違反になる）
+- **`schema.sql` の `orders.id` は `uuid` 定義だが、本番DBの実IDは整数連番**（2026-07-17確認）。アプリは挿入・更新で `id` を送らない（`delete insertBody.id`）ので動作に影響はないが、DB再構築時は実態に合わせること
+- **列3〜5（顧客名・引取先・配送先）には折り返し用の `vertical-align: top` 個別ルールがある** → 見出し・セルの縦位置を変えるときは `#orderTable th:nth-child(n)` の優先度に注意
+- **週次バックアップのコミットは `master` ミラーに反映されない**（GITHUB_TOKEN の push は他の workflow を起動しないため）→ master がバックアップ分だけ遅れるのは正常・実害なし
 
 詳細は `tasks/lessons.md` を参照。
 
