@@ -1319,3 +1319,9 @@ textarea {
         .data-table th .checkbox {
             accent-color: var(--primary);
         }
+
+        /* 見出し行の文字は上下左右とも中央揃え */
+        .data-table th {
+            text-align: center;
+            vertical-align: middle;
+        }
