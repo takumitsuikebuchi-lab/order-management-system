@@ -1325,3 +1325,18 @@ textarea {
             text-align: center;
             vertical-align: middle;
         }
+
+        /* 顧客名・引取先・配送先の見出しも他の列と同じ上下中央揃えに
+           （本文セルの折り返し上寄せ表示は従来どおり） */
+        #orderTable thead th:nth-child(3),
+        #orderTable thead th:nth-child(4),
+        #orderTable thead th:nth-child(5) {
+            vertical-align: middle;
+        }
+
+        /* 一覧の白枠の内側余白をなくし、見出しの帯を枠の端から端まで通す
+           （帯の角は白枠の角丸に沿ってきれいに丸く収まる） */
+        .table-wrapper {
+            padding-left: 0;
+            padding-right: 0;
+        }
