@@ -40,10 +40,20 @@
 
     <!-- クイックバー（アクションバーが画面外に出たときだけ上部に固定表示） -->
     <div class="quick-bar" id="quickBar" hidden>
-        <button class="btn btn-primary btn-sm" onclick="openModal()">＋ 新規受注</button>
-        <button class="btn btn-warning btn-sm" onclick="printInstructions()">📄 運行指示書（選択分）</button>
-        <button class="btn btn-warning btn-sm" onclick="printPickupSlips()">📋 引取書</button>
-        <button class="btn btn-secondary btn-sm quick-bar-top" onclick="window.scrollTo({ top: 0, behavior: 'smooth' })">⬆ 先頭へ</button>
+        <div class="quick-bar-row">
+            <button class="btn btn-primary btn-sm" onclick="openModal()">＋ 新規受注</button>
+            <button class="btn btn-warning btn-sm" onclick="printInstructions()">📄 運行指示書（選択分）</button>
+            <button class="btn btn-warning btn-sm" onclick="printPickupSlips()">📋 引取書</button>
+            <span class="quick-bar-divider" aria-hidden="true"></span>
+            <button class="btn btn-secondary btn-sm quick-bar-master" onclick="openCustomerMaster()">👥 顧客マスタ</button>
+            <button class="btn btn-secondary btn-sm quick-bar-master" onclick="openCargoMaster()">📦 積荷マスタ</button>
+            <button class="btn btn-secondary btn-sm quick-bar-master" onclick="openPackagingMaster()">📋 荷姿マスタ</button>
+            <button class="btn btn-secondary btn-sm quick-bar-master" onclick="openUnitMaster()">📏 単位マスタ</button>
+            <button class="btn btn-secondary btn-sm quick-bar-master" onclick="openDriverMaster()">👤 ドライバーマスタ</button>
+            <button class="btn btn-secondary btn-sm quick-bar-master" onclick="openVehicleMaster()">🚚 車両マスタ</button>
+            <button class="btn btn-secondary quick-bar-top" onclick="this.blur(); window.scrollTo({ top: 0, behavior: 'smooth' })">⬆ 先頭へ</button>
+        </div>
+        <div class="quick-bar-row quick-bar-filter-slot" id="quickBarFilterSlot"></div>
     </div>
 
     <!-- メインコンテナ -->
@@ -1571,17 +1581,43 @@
             // 判定基準は業務ボタンの1行目（モバイルではアクションバー全体が縦長になるため）
             const anchor = document.querySelector('.action-bar .action-row');
             if (!bar || !anchor) return;
+
+            // 絞り込みバーは複製せず本物を移動する（入力値・IDの二重化を避ける）。
+            // 元の位置には同じ高さのスペーサーを置き、レイアウトが跳ねないようにする。
+            const filterBar = document.querySelector('.action-bar .filter-bar');
+            const filterSlot = document.getElementById('quickBarFilterSlot');
+            const filterSpacer = document.createElement('div');
+            filterSpacer.className = 'action-row filter-bar-spacer';
+            function placeFilterBar(show) {
+                if (!filterBar || !filterSlot) return;
+                const wide = window.matchMedia('(min-width: 768px)').matches;
+                if (show && wide) {
+                    if (filterBar.parentNode !== filterSlot) {
+                        filterSpacer.style.height = filterBar.offsetHeight + 'px';
+                        filterBar.replaceWith(filterSpacer);
+                        filterSlot.appendChild(filterBar);
+                    }
+                } else if (filterSpacer.parentNode) {
+                    filterSpacer.replaceWith(filterBar);
+                }
+            }
+
             let ticking = false;
             function updateQuickBarVisibility() {
                 ticking = false;
+                // バー内の入力を操作中は隠さない（絞り込みで一覧が短くなった瞬間に検索欄が消えるのを防ぐ）
+                if (!bar.hidden && bar.contains(document.activeElement)) return;
                 const show = anchor.getBoundingClientRect().bottom < 0;
                 if (bar.hidden !== !show) bar.hidden = !show;
+                placeFilterBar(show);
             }
             function onScrollOrResize() {
                 if (!ticking) { ticking = true; requestAnimationFrame(updateQuickBarVisibility); }
             }
             window.addEventListener('scroll', onScrollOrResize, { passive: true });
             window.addEventListener('resize', onScrollOrResize, { passive: true });
+            // バーから離れたら（フォーカスが外れたら）表示状態を判定し直す
+            bar.addEventListener('focusout', () => setTimeout(onScrollOrResize, 0));
             updateQuickBarVisibility();
         })();
 

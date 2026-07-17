@@ -617,7 +617,7 @@ test('customer master add flow updates the master list', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /顧客マスタ/ }).click();
   await expect(page.locator('#customerMasterModal')).toBeVisible();
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
 
@@ -639,7 +639,7 @@ test('driver master save updates filter options', async ({ page }) => {
   await seedLocalMode(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /ドライバーマスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /ドライバーマスタ/ }).click();
   await expect(page.locator('#simpleMasterModal')).toBeVisible();
   await expect(page.locator('#simpleMasterTitle')).toHaveText('ドライバーマスタ管理');
 
@@ -873,7 +873,7 @@ test('customer master csv import adds new customers and skips duplicates', async
   await seedLocalMode(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /顧客マスタ/ }).click();
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
 
   const csvText = [
@@ -905,7 +905,7 @@ test('customer master csv import with duplicates only keeps the list unchanged',
   await seedLocalMode(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /顧客マスタ/ }).click();
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(2);
 
   let seenAlert = '';
@@ -941,7 +941,7 @@ test('customer master csv export creates a customer csv download', async ({ page
     window.saveCsvToDir = async () => false;
   });
 
-  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /顧客マスタ/ }).click();
   await page.locator('#customerMasterModal').getByRole('button', { name: /CSV出力/ }).click();
 
   await expect.poll(async () => {
@@ -1039,7 +1039,7 @@ test('simple master csv import adds new driver values and skips duplicates', asy
   await seedLocalMode(page);
   await page.goto('/');
 
-  await page.getByRole('button', { name: /ドライバーマスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /ドライバーマスタ/ }).click();
   await expect(page.locator('#simpleMasterTitle')).toHaveText('ドライバーマスタ管理');
 
   const csvText = [
@@ -1075,7 +1075,7 @@ test('simple master csv export creates a driver csv download', async ({ page }) 
     window.saveCsvToDir = async () => false;
   });
 
-  await page.getByRole('button', { name: /ドライバーマスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /ドライバーマスタ/ }).click();
   await page.locator('#simpleMasterModal').getByRole('button', { name: /CSV出力/ }).click();
 
   await expect.poll(async () => {
@@ -1677,7 +1677,7 @@ test('cloud master sync accepts empty customer and driver lists as the latest st
     );
   }).toEqual(['全ドライバー', '混載流通', '門脇悟大']);
 
-  await page.getByRole('button', { name: /顧客マスタ/ }).click();
+  await page.locator('.action-bar').getByRole('button', { name: /顧客マスタ/ }).click();
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(0);
 });
 
@@ -2078,8 +2078,13 @@ test('quick bar appears after scrolling and returns to top', async ({ page }) =>
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await expect(page.locator('#quickBar')).toBeVisible();
   await expect(page.locator('#quickBar').getByRole('button', { name: /新規受注/ })).toBeVisible();
+  await expect(page.locator('#quickBar').getByRole('button', { name: /顧客マスタ/ })).toBeVisible();
+  // 絞り込みバー（本物）がクイックバー内へ移動している
+  await expect(page.locator('#quickBar #searchInput')).toBeVisible();
 
   await page.locator('#quickBar').getByRole('button', { name: /先頭へ/ }).click();
   await expect.poll(async () => await page.evaluate(() => window.scrollY)).toBe(0);
   await expect(page.locator('#quickBar')).toBeHidden();
+  // 絞り込みバーが元の位置（アクションバー内）に戻っている
+  await expect(page.locator('.action-bar #searchInput')).toBeVisible();
 });

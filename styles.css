@@ -1213,3 +1213,51 @@ textarea {
         .quick-bar .quick-bar-top {
             margin-left: auto;
         }
+
+        /* クイックバー2段構成 */
+        .quick-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.5rem;
+        }
+
+        .quick-bar-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .quick-bar-divider {
+            width: 1px;
+            align-self: stretch;
+            background: var(--border);
+            margin: 0 0.25rem;
+        }
+
+        .quick-bar .quick-bar-top {
+            margin-left: auto;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 0.55rem 1.3rem;
+        }
+
+        /* クイックバー内の絞り込みバーは仕切り線なしで馴染ませる */
+        .quick-bar-filter-slot .filter-bar {
+            margin-top: 0;
+            padding-top: 0;
+            border-top: none;
+        }
+
+        .quick-bar-filter-slot:empty {
+            display: none;
+        }
+
+        /* モバイルは従来のコンパクト表示（マスタ・検索は出さない） */
+        @media (max-width: 767px) {
+            .quick-bar-master,
+            .quick-bar-divider,
+            .quick-bar-filter-slot {
+                display: none;
+            }
+        }
