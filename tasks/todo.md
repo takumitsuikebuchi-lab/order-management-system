@@ -427,13 +427,28 @@ R260903-014（梶原農場）の金額(税別)が 1,500×32=48,000 のはずが 
 - [x] index.html:1796 受注取得の order パラメータ二重指定を `order=date.asc,order_no.asc` に修正（本番で二重指定だと2つ目が効かないことを実測）、テストの route 文字列4箇所も同時修正
 - [x] .gitignore に .DS_Store / .claude/ を追加
 - [x] テスト48件成功
-- [ ] 【要ユーザー判断・重大】リポジトリが Public で、backups/ と CSV保存/ の顧客マスタ（住所・電話番号）・受注明細が
+- [x] 【対応済 2026-09-04】リポジトリが Public で、backups/ と CSV保存/ の顧客マスタ（住所・電話番号）・受注明細が
       GitHub と本番URL（GitHub Pages は全ファイルを配信）から誰でも取得できる。非公開化（個人アカウントは GitHub Pro 必要）＋
       配信物からバックアップを外す（Pages を Actions 配信にしてアプリファイルだけ載せる／バックアップ先を別の非公開リポへ）＋履歴の削除
-- [ ] 【要ユーザー判断】CSV保存/ の未追跡7ファイル＋変更1ファイル（22列の新形式で再出力済み）をコミットするか、追跡をやめるか（上の公開範囲の判断が前提）
+- [x] 【対応済 2026-09-04・追跡をやめ kyoshin-order-backups/csv-exports へ移設】CSV保存/ の未追跡7ファイル＋変更1ファイル（22列の新形式で再出力済み）をコミットするか、追跡をやめるか（上の公開範囲の判断が前提）
 - [ ] 【提案】顧客マスタCSV（出力・取込）が3列で `delivery_address`（配送先住所）を落とす → 4列化（取込は3列も後方互換）
 - [ ] 【提案】schema.sql にインデックスが無い → `orders(date)`、`simple_masters(master_type, sort_order)`、`customers(customer_name)`
 - [ ] 【提案】setup-wizard.html は本番では到達不能（cloud-config.json が enabled のため）→ 復旧経路として残すなら README に明記、不要なら削除
 - [ ] 【提案】manual_images/ の5画像はどこからも参照されておらず、`01-welcome.webp-01-welcome.webp` は名前が壊れている → 使うか消すか
 - [ ] 【提案】guard-and-sync.yml の pull_request トリガが main 宛のみ（master 宛PRは未検証で通る）
 - 備考: ローカル master ブランチは97コミット遅れだが origin/master は origin/main と同一。週次バックアップの3年超削除は未発動（最古 2026-04-08）
+
+---
+
+## 2026-09-04: 顧客データを公開リポジトリから除去（方針2＝公開のまま、データだけ外へ）
+
+### 計画・結果
+- [x] 書き換え前の完全ミラーを `~/arenge-work/clients/01-kyoshin/_backup-order-management-system-mirror-20260904.git` に保管
+- [x] 非公開リポジトリ `kyoshin-order-backups` を作成し、backups/ 166件＋CSV保存/ 10件を移設（SHA-256 全件一致を確認）
+- [x] weekly-backup.yml をデプロイキー経由で非公開リポへ push する方式に変更（この公開リポへの書込権限は外した）
+- [x] backups/ と CSV保存/ を git 追跡から外し .gitignore に追加（CSV保存/ はアプリの保存先としてローカルに残す）
+- [x] README / SETUP / CLAUDE.md / CHANGELOG を更新
+- [ ] git filter-repo で main/master の履歴から backups/ と CSV保存/ を除去し force push
+- [ ] 検証: 本番URLで顧客マスタCSVが404、GitHub履歴に残っていない、Weekly Backup を手動実行して kyoshin-order-backups に入る
+- [ ] GitHub サポートへ「削除済みデータのキャッシュ消去」依頼（ユーザー操作。依頼文は下書き済み）
+- 備考: 残る課題＝Supabase anon key が公開ページに埋め込まれ RLS が全許可（DB自体は誰でも読み書き可）。別途対策が必要

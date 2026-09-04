@@ -42,7 +42,7 @@
    - テスト用受注・顧客データを作った場合は、確認後に必ず削除して報告する
 
 4. **バックアップを確認してから、データに触れる作業を始める**
-   - 受注データに影響する改修の前に、最新のCSVバックアップが存在することを確認する
+   - 受注データに影響する改修の前に、非公開リポジトリ `kyoshin-order-backups` の `backups/` に最新のCSVバックアップが存在することを確認する
    - バックアップがない場合はユーザーに手動エクスポートを依頼してから作業する
 
 5. **作業ミスでデータが消えた・おかしくなった場合は即座に報告する**
@@ -77,7 +77,7 @@
 | `schema.sql` | Supabaseのテーブル定義 |
 | `tests/smoke.spec.js` | Playwrightによる自動UIテスト（48件） |
 | `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
-| `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除） |
+| `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除）。出力先は**非公開リポジトリ `kyoshin-order-backups`**（デプロイキー `BACKUP_DEPLOY_KEY` で push。2026-09-04 変更） |
 
 ### 主な機能（ボタン）
 - 📊 当月CSV出力 / 💰 請求書CSV（MF用） / 📁 CSV取込
@@ -154,7 +154,7 @@
 - **`<input type="number">` はフォーカス中にマウスホイール／↑↓キーで値が1ずつ増減する**（Chrome標準動作）→ 受注フォームの数量・単価・金額(税別)には `onwheel="this.blur()"` と ArrowUp/Down の preventDefault を付けてある（2026-09-04。48,000円が保存時に47,998円になっていた事故の原因）。数値入力欄を新設するときも同じ属性を付けること
 - **受注番号の日付部分は「登録した日」**（新規登録時に今日の日付で採番し、その後「日付」欄を配送日に変えても番号は変わらない）。番号と日付欄が違うのは仕様であり不具合ではない
 - **Supabase REST（PostgREST）の並び順は `order=a.asc,b.asc` とカンマで1つにまとめる** → `&order=a.asc&order=b.asc` と2回書くと2つ目のキーが効かない（2026-09-04 本番で実測。同日内の受注番号順が崩れていた）。テストの `page.route()` はURL文字列の完全一致なので、クエリを変えたらテスト側も同時に直す
-- **週次バックアップのコミットは `master` ミラーに反映されない**（GITHUB_TOKEN の push は他の workflow を起動しないため）→ master がバックアップ分だけ遅れるのは正常・実害なし
+- **このリポジトリは Public（GitHub Pages は無料プランでは公開リポジトリのみ）** → 顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリの手動出力CSV）を絶対にコミットしない。`backups/`・`CSV保存/` は .gitignore 済み。2026-09-04 に過去分を非公開リポジトリ `kyoshin-order-backups` へ移設し、履歴からも除去した（Pages は master の全ファイルを配信するので、コミット＝公開）
 
 詳細は `tasks/lessons.md` を参照。
 
@@ -195,9 +195,9 @@
 
 ### バックアップ
 - 週次自動バックアップ: `.github/workflows/weekly-backup.yml`（毎週火曜 15:00 UTC ＝ 日本時間 水曜 0:00。workflow の cron は `0 15 * * 2`。旧 AGENTS.md の「水曜 15:00 UTC」表記は誤りだった）
-- `orders`・`customers`・`simple_masters` を `backups/YYYY-MM-DD_受注明細.csv`・`backups/YYYY-MM-DD_顧客マスタ.csv`・簡易マスタ6種（`品名マスタ` / `荷姿マスタ` / `単位マスタ` / `ドライバーマスタ` / `車両マスタ` / `シンプルマスタ全体`）へCSV出力（UTF-8 BOM付き。2026-04-17 に6種へ拡張）
+- `orders`・`customers`・`simple_masters` を `backups/YYYY-MM-DD_受注明細.csv`・`backups/YYYY-MM-DD_顧客マスタ.csv`・簡易マスタ6種（`品名マスタ` / `荷姿マスタ` / `単位マスタ` / `ドライバーマスタ` / `車両マスタ` / `シンプルマスタ全体`）へCSV出力（UTF-8 BOM付き。2026-04-17 に6種へ拡張）。**保存先は非公開リポジトリ `kyoshin-order-backups`**（2026-09-04 移設。それ以前はこのリポジトリの `backups/` に置いていたが、公開リポジトリのため履歴ごと削除した）
 - 手動実行は GitHub Actions タブ → "Weekly Backup" → "Run workflow"
-- 受注データに触れる改修の前に、`backups/` に最近のバックアップがあることを必ず確認する
+- 受注データに触れる改修の前に、非公開リポジトリ `kyoshin-order-backups` の `backups/` に最近のバックアップがあることを必ず確認する（このリポジトリ内に `backups/` は無い）
 
 ### 設計上の意図（変更時に壊さないこと）
 - Supabase への書込はリトライ／キューのガード付き

@@ -4,3 +4,5 @@ test-results/
 
 .DS_Store
 .claude/
+backups/
+CSV保存/

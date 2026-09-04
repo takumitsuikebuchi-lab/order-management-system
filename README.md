@@ -22,7 +22,7 @@
 - **変更履歴**: 重要変更を `CHANGELOG.md` に整理
 - **保守メモ**: AIツール向けの判断材料を `CLAUDE.md` に整理（旧 `AGENTS.md` は 2026-07-02 に統合済み）
 - **Claude Code指示書**: Claude Codeがこのプロジェクトを正しく扱うための指示を `CLAUDE.md` に整理
-- **週次自動バックアップ**: 毎週水曜深夜0時（JST）に受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）をCSV保存（`backups/` フォルダに蓄積）
+- **週次自動バックアップ**: 毎週水曜深夜0時（JST）に受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）をCSV出力し、**非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/` に保存**（2026-09-04 に公開リポジトリ内の `backups/` から移設。3年超は自動削除）
 
 ## 🚀 使い始める
 
@@ -81,7 +81,7 @@ npx http-server -p 4173
 - ✅ Supabaseクラウド同期
 - ✅ CSV取込・出力
 - ✅ CSV保存先フォルダ設定（File System Access API・対応ブラウザのみ）
-- ✅ 週次自動バックアップ（毎週水曜深夜0時・受注明細・顧客マスタ・簡易マスタ6種を `backups/` フォルダに保存）
+- ✅ 週次自動バックアップ（毎週水曜深夜0時・受注明細・顧客マスタ・簡易マスタ6種を非公開リポジトリ kyoshin-order-backups に保存）
 
 ## 🛠️ 技術仕様
 
@@ -116,7 +116,6 @@ order-management-system/
 │   ├── guard-and-sync.yml        # CI/CD（テスト → main→master自動同期）
 │   └── weekly-backup.yml         # 週次自動バックアップ（毎週水曜深夜0時JST）
 ├── tests/smoke.spec.js           # UIスモークテスト
-├── backups/                      # 週次CSVバックアップ保存先
 ├── tasks/
 │   ├── todo.md                   # タスク管理ログ
 │   └── lessons.md                # 過去の失敗から学んだ教訓
@@ -144,8 +143,9 @@ order-management-system/
 ## 💡 ヒント
 
 ### データのバックアップ
-- **週次自動バックアップが設定済みです**（毎週水曜深夜0時・GitHub上の `backups/` フォルダに保存）
-- 2026-04-08 から毎週 `backups/` フォルダに蓄積されています（3年を超えた分は自動削除）
+- **週次自動バックアップが設定済みです**（毎週水曜深夜0時・非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/` に保存）
+- 2026-04-08 からの全世代を kyoshin-order-backups に蓄積しています（3年を超えた分は自動削除）。顧客名・住所・電話番号を含むため、この公開リポジトリには置きません（2026-09-04 に移設・履歴からも削除）
+- アプリの「CSV保存先フォルダ設定」で保存した `CSV保存/` も同じ理由で git 追跡対象外（.gitignore）です
 - 手動バックアップも引き続き「CSV出力」で取得できます
 - 緊急バックアップは GitHub → Actions → 「Weekly Backup」→「Run workflow」で即時実行できます
 
