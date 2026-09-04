@@ -237,7 +237,7 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="quantity">数量</label>
-                            <input type="number" class="form-input-full numeric-input" id="quantity" onchange="calculateAmount()" inputmode="decimal">
+                            <input type="number" class="form-input-full numeric-input" id="quantity" onchange="calculateAmount()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="unit">単位</label>
@@ -253,11 +253,11 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="unitPrice">単価（税抜）</label>
-                            <input type="number" class="form-input-full numeric-input" id="unitPrice" onchange="calculateAmount()" inputmode="decimal">
+                            <input type="number" class="form-input-full numeric-input" id="unitPrice" onchange="calculateAmount()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="amountNet">金額（税別）</label>
-                            <input type="number" class="form-input-full numeric-input" id="amountNet" onchange="calculateGrossFromNet()" inputmode="decimal">
+                            <input type="number" class="form-input-full numeric-input" id="amountNet" onchange="calculateGrossFromNet()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="amountGross">金額（税込）</label>

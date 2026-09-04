@@ -1200,6 +1200,40 @@ test('invoice csv export writes tax rounded once per customer', async ({ page })
   }).toMatch(/2470[",]+247[",]+2717/);
 });
 
+test('mouse wheel and arrow keys do not change amount fields in the order form', async ({ page }) => {
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await page.locator('.action-bar').getByRole('button', { name: /新規受注/ }).click();
+  await expect(page.locator('#modalTitle')).toHaveText('新規受注登録');
+
+  await page.locator('#quantity').fill('32');
+  await page.locator('#unitPrice').fill('1500');
+  await page.locator('#unitPrice').dispatchEvent('change');
+  await expect(page.locator('#amountNet')).toHaveValue('48000');
+  await expect(page.locator('#amountGross')).toHaveValue('52800');
+
+  // 金額欄にカーソルを置いたままホイールを回す／↓キーを押しても値が減らないこと（47,998円事故の再発防止）
+  const amountNet = page.locator('#amountNet');
+  await amountNet.click();
+  const box = await amountNet.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, 120);
+  await page.mouse.wheel(0, 120);
+  await page.waitForTimeout(200);
+  await expect(amountNet).toHaveValue('48000');
+
+  await amountNet.click();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(amountNet).toHaveValue('48000');
+  await expect(page.locator('#amountGross')).toHaveValue('52800');
+
+  await page.locator('#unitPrice').click();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#unitPrice')).toHaveValue('1500');
+});
+
 test('invoice and payment checkboxes persist to local storage', async ({ page }) => {
   await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);

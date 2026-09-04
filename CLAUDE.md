@@ -75,7 +75,7 @@
 | `setup-wizard.html` | 初回セットアップ画面 |
 | `cloud-config.json` | 共有クラウド設定の**正本** |
 | `schema.sql` | Supabaseのテーブル定義 |
-| `tests/smoke.spec.js` | Playwrightによる自動UIテスト（47件） |
+| `tests/smoke.spec.js` | Playwrightによる自動UIテスト（48件） |
 | `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
 | `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除） |
 
@@ -150,6 +150,8 @@
 - **`schema.sql` の `orders.id` は `uuid` 定義だが、本番DBの実IDは整数連番**（2026-07-17確認）。アプリは挿入・更新で `id` を送らない（`delete insertBody.id`）ので動作に影響はないが、DB再構築時は実態に合わせること
 - **列3〜5（顧客名・引取先・配送先）には折り返し用の `vertical-align: top` 個別ルールがある** → 見出し・セルの縦位置を変えるときは `#orderTable th:nth-child(n)` の優先度に注意
 - **売上高（税込）は行の税込額の合計ではない** → 請求書単位（顧客×月）で消費税を四捨五入する仕様（2026-09-04）。「行を足すと数円合わない」は不具合ではない。**単価×数量≠金額(税別)の受注はMF側で金額が変わる**（MFは単価×数量で再計算）ので、税ではなく入力の問題として案内する
+- **`<input type="number">` はフォーカス中にマウスホイール／↑↓キーで値が1ずつ増減する**（Chrome標準動作）→ 受注フォームの数量・単価・金額(税別)には `onwheel="this.blur()"` と ArrowUp/Down の preventDefault を付けてある（2026-09-04。48,000円が保存時に47,998円になっていた事故の原因）。数値入力欄を新設するときも同じ属性を付けること
+- **受注番号の日付部分は「登録した日」**（新規登録時に今日の日付で採番し、その後「日付」欄を配送日に変えても番号は変わらない）。番号と日付欄が違うのは仕様であり不具合ではない
 - **週次バックアップのコミットは `master` ミラーに反映されない**（GITHUB_TOKEN の push は他の workflow を起動しないため）→ master がバックアップ分だけ遅れるのは正常・実害なし
 
 詳細は `tasks/lessons.md` を参照。
