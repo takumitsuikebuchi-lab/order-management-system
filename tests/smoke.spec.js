@@ -1149,6 +1149,57 @@ test('month navigation updates the visible month and monthly stats', async ({ pa
   await expect(page.locator('#totalGross')).toHaveText('¥3,300');
 });
 
+test('monthly gross total rounds tax once per customer like moneyforward', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  // 行ごとの税額に .5 が出るデータ。行ごと四捨五入なら 1,359+1,359+1,106=3,824 になるが、
+  // 顧客ごとの税抜合計に対して四捨五入すると 2,470+247 と 1,005+101 で 3,823 になる（MF と同じ）
+  const halfYenOrders = [
+    { ...seededOrders[0], id: 'tax-1', orderNo: 'R260319-101', date: '2026-03-10', customerName: '端数商店', quantity: 1, unitPrice: 1235, amountNet: 1235, amountGross: 1359 },
+    { ...seededOrders[0], id: 'tax-2', orderNo: 'R260319-102', date: '2026-03-11', customerName: '端数商店', quantity: 1, unitPrice: 1235, amountNet: 1235, amountGross: 1359 },
+    { ...seededOrders[1], id: 'tax-3', orderNo: 'R260319-103', date: '2026-03-12', customerName: '半端物産', quantity: 1, unitPrice: 1005, amountNet: 1005, amountGross: 1106 }
+  ];
+
+  await replaceOrdersAndRefresh(page, halfYenOrders);
+
+  await expect(page.locator('#orderCount')).toHaveText('3件');
+  await expect(page.locator('#totalNet')).toHaveText('¥3,475');
+  await expect(page.locator('#totalTax')).toHaveText('¥348');
+  await expect(page.locator('#totalGross')).toHaveText('¥3,823');
+
+  // 顧客で絞り込んでも同じ方式で再集計される
+  await page.locator('#searchInput').fill('端数商店');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalTax')).toHaveText('¥247');
+  await expect(page.locator('#totalGross')).toHaveText('¥2,717');
+});
+
+test('invoice csv export writes tax rounded once per customer', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await installCsvCapture(page);
+  await page.goto('/');
+
+  const halfYenOrders = [
+    { ...seededOrders[0], id: 'tax-1', orderNo: 'R260319-101', date: '2026-03-10', customerName: '端数商店', quantity: 1, unitPrice: 1235, amountNet: 1235, amountGross: 1359 },
+    { ...seededOrders[0], id: 'tax-2', orderNo: 'R260319-102', date: '2026-03-11', customerName: '端数商店', quantity: 1, unitPrice: 1235, amountNet: 1235, amountGross: 1359 }
+  ];
+  await replaceOrdersAndRefresh(page, halfYenOrders);
+  await page.evaluate(() => {
+    window.saveCsvToDir = async () => false;
+  });
+  page.once('dialog', async dialog => { await dialog.accept(); });
+
+  await page.getByRole('button', { name: /請求書CSV/ }).click();
+
+  // 請求書行: 小計 2470 / 消費税 247（2,718-2,470=248 ではない）/ 合計金額 2717
+  await expect.poll(async () => {
+    return await page.evaluate(() => window.__csvCapture.content);
+  }).toMatch(/2470[",]+247[",]+2717/);
+});
+
 test('invoice and payment checkboxes persist to local storage', async ({ page }) => {
   await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);

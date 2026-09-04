@@ -64,7 +64,7 @@
             <div class="stat-card">
                 <div class="stat-label">当月売上高（税込）</div>
                 <div class="stat-value" id="totalGross">¥0</div>
-                <div class="stat-sub">税抜: <span id="totalNet">¥0</span></div>
+                <div class="stat-sub">税抜: <span id="totalNet">¥0</span> ／ 消費税: <span id="totalTax">¥0</span></div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">受注件数</div>
@@ -483,7 +483,7 @@
 
 
     <!-- 純関数ユーティリティ（DOM・状態に依存しない共通関数）。メインスクリプトより前に読み込む -->
-    <script src="utils.js?v=20260717b"></script>
+    <script src="utils.js?v=20260904a"></script>
     <script>
         // データストレージ
         let orders = [];
@@ -2624,8 +2624,11 @@ updateStatsFromView();
         function updateStats() {
             // 初期統計は常に「当月」を基準（viewMode の影響を受けない）
             const monthOrders = getMonthOrders('single');
-            const totalGross = monthOrders.reduce((sum, order) => sum + (order.amountGross || 0), 0);
-            const totalNet = monthOrders.reduce((sum, order) => sum + (order.amountNet || 0), 0);
+            // 税込合計は受注ごとの税込額の足し算ではなく、顧客×月（請求書単位）で消費税を四捨五入して算出（マネーフォワードと一致させる）
+            const invoiceTotals = calcInvoiceTotals(monthOrders);
+            const totalGross = invoiceTotals.gross;
+            const totalNet = invoiceTotals.net;
+            const totalTax = invoiceTotals.tax;
             const incomplete = monthOrders.filter(order => !order.orderCompleted).length;
             
             // 本日と翌日の配送予定件数を計算
@@ -2646,6 +2649,7 @@ updateStatsFromView();
             
             document.getElementById('totalGross').textContent = `¥${totalGross.toLocaleString()}`;
             document.getElementById('totalNet').textContent = `¥${totalNet.toLocaleString()}`;
+            document.getElementById('totalTax').textContent = `¥${totalTax.toLocaleString()}`;
             document.getElementById('orderCount').textContent = `${monthOrders.length}件`;
             document.getElementById('incompleteCount').textContent = `${incomplete}件`;
             document.getElementById('todayDeliveryCount').textContent = `${todayDeliveries}件`;
@@ -2664,8 +2668,11 @@ function updateStatsFromView() {
 
     const visibleOrders = orders.filter(o => visibleIds.includes(String(o.id)));
 
-    const totalGross = visibleOrders.reduce((sum, o) => sum + (o.amountGross || 0), 0);
-    const totalNet   = visibleOrders.reduce((sum, o) => sum + (o.amountNet   || 0), 0);
+    // 請求書単位（顧客×月）で消費税を四捨五入（マネーフォワードと一致させる）
+    const invoiceTotals = calcInvoiceTotals(visibleOrders);
+    const totalGross = invoiceTotals.gross;
+    const totalNet   = invoiceTotals.net;
+    const totalTax   = invoiceTotals.tax;
     const count      = visibleOrders.length;
     const incomplete = visibleOrders.filter(o => !o.orderCompleted).length;
 
@@ -2680,6 +2687,8 @@ function updateStatsFromView() {
 
     document.getElementById('totalGross').textContent = `¥${totalGross.toLocaleString()}`;
     document.getElementById('totalNet').textContent   = `¥${totalNet.toLocaleString()}`;
+    const totalTaxEl = document.getElementById('totalTax');
+    if (totalTaxEl) totalTaxEl.textContent = `¥${totalTax.toLocaleString()}`;
     document.getElementById('orderCount').textContent = `${count}件`;
     document.getElementById('incompleteCount').textContent = `${incomplete}件`;
     const todayEl = document.getElementById('todayDeliveryCount');
@@ -5102,8 +5111,11 @@ async function exportInvoiceCSV() {
     };
     byCustomer[key].items.push(item);
     byCustomer[key].net   += item.amountNet;
-    byCustomer[key].gross += item.amountGross;
-    byCustomer[key].tax   += (item.amountGross - item.amountNet);
+  });
+  // 消費税は請求書（顧客）単位で税抜合計に対して1回だけ四捨五入（マネーフォワードの計算と一致させる）
+  Object.values(byCustomer).forEach(sum => {
+    sum.tax   = calcInvoiceTax(sum.net);
+    sum.gross = sum.net + sum.tax;
   });
 
   // 行生成：オブジェクト → HEADERS順に並べて出力（ズレ防止）

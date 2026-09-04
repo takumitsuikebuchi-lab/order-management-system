@@ -126,3 +126,45 @@ function normalizeForSearch(s) {
         return String(s == null ? '' : s).toLowerCase();
     }
 }
+
+/**
+ * 請求書1枚分の消費税（マネーフォワード準拠）。
+ * 税抜合計に税率を掛け、1円未満を「四捨五入」する（受注1件ごとには丸めない）。
+ * 整数の税抜額なら (net * rate) / 100 は誤差なく .5 まで表現できるため、Math.round がそのまま半上げになる。
+ * @param {unknown} net 税抜合計
+ * @param {number} [ratePercent=10] 税率（%）
+ * @returns {number} 消費税額（整数円）
+ */
+function calcInvoiceTax(net, ratePercent) {
+    const rate = (ratePercent === undefined || ratePercent === null) ? 10 : Number(ratePercent);
+    const n = toNumber(net);
+    return Math.round((n * rate) / 100);
+}
+
+/**
+ * 受注一覧から「顧客×月」＝請求書単位で消費税・税込合計を集計する（マネーフォワード準拠）。
+ * 受注ごとの税込額（amountGross）は使わず、税抜額（amountNet）だけを合計してから税を1回計算する。
+ * @param {Array<{customerName?: string, date?: string, amountNet?: unknown}>} orderList
+ * @param {number} [ratePercent=10]
+ * @returns {{net: number, tax: number, gross: number, groups: Array<{key: string, customerName: string, month: string, count: number, net: number, tax: number, gross: number}>}}
+ */
+function calcInvoiceTotals(orderList, ratePercent) {
+    /** @type {Record<string, {key: string, customerName: string, month: string, count: number, net: number, tax: number, gross: number}>} */
+    const map = {};
+    (orderList || []).forEach(o => {
+        const customerName = (o && o.customerName) ? String(o.customerName) : '(不明顧客)';
+        const month = (o && o.date) ? String(o.date).slice(0, 7) : '';
+        const key = month + '|' + customerName;
+        if (!map[key]) map[key] = { key, customerName, month, count: 0, net: 0, tax: 0, gross: 0 };
+        map[key].net += toNumber(o ? o.amountNet : 0);
+        map[key].count += 1;
+    });
+    let net = 0, tax = 0, gross = 0;
+    const groups = Object.values(map).map(g => {
+        g.tax = calcInvoiceTax(g.net, ratePercent);
+        g.gross = g.net + g.tax;
+        net += g.net; tax += g.tax; gross += g.gross;
+        return g;
+    });
+    return { net, tax, gross, groups };
+}
