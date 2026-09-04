@@ -20,7 +20,7 @@
 - `RUNBOOK.md`: 障害時の初動確認
 - `TEST_CHECKLIST.md`: 修正後の最低限確認項目
 - `schema.sql`: 新規環境構築時の DB スキーマ正本
-- `AGENTS.md`: AI ツール向けの保守メモ
+- `CLAUDE.md`（旧 `AGENTS.md` を 2026-07-02 に統合）: AI ツール向けの保守メモ（運用構成・緊急メンテ手順を含む）
 
 ### 直近の整理（2026-03-17）
 
@@ -33,16 +33,15 @@
 
 - 受注一覧の検索UIは `顧客検索` 1欄に統一
 - この欄は手入力による絞り込みと候補一覧からの選択の両方に対応
-- 顧客絞り込みの解除は右端の `クリア` ボタンで行う
-- 日付絞り込みの解除は `日付解除` ボタンで行う
+- 絞り込み（顧客・日付・ドライバー・車両・並び順）の解除は `🗑 すべてクリア` ボタン1本で行う（2026-04-17 に個別の `クリア` / `日付解除` から統一）
 - バックグラウンドのクラウド再同期が入っても、表示中の絞り込み条件は維持される
 
 ### バックアップ体制（2026-04-01）
 
 - **週次自動バックアップ**が `.github/workflows/weekly-backup.yml` で設定済み
-- 毎週水曜日の深夜0時（JST）にSupabaseから受注明細・顧客マスタを取得し、`backups/` フォルダにCSV保存
-- ファイル名例: `backups/2026-04-02_受注明細.csv` / `backups/2026-04-02_顧客マスタ.csv`
-- 初回バックアップは設定後の最初の水曜深夜0時に自動作成されます（それまで `backups/` フォルダは空です）
+- 毎週水曜日の深夜0時（JST）にSupabaseから受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）を取得し、`backups/` フォルダにCSV保存
+- ファイル名例: `backups/2026-04-22_受注明細.csv` / `backups/2026-04-22_顧客マスタ.csv` / `backups/2026-04-22_品名マスタ.csv` / `backups/2026-04-22_シンプルマスタ全体.csv`
+- 2026-04-08 から毎週蓄積されています（3年を超えた分は自動削除）
 - 緊急バックアップはGitHub → Actions → 「Weekly Backup」→「Run workflow」から即時実行可能
 - 受注データに影響する改修を行う前に、必ず最新のバックアップが存在することを確認する
 
@@ -76,8 +75,8 @@
 ## 受注一覧の絞り込みについて
 
 - `顧客検索` は、直接文字を打っても、候補一覧から顧客名を選んでも使えます
-- 顧客の絞り込みを解除したいときは、右端の `クリア` を押します
-- 日付の絞り込みを解除したいときは、`日付解除` を押します
+- 日付・ドライバー・車両のプルダウンでも絞り込めます
+- 絞り込みを解除したいときは、並び順の右隣にある `🗑 すべてクリア` を押します（顧客・日付・ドライバー・車両・並び順がまとめて解除されます）
 - クラウド同期が裏で走っても、表示中の絞り込み条件は維持されます
 
 ---
@@ -141,63 +140,10 @@ Supabaseの無料プランは**7日間アクセスがないと自動停止**し�
 
 ### 2. テーブル作成（SQL Editorで実行）
 
-```sql
--- 受注テーブル
-create table orders (
-  id uuid primary key default gen_random_uuid(),
-  order_no text unique not null,
-  date date,
-  customer_name text,
-  pickup_location text,
-  pickup_address text,
-  delivery_location text,
-  delivery_address text,
-  delivery_tel text,
-  cargo text,
-  quantity numeric,
-  unit text,
-  packaging text,
-  unit_price numeric,
-  amount_net numeric,
-  amount_gross numeric,
-  instructions text,
-  driver text,
-  vehicle text,
-  instruction_sheet boolean default false,
-  invoice_sent boolean default false,
-  payment_received boolean default false,
-  order_completed boolean default false,
-  created_at timestamptz default now()
-);
+テーブル定義の正本はリポジトリの `schema.sql` です。Supabase の SQL Editor に `schema.sql` の内容をそのまま貼り付けて実行してください。
 
--- 顧客マスタテーブル
-create table customers (
-  id uuid primary key default gen_random_uuid(),
-  customer_name text,
-  pickup_address text,
-  delivery_address text,
-  phone_number text,
-  created_at timestamptz default now()
-);
-
--- シンプルマスタテーブル（ドライバー・車両・積荷・荷姿・単位）
-create table simple_masters (
-  id uuid primary key default gen_random_uuid(),
-  master_type text not null,
-  name text not null,
-  sort_order integer default 0,
-  created_at timestamptz default now()
-);
-
--- RLS有効化・匿名アクセス許可
-alter table orders enable row level security;
-alter table customers enable row level security;
-alter table simple_masters enable row level security;
-
-create policy "allow_all_orders" on orders for all using (true) with check (true);
-create policy "allow_all_customers" on customers for all using (true) with check (true);
-create policy "allow_all_simple_masters" on simple_masters for all using (true) with check (true);
-```
+- `schema.sql` には `orders.updated_at` 列と `set_updated_at` トリガーが含まれています。これが無いと受注編集の競合検知（別端末で先に更新されていたら保存時に警告して止める仕様）が動きません
+- 本書に SQL を転記していた時期がありましたが、`schema.sql` と食い違いが生じたため 2026-09-04 に削除しました。SQL は必ず `schema.sql` から取ってください
 
 ### 3. 接続情報の取得
 - **Project URL**: Settings → General → Project ID から `https://{ID}.supabase.co`
@@ -220,7 +166,7 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 - `接続: Cloud（エラー）` や `接続: ローカル` の場合は、通信または設定を疑う
 - `cloud-config.json` が正しいか確認
 - そのブラウザで過去に `?manualCloudConfig=1` を使っていないか確認
-- ハードリロード後も差が出る場合は、AIツールに `SETUP.md` と `AGENTS.md` を読ませて対応する
+- ハードリロード後も差が出る場合は、AIツールに `SETUP.md` と `CLAUDE.md` を読ませて対応する
 
 ### データが0件になった
 - クラウドを有効にするとSupabase（空）のデータが表示される
@@ -262,6 +208,6 @@ create policy "allow_all_simple_masters" on simple_masters for all using (true) 
 1. 本番URL: `https://takumitsuikebuchi-lab.github.io/order-management-system/`
 2. 共通クラウド設定は `cloud-config.json` が正本
 3. 通常運用ではクラウド設定UIはロックされている
-4. まず `CLAUDE.md` `requirements.md` `AGENTS.md` `SETUP.md` を読んでから対応してほしい
+4. まず `CLAUDE.md` `requirements.md` `SETUP.md` を読んでから対応してほしい（`AGENTS.md` は `CLAUDE.md` へ統合済み）
 
 これで、運用方式の誤解による再設定ミスをかなり防げます。

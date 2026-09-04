@@ -1793,7 +1793,7 @@
             while (true) {
                 var end = start + pageSize - 1;
                 var res = await cloudFetchRetry(
-                    base + '/orders?select=*&order=date.asc&order=order_no.asc',
+                    base + '/orders?select=*&order=date.asc,order_no.asc',
                     { headers: Object.assign({}, supabaseHeaders(), { 'Range': start + '-' + end, 'Prefer': 'count=exact' }), cache: 'no-store' },
                     { retries: retries, timeoutMs: timeoutMs }
                 );

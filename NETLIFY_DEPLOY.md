@@ -32,4 +32,4 @@ Netlify は現行の標準手順ではありません。
 ## 参考
 
 - 現行の保守手順は `SETUP.md`
-- AI向けの運用前提は `AGENTS.md`
+- AI向けの運用前提は `CLAUDE.md`

@@ -178,7 +178,7 @@ async function seedConflictMode(page) {
     });
   });
 
-  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc,order_no.asc', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -231,7 +231,7 @@ async function seedRefreshCloudMode(page, updatedOrders) {
     });
   });
 
-  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc,order_no.asc', async route => {
     orderFetchCount += 1;
     await route.fulfill({
       status: 200,
@@ -284,7 +284,7 @@ async function seedQueueRecoveryCloudMode(page) {
     });
   });
 
-  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc,order_no.asc', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -391,7 +391,7 @@ async function seedEmptyMastersCloudMode(page) {
     });
   });
 
-  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc&order=order_no.asc', async route => {
+  await page.route('https://example.supabase.co/rest/v1/orders?select=*&order=date.asc,order_no.asc', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
