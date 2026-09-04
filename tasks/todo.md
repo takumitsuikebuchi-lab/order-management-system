@@ -448,7 +448,7 @@ R260903-014（梶原農場）の金額(税別)が 1,500×32=48,000 のはずが 
 - [x] weekly-backup.yml をデプロイキー経由で非公開リポへ push する方式に変更（この公開リポへの書込権限は外した）
 - [x] backups/ と CSV保存/ を git 追跡から外し .gitignore に追加（CSV保存/ はアプリの保存先としてローカルに残す）
 - [x] README / SETUP / CLAUDE.md / CHANGELOG を更新
-- [ ] git filter-repo で main/master の履歴から backups/ と CSV保存/ を除去し force push
-- [ ] 検証: 本番URLで顧客マスタCSVが404、GitHub履歴に残っていない、Weekly Backup を手動実行して kyoshin-order-backups に入る
+- [x] git filter-repo で main/master の履歴から backups/ と CSV保存/ を除去し force-with-lease で push（171→148コミット。旧SHA 3a3f530 は GitHub のキャッシュで当面参照可＝サポート依頼で消す）
+- [x] 検証: 本番URLで backups/・CSV保存/ のCSVが404（Pages は force push では自動再ビルドされず、`gh api -X POST .../pages/builds` で明示要求して反映）、GitHub API で backups を触ったコミット0件、Weekly Backup 手動実行 success → kyoshin-order-backups に 2026-09-04 の8ファイル追加（計174件）
 - [ ] GitHub サポートへ「削除済みデータのキャッシュ消去」依頼（ユーザー操作。依頼文は下書き済み）
 - 備考: 残る課題＝Supabase anon key が公開ページに埋め込まれ RLS が全許可（DB自体は誰でも読み書き可）。別途対策が必要

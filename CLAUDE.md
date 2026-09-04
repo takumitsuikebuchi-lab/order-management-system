@@ -154,6 +154,7 @@
 - **`<input type="number">` はフォーカス中にマウスホイール／↑↓キーで値が1ずつ増減する**（Chrome標準動作）→ 受注フォームの数量・単価・金額(税別)には `onwheel="this.blur()"` と ArrowUp/Down の preventDefault を付けてある（2026-09-04。48,000円が保存時に47,998円になっていた事故の原因）。数値入力欄を新設するときも同じ属性を付けること
 - **受注番号の日付部分は「登録した日」**（新規登録時に今日の日付で採番し、その後「日付」欄を配送日に変えても番号は変わらない）。番号と日付欄が違うのは仕様であり不具合ではない
 - **Supabase REST（PostgREST）の並び順は `order=a.asc,b.asc` とカンマで1つにまとめる** → `&order=a.asc&order=b.asc` と2回書くと2つ目のキーが効かない（2026-09-04 本番で実測。同日内の受注番号順が崩れていた）。テストの `page.route()` はURL文字列の完全一致なので、クエリを変えたらテスト側も同時に直す
+- **履歴を書き換えて force push した直後は GitHub Pages が自動再ビルドされないことがある**（2026-09-04 実測）→ `gh api -X POST repos/<owner>/<repo>/pages/builds` でビルドを明示要求し、`pages/builds/latest` の commit が新SHAになるまで待ってから疎通確認する。なお `git push --force` は guard-bash フックで禁止＝`--force-with-lease=refs/heads/<branch>:<旧SHA>` を使う
 - **このリポジトリは Public（GitHub Pages は無料プランでは公開リポジトリのみ）** → 顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリの手動出力CSV）を絶対にコミットしない。`backups/`・`CSV保存/` は .gitignore 済み。2026-09-04 に過去分を非公開リポジトリ `kyoshin-order-backups` へ移設し、履歴からも除去した（Pages は master の全ファイルを配信するので、コミット＝公開）
 
 詳細は `tasks/lessons.md` を参照。
