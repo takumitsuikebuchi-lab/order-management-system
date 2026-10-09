@@ -22,7 +22,7 @@
 - **変更履歴**: 重要変更を `CHANGELOG.md` に整理
 - **保守メモ**: AIツール向けの判断材料を `CLAUDE.md` に整理（旧 `AGENTS.md` は 2026-07-02 に統合済み）
 - **Claude Code指示書**: Claude Codeがこのプロジェクトを正しく扱うための指示を `CLAUDE.md` に整理
-- **週次自動バックアップ**: 毎週水曜深夜0時（JST）に受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）をCSV出力し、**非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/` に保存**（2026-09-04 に公開リポジトリ内の `backups/` から移設。3年超は自動削除）
+- **自動バックアップ**: 毎日 深夜0時（JST）に受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）をCSV出力し、非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) に保存（日次分は35日・水曜分は3年保持。件数がサーバーの総数と一致しないと失敗して通知される）
 
 ## 🚀 使い始める
 
@@ -81,7 +81,7 @@ npx http-server -p 4173
 - ✅ Supabaseクラウド同期
 - ✅ CSV取込・出力
 - ✅ CSV保存先フォルダ設定（File System Access API・対応ブラウザのみ）
-- ✅ 週次自動バックアップ（毎週水曜深夜0時・受注明細・顧客マスタ・簡易マスタ6種を非公開リポジトリ kyoshin-order-backups に保存）
+- ✅ 自動バックアップ（毎日深夜0時・受注明細・顧客マスタ・簡易マスタ6種を非公開リポジトリ kyoshin-order-backups に保存）
 
 ## 🛠️ 技術仕様
 
@@ -114,7 +114,6 @@ order-management-system/
 ├── playwright.config.js          # Playwright設定
 ├── .github/workflows/
 │   ├── guard-and-sync.yml        # CI/CD（テスト → main→master自動同期）
-│   └── weekly-backup.yml         # 週次自動バックアップ（毎週水曜深夜0時JST）
 ├── tests/smoke.spec.js           # UIスモークテスト
 ├── tasks/
 │   ├── todo.md                   # タスク管理ログ
@@ -143,11 +142,11 @@ order-management-system/
 ## 💡 ヒント
 
 ### データのバックアップ
-- **週次自動バックアップが設定済みです**（毎週水曜深夜0時・非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/` に保存）
+- **自動バックアップが設定済みです**（毎日深夜0時・非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/daily/`（35日）と `backups/`（水曜分・3年）に保存。処理本体も kyoshin-order-backups 側にある）
 - 2026-04-08 からの全世代を kyoshin-order-backups に蓄積しています（3年を超えた分は自動削除）。顧客名・住所・電話番号を含むため、この公開リポジトリには置きません（2026-09-04 に移設・履歴からも削除）
 - アプリの「CSV保存先フォルダ設定」で保存した `CSV保存/` も同じ理由で git 追跡対象外（.gitignore）です
 - 手動バックアップも引き続き「CSV出力」で取得できます
-- 緊急バックアップは GitHub → Actions → 「Weekly Backup」→「Run workflow」で即時実行できます
+- 緊急バックアップは kyoshin-order-backups の Actions → 「Backup」→「Run workflow」で即時実行できます
 
 ### トラブルシューティング
 - データが表示されない → ブラウザのキャッシュをクリア

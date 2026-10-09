@@ -77,7 +77,7 @@
 | `schema.sql` | Supabaseのテーブル定義 |
 | `tests/smoke.spec.js` | Playwrightによる自動UIテスト（48件） |
 | `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
-| `.github/workflows/weekly-backup.yml` | 週次バックアップ（火曜15:00 UTC、3年超は自動削除）。出力先は**非公開リポジトリ `kyoshin-order-backups`**（デプロイキー `BACKUP_DEPLOY_KEY` で push。2026-09-04 変更） |
+| （バックアップ） | 処理本体は**非公開リポジトリ `kyoshin-order-backups`** の `.github/workflows/backup.yml` と `scripts/backup.py`（毎日 0:00 JST、2026-10-09 にこのリポジトリから移設）。このリポジトリには無い |
 
 ### 主な機能（ボタン）
 - 📊 当月CSV出力 / 💰 請求書CSV（MF用） / 📁 CSV取込
@@ -143,7 +143,7 @@
 - `cloud-config.json` 関連の変更は「危険な変更」ではなく「意図された設計」なので、差し戻さない
 - バックグラウンド同期後に一覧が全件に戻るのはフィルタ保持のバグ（データ消失ではない）
 - **`cloudSaveCustomers()` を新規追加1件のために呼ぶな** → 全件DELETE+再INSERTになり、保存中リロードで全顧客消失する。1件追加には `cloudInsertCustomer()` を使う
-- **Supabase REST はデフォルト1,000件上限** → 大量データを取得するときは必ずページング（Range ヘッダ）か limit 指定を入れる
+- **Supabase REST はデフォルト1,000件上限** → 大量データを取得するときは必ずページング（Range ヘッダ）か limit 指定を入れる。**1ページの大きさを1,000より大きくしても1,000件しか返らない**ので、次の開始位置は「要求した件数」ではなく「実際に受け取った件数」で進める（2026-10-09: 週次バックアップが page_size=10000 で1,000件頭打ちになり、2か月分の受注がバックアップされていなかった）。件数は `wc -l` でなくCSVとして読み直して数える（備考の改行で増える）
 - **URLにIDを並べる `?id=in.(...)` 方式は件数が増えると壊れる** → 件数が多いDELETEは `?id=not.is.null` などURLに依存しない方式を使う
 - **受注一覧の既定は「当月のみ」** → レンジ表示・複数月同時表示は拒否された履歴あり。情報密度を上げる改善は事前にユーザー確認（既定は当月。明示的に押したときだけ全期間になる「📚 全件表示」ボタンは2026-04-18に導入済み）
 - **`getByRole('button', { name: '←' })` は aria-label で上書きされる** → ボタンにaria-labelを付けたら、テストのセレクタも aria-label 名（`'前月へ'` 等）に合わせる
@@ -195,9 +195,9 @@
 5. 1ブラウザだけおかしい場合は、そのセッションが手動オーバーライドされていないか確認
 
 ### バックアップ
-- 週次自動バックアップ: `.github/workflows/weekly-backup.yml`（毎週火曜 15:00 UTC ＝ 日本時間 水曜 0:00。workflow の cron は `0 15 * * 2`。旧 AGENTS.md の「水曜 15:00 UTC」表記は誤りだった）
+- 自動バックアップ: 非公開リポジトリ `kyoshin-order-backups` の `.github/workflows/backup.yml`（cron `0 15 * * *` ＝ 毎日 日本時間 0:00）。`backups/daily/` は35日、水曜分の `backups/` は3年保持。件数がサーバー総数と一致しないと失敗し、Issue が自動作成される。2026-10-09 にこのリポジトリの weekly-backup.yml から移設（①PostgREST の1,000行上限で 2026-08-12〜10-07 の受注明細が先頭1,000件しか入っていなかった ②公開リポジトリの定期実行は60日間コミットなしで自動停止される、の2点への対策）
 - `orders`・`customers`・`simple_masters` を `backups/YYYY-MM-DD_受注明細.csv`・`backups/YYYY-MM-DD_顧客マスタ.csv`・簡易マスタ6種（`品名マスタ` / `荷姿マスタ` / `単位マスタ` / `ドライバーマスタ` / `車両マスタ` / `シンプルマスタ全体`）へCSV出力（UTF-8 BOM付き。2026-04-17 に6種へ拡張）。**保存先は非公開リポジトリ `kyoshin-order-backups`**（2026-09-04 移設。それ以前はこのリポジトリの `backups/` に置いていたが、公開リポジトリのため履歴ごと削除した）
-- 手動実行は GitHub Actions タブ → "Weekly Backup" → "Run workflow"
+- 手動実行は kyoshin-order-backups の Actions タブ → "Backup" → "Run workflow"（入力「通知テスト」でわざと失敗させ、Issue 通知を確認できる）
 - 受注データに触れる改修の前に、非公開リポジトリ `kyoshin-order-backups` の `backups/` に最近のバックアップがあることを必ず確認する（このリポジトリ内に `backups/` は無い）
 
 ### 設計上の意図（変更時に壊さないこと）

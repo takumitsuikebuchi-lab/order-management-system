@@ -38,12 +38,12 @@
 
 ### バックアップ体制（2026-04-01 開始・2026-09-04 保存先を非公開リポジトリへ変更）
 
-- **週次自動バックアップ**が `.github/workflows/weekly-backup.yml` で設定済み
-- 毎週水曜日の深夜0時（JST）にSupabaseから受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）を取得し、**非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/`** にCSV保存（このリポジトリは公開なので顧客データは置かない）
+- **自動バックアップ**は 非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `.github/workflows/backup.yml` で動いている（2026-10-09 にこのリポジトリから移設。公開リポジトリの定期実行は60日間コミットが無いと自動停止されるため）
+- 毎日 深夜0時（JST）にSupabaseから受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）を取得し、`backups/daily/`（35日保持）に保存。水曜日の分は `backups/`（3年保持）にも保存する。書き出したCSVの行数がサーバーの総件数と一致しないと失敗し、kyoshin-order-backups に Issue が作られて通知が届く
 - ファイル名例: `backups/2026-04-22_受注明細.csv` / `backups/2026-04-22_顧客マスタ.csv` / `backups/2026-04-22_品名マスタ.csv` / `backups/2026-04-22_シンプルマスタ全体.csv`（保存先は kyoshin-order-backups 側）
-- 接続はデプロイキー方式: 秘密鍵はこのリポジトリの Actions Secrets `BACKUP_DEPLOY_KEY`、公開鍵は kyoshin-order-backups の Deploy keys（書込可）。鍵を差し替えるときは両方を更新する
+- 接続設定は毎回このリポジトリの `cloud-config.json`（公開URL）を読む。キーを変えたら `cloud-config.json` を直せばバックアップ側も追随する
 - 2026-04-08 から毎週蓄積されています（3年を超えた分は自動削除）
-- 緊急バックアップはGitHub → Actions → 「Weekly Backup」→「Run workflow」から即時実行可能
+- 緊急バックアップは kyoshin-order-backups の Actions → 「Backup」→「Run workflow」から即時実行可能（「通知テスト」にチェックすると、わざと失敗させて通知が届くか確かめられる）
 - 受注データに影響する改修を行う前に、必ず最新のバックアップが存在することを確認する
 
 ### 自動確認の現在地（2026-03-19）
