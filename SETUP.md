@@ -8,7 +8,8 @@
 | Supabaseプロジェクト | 本番共有プロジェクト |
 | Project ID | `xrmczawpwpctbpuebddi` |
 | Project URL | `https://xrmczawpwpctbpuebddi.supabase.co` |
-| 公開キー | `cloud-config.json` に保存（現在は旧形式の anon キー `eyJ...`。新形式 `sb_publishable_...` にも対応済み。下の「公開キーを新形式に切り替える」参照） |
+| 公開キー | `cloud-config.json` に保存。2026-10-09 に新形式の Publishable key（`sb_publishable_...`、名前 default）へ切替済み。旧形式の anon キーはまだ有効（無効化は `tasks/todo.md` 参照） |
+| Supabase アカウント | きょうしん輸送さんの Google アカウントで作った組織（Free プラン・請求なし）。保守担当の個人アカウントの組織とは別 |
 | デフォルトブランチ | `main` |
 | 配信 | GitHub Actions がテスト合格後に GitHub Pages へ反映（2026-10-09〜）。`master` は `main` のミラー（配信には使わない） |
 
@@ -153,6 +154,8 @@ Supabaseの無料プランは**1週間データベースへのアクセスがな
 
 ## 公開キーを新形式（sb_publishable_）に切り替える
 
+**2026-10-09 に切替済み**（手順1〜5を実施。6の旧キー無効化は様子見中）。キーを作り直すときも同じ手順で行う。
+
 Supabase は旧形式の anon キー（`eyJ...`）を **2026年末までに廃止予定**（2026-10-09 に公式ドキュメントで確認）。アプリ・バックアップ・CI は新形式に対応済みなので、次の手順だけで切り替わる。
 
 1. Supabase ダッシュボード → Settings → API Keys で Publishable key を作成（旧キーはまだ無効化しない）
@@ -198,7 +201,9 @@ Supabase は旧形式の anon キー（`eyJ...`）を **2026年末までに廃�
 
 ### Supabaseの無料プランについて
 - 1週間アクセスがないと一時停止する（毎日の自動バックアップがアクセスするので通常は停止しない）
-- 無料枠の通信量（月5GB）に対し、60秒ごとの同期は全件取得だと1端末あたり月1.5GB前後。差分取得（月0.2GB程度）は、DB に更新日時の自動更新（migrations/2026-10-09_... の `trg_orders_updated_at`）を入れると自動で有効になる
+- 無料枠の通信量は月5GB。2026-09-20〜10-09 で 1.9GB 使っていた（全件取得の60秒同期のため）。2026-10-09 に DB へ更新日時の自動更新を入れ、差分取得（1端末あたり月0.2GB程度）に切り替わった
+- 無料プランは猶予期間が終わっており、使用量が上限を超えると API が 402 で止められる可能性がある（管理画面の表示。2026-10-09 確認）。通信量は Supabase の組織の Usage で確認できる
+- 無料プランには Supabase 側の自動バックアップが無い（管理画面で「No backups」）。バックアップは kyoshin-order-backups の毎日の CSV だけ
 - 停止した場合は上記「Supabaseが停止した場合の対処」を参照
 
 ---
@@ -207,7 +212,7 @@ Supabase は旧形式の anon キー（`eyJ...`）を **2026年末までに廃�
 
 - 公開キーは共通設定 `cloud-config.json` とブラウザのlocalStorageに保持される。公開リポジトリ・公開ページにあるので、キー自体は秘密ではない
 - データベース側の権限（RLS）は「誰でも読み書き可」の設定のまま。ログインの導入などの強化策は `tasks/todo.md` の未対応項目を参照
-- 誤操作や第三者による一括削除を防ぐ DB の保護（`migrations/2026-10-09_bulk_delete_guard_and_indexes.sql`）を用意済み。適用状況は `tasks/todo.md` を参照
+- 誤操作や第三者による一括削除を防ぐ DB の保護（`migrations/2026-10-09_bulk_delete_guard_and_indexes.sql`）は 2026-10-09 に本番へ適用済み。受注は1回に1行、顧客・マスタは1回に50行を超える削除がエラーになる
 - 旧形式の anon キーはローテーション（作り直し）ができない。新形式（Publishable key）に切り替えれば、作成・無効化ができるようになる
 - 秘密キー（`sb_secret_...`）・service_role キーはブラウザ・リポジトリのどこにも置かない
 
