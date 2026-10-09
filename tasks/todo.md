@@ -536,3 +536,4 @@ R260903-014（梶原農場）の金額(税別)が 1,500×32=48,000 のはずが 
 - Supabase 側の自動バックアップは無い（Free）。バックアップは kyoshin-order-backups のみ
 - [ ] 旧形式 anon キーの無効化（新キーで1週間ほど問題が無ければ、Settings → API Keys → Legacy で無効化。取り消し可）
 - [ ] 1週間後に通信量（Usage の Egress）が減っているか確認
+- 上の2つは 2026-10-16 10:00 に自動実行される予約タスク（Claude デスクトップの scheduled task「kyoshin-order-system-1week-check」）で確認・実施する。アプリが閉じていれば次回起動時に実行
