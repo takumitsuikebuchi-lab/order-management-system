@@ -1,4 +1,10 @@
-name: Guard And Sync
+name: Guard And Deploy
+
+# main への push で「チェック → テスト → 合格したときだけ本番（GitHub Pages）へ反映」する。
+# 2026-10-09 変更: 以前は master ブランチを Pages がそのまま配信しており、テストに落ちても本番に出る経路があった。
+#   今は Pages の配信元を「GitHub Actions」にし、テスト合格後に deploy ジョブが配信する。
+#   配信するのはアプリに必要なファイル（index.html / styles.css / utils.js / cloud-config.json）だけ。
+#   master は main のミラーとして残している（配信には使っていない）。
 
 on:
   push:
@@ -8,65 +14,84 @@ on:
   pull_request:
     branches:
       - main
+      - master
+  workflow_dispatch:
 
 concurrency:
-  group: guard-and-sync-${{ github.ref }}
-  cancel-in-progress: true
+  group: guard-and-deploy-${{ github.ref }}
+  # PR の検証は新しい push で打ち切ってよいが、本番反映の途中では止めない
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Verify shared config exists
-        run: test -f cloud-config.json
-
-      - name: Verify shared config shape
-        run: |
-          node -e "const cfg=require('./cloud-config.json'); if (!cfg.url || !cfg.anonKey || typeof cfg.enabled !== 'boolean') { throw new Error('cloud-config.json is invalid'); }"
-
-      - name: Verify index.html fallback matches cloud-config.json
-        run: |
-          node -e "
-            const fs = require('fs');
-            const cfg = require('./cloud-config.json');
-            const html = fs.readFileSync('index.html', 'utf8');
-            // EMBEDDED_SHARED_CLOUD_CONFIG ブロックだけを対象に抽出して厳密比較する
-            const embMatch = html.match(/EMBEDDED_SHARED_CLOUD_CONFIG\s*=\s*\{([\s\S]*?)\};/);
-            if (!embMatch) throw new Error('EMBEDDED_SHARED_CLOUD_CONFIG block not found in index.html');
-            const block = embMatch[1];
-            const urlMatch = block.match(/url:\s*'(https:\/\/[a-z0-9-]+\.supabase\.co)'/);
-            const keyMatch = block.match(/anonKey:\s*'(eyJ[^']{50,})'/);
-            const enabledMatch = block.match(/enabled:\s*(true|false)/);
-            if (!urlMatch) throw new Error('Embedded URL not found');
-            if (!keyMatch) throw new Error('Embedded anonKey not found');
-            if (!enabledMatch) throw new Error('Embedded enabled flag not found');
-            if (urlMatch[1] !== cfg.url) throw new Error('Embedded URL does not match cloud-config.json: ' + urlMatch[1]);
-            if (keyMatch[1] !== cfg.anonKey) throw new Error('Embedded anonKey does not match cloud-config.json');
-            if ((enabledMatch[1] === 'true') !== cfg.enabled) throw new Error('Embedded enabled flag does not match cloud-config.json');
-            console.log('OK: embedded fallback matches cloud-config.json (url/anonKey/enabled)');
-          "
-
-      - name: Verify index.html script syntax
-        run: |
-          node -e "const fs=require('fs'); const vm=require('vm'); const html=fs.readFileSync('index.html','utf8'); const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]; if(!scripts.length) throw new Error('script not found'); scripts.forEach((m,i)=>new vm.Script(m[1],{filename:'script-'+i+'.js'}));"
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install test dependencies
         run: npm ci
 
+      - name: 共有クラウド設定の照合と構文チェック（ES2019 まで）
+        run: npm run check
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Run UI smoke tests
+      - name: Run UI tests
         run: npm run test:ui
+
+      - name: 失敗したテストの記録を保存（Actions の画面からダウンロードできる）
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+      - name: 配信するファイルだけを集める
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p _site
+          cp index.html styles.css utils.js cloud-config.json _site/
+          touch _site/.nojekyll
+
+      - name: 配信用ファイルを保存
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: 本番（GitHub Pages）へ反映
+        id: deployment
+        uses: actions/deploy-pages@v5
 
   sync-master:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -76,12 +101,12 @@ jobs:
       contents: write
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
 
-      - name: Push main to master
+      - name: Push main to master（ミラー）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

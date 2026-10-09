@@ -48,7 +48,7 @@ Supabase の orders / customers / simple_masters に接続
         </div>
         <div class="box">
           <h3>GitHub Actions</h3>
-          <p><code>Guard And Sync</code> が push 後に UI smoke test を実行し、通過後に <code>master</code> へ同期します。</p>
+          <p><code>Guard And Deploy</code> が push 後に設定の照合・構文チェック・UI テストを実行し、合格したときだけ GitHub Pages（本番）へ反映します。バックアップは非公開リポジトリ kyoshin-order-backups が毎日取得します。</p>
         </div>
         <div class="box">
           <h3>cloud-config.json</h3>

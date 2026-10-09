@@ -69,18 +69,19 @@
 
 | ファイル | 役割 |
 |---|---|
-| `index.html` | アプリ本体（約5,200行）。ほぼ全機能がここに |
+| `index.html` | アプリ本体（約5,300行）。ほぼ全機能がここに |
 | `styles.css` | UIスタイル（2026-04-18 に index.html から切り出し） |
-| `utils.js` | 純関数ユーティリティ10個（`// @ts-check` + JSDoc 型注釈付き。2026-09-04 に `calcInvoiceTax` / `calcInvoiceTotals` を追加） |
-| `setup-wizard.html` | 初回セットアップ画面 |
+| `utils.js` | 純関数ユーティリティ16個（`// @ts-check` + JSDoc 型注釈付き。税計算・JST日付 `toYmdLocal`・日付検証・真偽値解釈・通信エラー判定など。2026-10-09 に6個追加） |
 | `cloud-config.json` | 共有クラウド設定の**正本** |
-| `schema.sql` | Supabaseのテーブル定義 |
-| `tests/smoke.spec.js` | Playwrightによる自動UIテスト（48件） |
-| `.github/workflows/guard-and-sync.yml` | CI/CD（テスト実行 → main→masterへの自動同期、フォールバック設定の厳密照合） |
+| `schema.sql` | Supabaseのテーブル定義（2026-10-09 に本番の列構成へ合わせた） |
+| `migrations/` | DB への追加変更（日付順に実行）。`2026-10-09_bulk_delete_guard_and_indexes.sql` は**未適用**（ユーザー確認待ち。状況は tasks/todo.md） |
+| `scripts/check-app.js` | `npm run check`: cloud-config.json と埋め込み設定の照合＋ ES2019 構文チェック（acorn） |
+| `tests/smoke.spec.js` / `tests/regression.spec.js` | Playwright の UI テスト（48件＋19件＝67件）。regression は偽の Supabase（メモリ上の PostgREST もどき）で同期・マスタ保存・キューを検証する |
+| `.github/workflows/guard-and-sync.yml` | Guard And Deploy: `npm run check` → UI テスト → **合格したときだけ GitHub Pages へ反映**（Pages の配信元は GitHub Actions。2026-10-09〜）→ master へミラー |
 | （バックアップ） | 処理本体は**非公開リポジトリ `kyoshin-order-backups`** の `.github/workflows/backup.yml` と `scripts/backup.py`（毎日 0:00 JST、2026-10-09 にこのリポジトリから移設）。このリポジトリには無い |
 
 ### 主な機能（ボタン）
-- 📊 当月CSV出力 / 💰 請求書CSV（MF用） / 📁 CSV取込
+- 📊 当月CSV出力 / 💰 請求書CSV（MF用・0円の受注があれば出力前に確認） / 📁 CSV取込（バックアップCSVも可。既存受注を書き換えるときは確認、空欄は既存値を保持）
 - **📑 月次レポートPDF**（2026-05-26追加・巡回指導用）
   - 実装方式: `window.open()` + `window.print()` （html2pdf.js はバンドル版がhtml2canvasをグローバル公開しないため非採用）
   - 新規ウィンドウに整形済HTMLを書き込み、`@page A4 landscape` の印刷専用CSSで印刷ダイアログを自動表示
@@ -142,20 +143,28 @@
 - テストがCIでだけ落ちる → テストの書き方が脆い可能性を疑う（本番の不具合とは別に考える）
 - `cloud-config.json` 関連の変更は「危険な変更」ではなく「意図された設計」なので、差し戻さない
 - バックグラウンド同期後に一覧が全件に戻るのはフィルタ保持のバグ（データ消失ではない）
-- **`cloudSaveCustomers()` を新規追加1件のために呼ぶな** → 全件DELETE+再INSERTになり、保存中リロードで全顧客消失する。1件追加には `cloudInsertCustomer()` を使う
+- **マスタを「全件削除→全件登録」で保存してはいけない**（2026-10-09 に `cloudSaveCustomers` / `cloudSaveSimpleMaster` を廃止）→ 途中で通信が切れると全端末からマスタが消える（空マスタは正しいデータとして同期される仕様のため）。保存は `cloudSyncCustomers(desired, removedIds)` / `cloudSyncSimpleMaster(type, names, removedNames)` で差分だけ送る。削除してよいのは「この画面で利用者が消したもの」だけ（画面を開いたときの一覧との差）。1件追加は `cloudInsertCustomer()`
 - **Supabase REST はデフォルト1,000件上限** → 大量データを取得するときは必ずページング（Range ヘッダ）か limit 指定を入れる。**1ページの大きさを1,000より大きくしても1,000件しか返らない**ので、次の開始位置は「要求した件数」ではなく「実際に受け取った件数」で進める（2026-10-09: 週次バックアップが page_size=10000 で1,000件頭打ちになり、2か月分の受注がバックアップされていなかった）。件数は `wc -l` でなくCSVとして読み直して数える（備考の改行で増える）
-- **URLにIDを並べる `?id=in.(...)` 方式は件数が増えると壊れる** → 件数が多いDELETEは `?id=not.is.null` などURLに依存しない方式を使う
+- **URLにIDを並べる `?id=in.(...)` 方式は件数が増えると壊れる** → 50件ずつに分けて送る（`postgrestInList`）。値は `"..."` で囲む。`?id=not.is.null` の全件DELETEはアプリから使わない（DB 側の一括削除ガードを適用すると拒否される）
 - **受注一覧の既定は「当月のみ」** → レンジ表示・複数月同時表示は拒否された履歴あり。情報密度を上げる改善は事前にユーザー確認（既定は当月。明示的に押したときだけ全期間になる「📚 全件表示」ボタンは2026-04-18に導入済み）
 - **`getByRole('button', { name: '←' })` は aria-label で上書きされる** → ボタンにaria-labelを付けたら、テストのセレクタも aria-label 名（`'前月へ'` 等）に合わせる
 - **クイックバーに同名ボタンが複製されている** → テストで業務・マスタボタンを掴むときは `page.locator('.action-bar').getByRole(...)` のようにスコープする（素の `page.getByRole` は strict mode 違反になる）
-- **`schema.sql` の `orders.id` は `uuid` 定義だが、本番DBの実IDは整数連番**（2026-07-17確認）。アプリは挿入・更新で `id` を送らない（`delete insertBody.id`）ので動作に影響はないが、DB再構築時は実態に合わせること
+- **本番DBの `orders.id` は整数連番、顧客・各種マスタの id は uuid**（schema.sql は 2026-10-09 に実態へ合わせた）。アプリは受注の挿入・更新で `id` を送らず `order_no` で行を特定する。anon キーでは本番のスキーマ（既定値・制約）を読めない（OpenAPI は 401）ので、列の確認はバックアップCSVの見出しで行う
 - **列3〜5（顧客名・引取先・配送先）には折り返し用の `vertical-align: top` 個別ルールがある** → 見出し・セルの縦位置を変えるときは `#orderTable th:nth-child(n)` の優先度に注意
 - **売上高（税込）は行の税込額の合計ではない** → 請求書単位（顧客×月）で消費税を四捨五入する仕様（2026-09-04）。「行を足すと数円合わない」は不具合ではない。**単価×数量≠金額(税別)の受注はMF側で金額が変わる**（MFは単価×数量で再計算）ので、税ではなく入力の問題として案内する
 - **`<input type="number">` はフォーカス中にマウスホイール／↑↓キーで値が1ずつ増減する**（Chrome標準動作）→ 受注フォームの数量・単価・金額(税別)には `onwheel="this.blur()"` と ArrowUp/Down の preventDefault を付けてある（2026-09-04。48,000円が保存時に47,998円になっていた事故の原因）。数値入力欄を新設するときも同じ属性を付けること
-- **受注番号の日付部分は「登録した日」**（新規登録時に今日の日付で採番し、その後「日付」欄を配送日に変えても番号は変わらない）。番号と日付欄が違うのは仕様であり不具合ではない
+- **受注番号の日付部分は「登録した日」（日本時間）**（新規登録時に今日の日付で採番し、その後「日付」欄を配送日に変えても番号は変わらない）。番号と日付欄が違うのは仕様であり不具合ではない。登録後は編集画面で番号を変更できない（2026-10-09〜）
+- **「今日」を `new Date().toISOString().split('T')[0]` で作ってはいけない** → UTC なので日本時間 0〜9時は前日になる（2026-10-09 に実データ23件の受注番号が前日付だったのを発見）。`utils.js` の `toYmdLocal()` を使う。テストは playwright.config.js で `timezoneId: 'Asia/Tokyo'` に固定済み
 - **Supabase REST（PostgREST）の並び順は `order=a.asc,b.asc` とカンマで1つにまとめる** → `&order=a.asc&order=b.asc` と2回書くと2つ目のキーが効かない（2026-09-04 本番で実測。同日内の受注番号順が崩れていた）。テストの `page.route()` はURL文字列の完全一致なので、クエリを変えたらテスト側も同時に直す
-- **履歴を書き換えて force push した直後は GitHub Pages が自動再ビルドされないことがある**（2026-09-04 実測）→ `gh api -X POST repos/<owner>/<repo>/pages/builds` でビルドを明示要求し、`pages/builds/latest` の commit が新SHAになるまで待ってから疎通確認する。なお `git push --force` は guard-bash フックで禁止＝`--force-with-lease=refs/heads/<branch>:<旧SHA>` を使う
-- **このリポジトリは Public（GitHub Pages は無料プランでは公開リポジトリのみ）** → 顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリの手動出力CSV）を絶対にコミットしない。`backups/`・`CSV保存/` は .gitignore 済み。2026-09-04 に過去分を非公開リポジトリ `kyoshin-order-backups` へ移設し、履歴からも除去した（Pages は master の全ファイルを配信するので、コミット＝公開）
+- **本番反映は GitHub Actions の deploy ジョブ**（2026-10-09〜。以前の「master を Pages がそのまま配信」は廃止）→ 反映の確認は Actions の Guard And Deploy の成否と本番URLで行う。`git push --force` は guard-bash フックで禁止＝必要なら `--force-with-lease=refs/heads/<branch>:<旧SHA>`
+- **このリポジトリは Public（GitHub Pages は無料プランでは公開リポジトリのみ）** → 顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリの手動出力CSV）を絶対にコミットしない。`backups/`・`CSV保存/` は .gitignore 済み。2026-09-04 に過去分を非公開リポジトリ `kyoshin-order-backups` へ移設し、履歴からも除去した。**コードやテストにも実在の顧客名・従業員名・電話番号を書かない**（2026-10-09 に既定マスタ・サンプル・テストから除去。ドライバー2名の固定色は名前のハッシュで指定＝`COLOR_OVERRIDES`）
+- **公開リポジトリの定期実行（schedule）は60日間コミットが無いと自動停止される**（GitHub 公式）→ 定期処理（バックアップ等）は非公開リポジトリ側に置く
+- **同期キュー（未送信の変更）の作法**（2026-10-09 に作り直し）→ キュー項目は `qid` を持ち、送信に成功した項目だけを「今のキュー」から取り除く。キューからの再送は `cloudUpsertOrder / cloudUpdateOrder / cloudBatchUpdate / cloudDeleteOrderByOrderNo` を `{ fromQueue: true }` で呼び、失敗したら例外を投げる（関数内で再びキューに積まない）。400 など何度送っても通らない変更は `cloudSyncFailed` に退避して後続を止めない（右上の表示を押すと確認できる）。以前は失敗した更新・削除を黙って捨てていた
+- **定期同期は差分取得**（2026-10-09〜）→ 60秒ごとは `updated_at=gte.<前回の最大値>` と件数（`Prefer: count=exact` の Content-Range）だけ取得し、件数が合わなければ全件を取り直す。10分ごと・未送信キューがあるとき・起動時は全件。Supabase は Content-Range をブラウザに公開している（2026-10-09 本番で確認）
+- **クラウドが0件を返しても一覧を上書きしない**（`applyFetchedOrders` のガード）→ 「この端末にクラウド由来（updatedAt あり）の受注があるのに0件」は誤設定・障害とみなす。テストで受注0件のクラウドを模すときは、端末側も0件にすること
+- **端末の localStorage には直近13か月分の受注だけを控える**（`ordersForLocalCache`）→ 全件はクラウドにある。オフラインで起動すると13か月より前は見えない（仕様）
+- **画面のスクリプトに ES2020 構文（`?.` `??` など）を書かない** → 古い事務所PCで画面全体が動かなくなる（2026-03-13 の事故）。`npm run check`（CI でも実行）が ES2019 で読めるか検査する
+- **顧客マスタ画面は入力欄の内容を保存時にしか読まない** → 再描画（削除・検索・並べ替え）の前に `captureCustomerMasterEdits()` を呼ぶ。呼ばないと保存前の編集が消える（2026-10-09 に修正した既存不具合）
 
 詳細は `tasks/lessons.md` を参照。
 
@@ -177,11 +186,13 @@
 
 ### 緊急メンテナンス
 
-**Supabase URL / anon key を変更する場合**
+**Supabase URL / 公開キーを変更する場合**（旧形式 anon キーは2026年末までに廃止予定。新形式 `sb_publishable_...` への切替手順は SETUP.md）
 1. `cloud-config.json` を編集
-2. `main` にコミット＆プッシュ
-3. GitHub Pages の更新を待つ
-4. ブラウザをハードリロード（Windows: `Ctrl+F5` / Mac: `Cmd+Shift+R`）
+2. `index.html` の `EMBEDDED_SHARED_CLOUD_CONFIG` も同じ値にする（`npm run check` と CI が一致を確認する）
+3. `main` にコミット＆プッシュ
+4. GitHub Actions の Guard And Deploy の成功（本番反映）を待つ
+5. ブラウザをハードリロード（Windows: `Ctrl+F5` / Mac: `Cmd+Shift+R`）
+6. kyoshin-order-backups の Backup を手動実行して成功を確認（バックアップは cloud-config.json を公開URLから読む）
 
 **ロックを一時的に回避する場合**
 - `index.html?manualCloudConfig=1` で開くとモーダルから設定変更できる
@@ -211,4 +222,5 @@
 - **2026-03-18**: 定期クラウド更新でテーブルフィルタ状態を保持するよう修正。受注一覧の検索UIを `顧客検索` 1フィールド（自由入力＋datalist両対応）に簡素化。顧客フィルタ解除は右側の `クリア` ボタン、日付フィルタ解除は `日付解除` ボタンに整理（2026-04-17 に『すべてクリア』1本へ統一済み）
 - **2026-03-19**: Playwright UIスモークテストを追加（アプリ実行系の外）。guard workflow が `master` へのミラー前にスモークテストを実行。カバレッジ＝受注CRUD・フィルタ保持・月切替・ダッシュボード統計・選択受注印刷・CSV入出力・顧客/簡易マスタCSV・クラウドキュー回復・空マスタ同期伝播
 - **2026-04-01**: `CLAUDE.md` 新設。`weekly-backup.yml`（週次CSVバックアップ）追加。`tasks/todo.md`（タスク管理ログ）追加
+- **2026-10-09**: 本番稼働1年レビュー（tasks/review-2026-10-09.md）の指摘を全件修正。バックアップの1,000件頭打ち修正と非公開リポジトリへの移設・日次化、同期キューの取りこぼし修正、マスタの差分保存、差分同期、JST日付、編集時の受注番号固定、印刷のエスケープ、CSV取込の改善、テスト合格後だけ本番反映、新形式キー対応、実名の除去、ウィザード等の未使用ファイル削除
 - **2026-04-02**: 顧客マスタ「＋ 新規追加」がリロードで消える不具合を修正（全件 `DELETE→POST` の `cloudSaveCustomers()` をやめ、`cloudInsertCustomer()` で1件だけ追加成功時に反映）。`cloudFetchCustomers()` を `Range` ヘッダのページング化（Supabase REST の1,000件上限対策）。本番 `customers` の同名重複838件を事前バックアップ後に削除し163件へ整理

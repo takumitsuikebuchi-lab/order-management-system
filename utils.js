@@ -168,3 +168,72 @@ function calcInvoiceTotals(orderList, ratePercent) {
     });
     return { net, tax, gross, groups };
 }
+
+/**
+ * 端末の現地時刻（日本なら JST）で YYYY-MM-DD を返す。
+ * `new Date().toISOString()` は UTC なので、日本時間の 0〜9 時は前日になる（2026-10-09 に修正した不具合）。
+ * @param {Date} [date] 省略時は現在
+ * @returns {string}
+ */
+function toYmdLocal(date) {
+    const d = (date && typeof date.getFullYear === 'function') ? date : new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * YYYY-MM-DD 形式で、かつ実在する日付か
+ * @param {unknown} s
+ * @returns {boolean}
+ */
+function isValidYmd(s) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s == null ? '' : s));
+    if (!m) return false;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const dt = new Date(y, mo - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d;
+}
+
+/**
+ * CSV などの真偽値表記を解釈する。Supabase のバックアップ CSV は t / f で出力される。
+ * @param {unknown} v
+ * @returns {boolean}
+ */
+function parseBoolLoose(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    return s === 'true' || s === 't' || s === '1' || s === 'yes' || s === '○' || s === '済';
+}
+
+/**
+ * クラウド通信エラーから HTTP ステータスを取り出す（不明なら 0）
+ * @param {unknown} e
+ * @returns {number}
+ */
+function cloudErrorStatus(e) {
+    const anyErr = /** @type {any} */ (e);
+    if (anyErr && typeof anyErr.status === 'number') return anyErr.status;
+    const m = /HTTP (\d{3})/.exec(String(anyErr && anyErr.message || ''));
+    return m ? Number(m[1]) : 0;
+}
+
+/**
+ * 何度送り直しても成功しない種類のエラーか（データの形が不正など）。
+ * 401/403（接続キーの問題）・408/409/429（一時的・競合）は送り直す価値があるので false。
+ * @param {unknown} e
+ * @returns {boolean}
+ */
+function isPermanentCloudError(e) {
+    const s = cloudErrorStatus(e);
+    return s >= 400 && s < 500 && [401, 403, 408, 409, 429].indexOf(s) === -1;
+}
+
+/**
+ * 接続キー（anon / publishable key）が無効・権限なしのエラーか
+ * @param {unknown} e
+ * @returns {boolean}
+ */
+function isAuthCloudError(e) {
+    const s = cloudErrorStatus(e);
+    return s === 401 || s === 403;
+}

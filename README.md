@@ -1,183 +1,102 @@
-# 🚚 受注管理システム（改良版）
+# 受注管理システム（きょうしん輸送）
 
-運送業向けの受注明細管理Webアプリケーション - 非エンジニアでも簡単にセットアップ・運用できるバージョン
+運送業の受注明細を登録・管理する Web アプリ。受注の登録・一覧・印刷（運行指示書・引取書・月次レポート）・マネーフォワード請求書CSVの出力ができる。
 
-## ✨ 新機能
+| 項目 | 内容 |
+|---|---|
+| 誰向け | きょうしん輸送の事務担当（複数のPCで同じデータを共有して使う） |
+| 状態 | Production（2025年10月から本番運用） |
+| 本番URL | https://takumitsuikebuchi-lab.github.io/order-management-system/ |
+| 技術構成 | 静的 HTML / CSS / JavaScript（`index.html` + `styles.css` + `utils.js`）＋ Supabase（PostgREST）。ビルド工程なし |
+| 配信 | GitHub Pages（GitHub Actions でテストに合格したときだけ反映） |
+| データ | Supabase の `orders` / `customers` / `simple_masters`。各端末のブラウザには直近13か月分の控えだけを置く |
+| バックアップ | 毎日 0:00（日本時間）に全データを CSV で非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) に保存 |
 
-### 🎯 初回セットアップウィザード
+## 使い方（利用者）
 
-本番URL（`cloud-config.json` が有効な環境）を開くだけで使えます。セットアップウィザードはローカル単体運用時のみ表示され、画面の指示に従うだけで簡単に設定が完了します。
+本番URLを開くだけで使える。右上の表示が `接続: Cloud（同期完了）` になっていれば正常。
+詳しい操作は `かんたん運用マニュアル.md`、困ったときは `RUNBOOK.md` を見る。
 
-- **ローカル運用**: 設定不要で即座に使い始められます
-- **クラウド運用**: 本番では共通クラウド設定を自動適用
+### 主な機能
+- 受注の新規登録・編集・複製・削除（編集時は受注番号を変更できない）
+- 絞り込み（顧客・日付・ドライバー・車両・並び順）と「🗑 すべてクリア」
+- 月表示（既定）と「📚 全件表示」の切替
+- 上部カード: 当月売上高（税込・税抜・消費税）、受注件数、本日・翌日の配送予定
+- 印刷: 📄 運行指示書（選択分）、📋 引取書、📑 月次レポートPDF（巡回指導用・A4横）
+- CSV: 当月の受注明細の出力、💰 請求書CSV（マネーフォワード用）、CSV取込（バックアップCSVも読める）
+- マスタ: 顧客・積荷・荷姿・単位・ドライバー・車両
+- 💾 CSV保存先フォルダ設定（Chrome / Edge のみ。他のブラウザは通常のダウンロードになる）
 
-### 📚 わかりやすいドキュメント
+### 対応ブラウザ
+Google Chrome・Microsoft Edge・Safari の最新版（Chrome 80 / Safari 14 相当以上）。
 
-- **かんたん運用マニュアル**: 画像付きで初心者にも分かりやすい
-- **セットアップガイド**: 5〜10分で完了する簡単設定
-- **要件定義書**: 現在の仕様と壊してはいけない前提を `requirements.md` に整理
-- **テストチェックリスト**: 修正後の最低限確認を `TEST_CHECKLIST.md` に整理
-- **自動UIテスト**: Playwright の smoke test を `tests/smoke.spec.js` に追加
-- **障害対応ランブック**: 代表的な障害初動を `RUNBOOK.md` に整理
-- **変更履歴**: 重要変更を `CHANGELOG.md` に整理
-- **保守メモ**: AIツール向けの判断材料を `CLAUDE.md` に整理（旧 `AGENTS.md` は 2026-07-02 に統合済み）
-- **Claude Code指示書**: Claude Codeがこのプロジェクトを正しく扱うための指示を `CLAUDE.md` に整理
-- **自動バックアップ**: 毎日 深夜0時（JST）に受注明細・顧客マスタ・簡易マスタ6種（品名/荷姿/単位/ドライバー/車両/全体）をCSV出力し、非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) に保存（日次分は35日・水曜分は3年保持。件数がサーバーの総数と一致しないと失敗して通知される）
+## 開発・保守（担当者・AI）
 
-## 🚀 使い始める
+作業前に `CLAUDE.md` → `requirements.md` → `SETUP.md` → `tasks/lessons.md` を読む。
 
-### 最も簡単な方法（ローカル運用）
-
-1. このフォルダをダウンロードして解凍
-2. HTTPサーバーを起動:
+### 手元で動かす
 
 ```bash
-# Python 3の場合
 python3 -m http.server 4173
-
-# Node.jsの場合
-npx http-server -p 4173
 ```
 
-3. ブラウザで `http://localhost:4173/` を開く
-4. （ローカル単体運用のときだけ）セットアップウィザードで「このPCだけで使う」を選択
-5. 完了！すぐに使い始められます
+ブラウザで `http://localhost:4173/` を開く。`cloud-config.json` が有効なので**本番のデータに接続される**。試しに保存すると本番に書き込まれるので注意。
 
-### クラウド運用（複数PCで共有）
+### テスト
 
-1. 上記と同じ手順でHTTPサーバーを起動
-2. （ローカル単体運用のときだけ）セットアップウィザードで「複数のPCで共有する」を選択
-3. GitHub Pages 本番では `cloud-config.json` の共通設定が自動適用される（ウィザードは表示されない）
-4. 完了！どのPC・ブラウザからでも同じクラウドデータを参照
+前提: Node.js 22 以上、python3（テスト用サーバーの起動に使う）。
 
-詳しくは `かんたん運用マニュアル.md` と `SETUP.md` をご覧ください。
+```bash
+npm ci
+```
 
-## 📋 主な機能
+```bash
+npx playwright install chromium
+```
 
-### 受注管理
-- ✅ 新規受注の登録・編集・削除
-- ✅ 受注の複製機能
-- ✅ 検索・フィルタリング（ドライバー、車両、顧客、日付）
-- ✅ 顧客検索は1欄で入力検索と候補選択の両対応
-- ✅ 全件表示（全期間）への切替（「📚 全件表示」ボタン。既定は当月表示）
-- ✅ 月次統計の表示
+```bash
+npm test
+```
 
-### マスタ管理
-- ✅ 顧客マスタ
-- ✅ 積荷マスタ
-- ✅ ドライバーマスタ
-- ✅ 車両マスタ
-- ✅ 荷姿・単位マスタ
+`npm test` は「共有クラウド設定の照合・構文チェック（`npm run check`）」と「Playwright の UI テスト（`npm run test:ui`）」を順に実行する。テストは偽の Supabase を使うので本番データには触れない。
 
-### 印刷・出力
-- ✅ 運行指示書（A4印刷）
-- ✅ 引取書（A4印刷）
-- ✅ 月次レポートPDF（巡回指導用・A4横・印刷ダイアログからPDF保存）
-- ✅ CSV出力（受注明細）
-- ✅ 請求書CSV（マネーフォワード形式）
+### デプロイ
 
-### データ管理
-- ✅ ローカルストレージ対応（オフライン可）
-- ✅ Supabaseクラウド同期
-- ✅ CSV取込・出力
-- ✅ CSV保存先フォルダ設定（File System Access API・対応ブラウザのみ）
-- ✅ 自動バックアップ（毎日深夜0時・受注明細・顧客マスタ・簡易マスタ6種を非公開リポジトリ kyoshin-order-backups に保存）
+`main` に push するだけ。GitHub Actions（`.github/workflows/guard-and-sync.yml`）が「チェック → テスト → 合格したら GitHub Pages へ反映」を行う。テストに落ちたら本番は前の版のまま。
+`styles.css` / `utils.js` を変えたら、`index.html` の読み込みタグの `?v=` 番号を必ず上げる（利用端末のキャッシュを更新させるため）。
 
-## 🛠️ 技術仕様
-
-- **フロントエンド**: 純粋なHTML/CSS/JavaScript（外部ライブラリ不要）
-- **データ保存**: ブラウザのlocalStorage + Supabase
-- **動作環境**: モダンブラウザ（Chrome、Firefox、Edge、Safari）
-- **サーバー**: 静的ファイルサーバーのみ（Python、Node.js、Apache、Nginxなど）
-
-## 📁 ファイル構成
+### ファイル構成
 
 ```
 order-management-system/
-├── index.html                    # メインアプリケーション
-├── styles.css                    # UIスタイル（index.html から分離）
-├── utils.js                      # 純関数ユーティリティ（税計算・CSV整形など）
-├── setup-wizard.html             # 初回セットアップウィザード
-├── cloud-config.json             # 共有クラウド設定の正本
-├── schema.sql                    # DBスキーマ正本
-├── かんたん運用マニュアル.md      # 運用マニュアル（利用者向け）
-├── README.md                     # このファイル
-├── CLAUDE.md                     # Claude Code向け指示書
-├── AGENTS.md                     # 旧保守メモ（CLAUDE.md へ統合済みの参照スタブ）
-├── SETUP.md                      # セットアップ・運用ガイド
-├── NETLIFY_DEPLOY.md             # 旧運用メモ（Netlify・現在は未使用）
-├── requirements.md               # 要件定義（壊してはいけない仕様）
-├── TEST_CHECKLIST.md             # 動作確認チェックリスト
-├── RUNBOOK.md                    # 障害対応手順
+├── index.html                    # アプリ本体（画面と処理のほぼすべて）
+├── styles.css                    # 見た目
+├── utils.js                      # 画面に依存しない関数（税計算・日付・CSV・エラー判定など）
+├── cloud-config.json             # 共有クラウド設定（Supabase の URL と公開キー）の正本
+├── schema.sql                    # DB のテーブル定義
+├── migrations/                   # DB への追加変更（日付順に実行）
+├── scripts/check-app.js          # 設定の照合と構文チェック（npm run check）
+├── tests/smoke.spec.js           # UI テスト（基本の操作）
+├── tests/regression.spec.js      # UI テスト（2026-10-09 に直した不具合の再発防止）
+├── package.json / playwright.config.js
+├── .github/workflows/guard-and-sync.yml  # テスト → 本番反映
+├── CLAUDE.md                     # 保守の指示書（AI 向け。まずここを読む）
+├── requirements.md               # 壊してはいけない仕様
+├── SETUP.md                      # 運用環境・設定・トラブル対応
+├── RUNBOOK.md                    # 障害対応とバックアップからの復元手順
+├── TEST_CHECKLIST.md             # 手動の動作確認
 ├── CHANGELOG.md                  # 変更履歴
-├── package.json                  # テスト実行設定
-├── playwright.config.js          # Playwright設定
-├── .github/workflows/
-│   ├── guard-and-sync.yml        # CI/CD（テスト → main→master自動同期）
-├── tests/smoke.spec.js           # UIスモークテスト
-├── tasks/
-│   ├── todo.md                   # タスク管理ログ
-│   └── lessons.md                # 過去の失敗から学んだ教訓
-├── manual_images/                # マニュアル用画像
-├── CSV保存/                      # サンプルCSVデータ
-├── 運用マニュアル.html           # 現行運用マニュアル
-├── システム全体像.html           # 現行アーキテクチャ説明
-└── 切替手順_方式A_A社.html       # 現行切替メモ
+├── かんたん運用マニュアル.md      # 利用者向けマニュアル
+├── 運用マニュアル.html / システム全体像.html / 切替手順_方式A_A社.html  # 補足資料
+├── AGENTS.md                     # 参照スタブ（内容は CLAUDE.md に統合済み）
+└── tasks/                        # 作業ログ（todo.md）・教訓（lessons.md）・レビュー結果
 ```
 
-## 🔒 セキュリティについて
+## 注意点
 
-### ローカル運用の場合
-- データはブラウザ内にのみ保存されます
-- 外部への通信は一切ありません
-- 完全にプライベートです
+- **このリポジトリは公開（Public）**。顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリから出力したCSV）は絶対にコミットしない。`backups/` と `CSV保存/` は `.gitignore` 済み
+- Supabase の接続キー（`cloud-config.json`）はブラウザから使う公開用のキー。データベース側は誰でも読み書きできる設定のため、強化策は `tasks/todo.md` の未対応項目を参照
+- Supabase の旧形式キー（`eyJ...`）は 2026 年末までに廃止予定。アプリは新形式（`sb_publishable_...`）にも対応済み。切替手順は `SETUP.md`
+- 本番データへの削除・一括変更は、必ず事前にバックアップ（kyoshin-order-backups）の存在を確認してから行う
 
-### クラウド運用の場合
-- Supabaseの無料プランを使用します
-- anon keyによる簡易認証を使用しています
-- `cloud-config.json` の共通設定を全ブラウザが読み込みます
-- **社内ネットワーク限定での使用を推奨します**
-- 外部公開する場合は、Supabaseの認証機能を追加してください
-
-## 💡 ヒント
-
-### データのバックアップ
-- **自動バックアップが設定済みです**（毎日深夜0時・非公開リポジトリ [kyoshin-order-backups](https://github.com/takumitsuikebuchi-lab/kyoshin-order-backups) の `backups/daily/`（35日）と `backups/`（水曜分・3年）に保存。処理本体も kyoshin-order-backups 側にある）
-- 2026-04-08 からの全世代を kyoshin-order-backups に蓄積しています（3年を超えた分は自動削除）。顧客名・住所・電話番号を含むため、この公開リポジトリには置きません（2026-09-04 に移設・履歴からも削除）
-- アプリの「CSV保存先フォルダ設定」で保存した `CSV保存/` も同じ理由で git 追跡対象外（.gitignore）です
-- 手動バックアップも引き続き「CSV出力」で取得できます
-- 緊急バックアップは kyoshin-order-backups の Actions → 「Backup」→「Run workflow」で即時実行できます
-
-### トラブルシューティング
-- データが表示されない → ブラウザのキャッシュをクリア
-- クラウド同期できない → `cloud-config.json` と右上の接続表示を確認
-- 顧客検索の表示が不安定 → ハードリロード後、`SETUP.md` の検索UI説明を確認
-- セットアップをやり直したい → ブラウザのlocalStorageをクリア
-- 保守時の前提確認 → `CLAUDE.md` を参照
-
-## 📞 サポート
-
-詳しい使い方は `かんたん運用マニュアル.md` をご覧ください。
-保守や障害対応は `requirements.md` `SETUP.md` `RUNBOOK.md` `CLAUDE.md` を参照してください。
-
-## ✅ 現在の自動テスト範囲
-
-現時点の Playwright smoke test は、アプリ本体を変更せずに次の重要導線を見張っています。
-
-- 受注の新規保存、編集競合警告、複製、削除
-- 顧客検索、日付絞り込み、ドライバー絞り込み、月切替、上部統計カード
-- バックグラウンドのクラウド再読込後も絞り込み条件が保持されること
-- 運行指示書、引取書、選択受注だけの印刷対象
-- 受注明細CSV、請求書CSV、0件月の安全停止
-- 受注CSV取込の新規追加、安全な空入力、既存受注の上書き
-- 顧客マスタ / 各種マスタの追加、CSV入出力、重複スキップ
-- クラウド保存失敗時のキュー退避と再送回復
-- 空マスタ状態のクラウド同期
-
-修正後は `npm run test:ui` を実行し、GitHub Actions 側でも同じ UI smoke test が走る前提です。
-
----
-
-**開発**: Manus AI
-**バージョン**: 2.0（改良版）
-**更新日**: 2026年9月4日
+**更新日**: 2026年10月9日

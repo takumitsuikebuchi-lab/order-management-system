@@ -44,7 +44,7 @@ const seededOrders = [
     amountNet: 1700,
     amountGross: 1870,
     instructions: 'テストデータ2',
-    driver: '門脇悟大',
+    driver: 'テスト運転手B',
     vehicle: '帯広500た56-78',
     instructionSheet: false,
     invoiceSent: false,
@@ -86,7 +86,7 @@ async function seedLocalMode(page) {
     localStorage.setItem('setupMode', 'cloud');
     localStorage.setItem('orders', JSON.stringify(orders));
     localStorage.setItem('customerMaster', JSON.stringify(customers));
-    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', '門脇悟大']));
+    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', 'テスト運転手B']));
     localStorage.setItem('vehicleMaster', JSON.stringify(['札幌100あ12-34', '帯広500た56-78']));
   }, { orders: seededOrders, customers: seededCustomers });
 }
@@ -155,7 +155,7 @@ async function seedLockedCloudMode(page) {
   await page.addInitScript(() => {
     localStorage.setItem('setupCompleted', 'true');
     localStorage.setItem('setupMode', 'cloud');
-    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', '門脇悟大']));
+    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', 'テスト運転手B']));
     localStorage.setItem('vehicleMaster', JSON.stringify(['札幌100あ12-34', '帯広500た56-78']));
   });
 }
@@ -254,7 +254,7 @@ async function seedRefreshCloudMode(page, updatedOrders) {
       contentType: 'application/json',
       body: JSON.stringify([
         { master_type: 'driver', name: '混載流通', sort_order: 0 },
-        { master_type: 'driver', name: '門脇悟大', sort_order: 1 },
+        { master_type: 'driver', name: 'テスト運転手B', sort_order: 1 },
         { master_type: 'vehicle', name: '札幌100あ12-34', sort_order: 0 },
         { master_type: 'vehicle', name: '帯広500た56-78', sort_order: 1 }
       ])
@@ -365,7 +365,7 @@ async function seedQueueRecoveryCloudMode(page) {
       contentType: 'application/json',
       body: JSON.stringify([
         { master_type: 'driver', name: '混載流通', sort_order: 0 },
-        { master_type: 'driver', name: '門脇悟大', sort_order: 1 },
+        { master_type: 'driver', name: 'テスト運転手B', sort_order: 1 },
         { master_type: 'vehicle', name: '札幌100あ12-34', sort_order: 0 },
         { master_type: 'vehicle', name: '帯広500た56-78', sort_order: 1 }
       ])
@@ -419,7 +419,7 @@ async function seedEmptyMastersCloudMode(page) {
     localStorage.setItem('setupCompleted', 'true');
     localStorage.setItem('setupMode', 'cloud');
     localStorage.setItem('customerMaster', JSON.stringify(customers));
-    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', '門脇悟大']));
+    localStorage.setItem('driverMaster', JSON.stringify(['混載流通', 'テスト運転手B']));
     localStorage.setItem('vehicleMaster', JSON.stringify(['札幌100あ12-34', '帯広500た56-78']));
   }, { customers: seededCustomers });
 }
@@ -830,9 +830,10 @@ test('csv import updates an existing order instead of duplicating it', async ({ 
   await seedLocalMode(page);
   await page.goto('/');
 
-  let seenAlert = '';
-  page.once('dialog', async dialog => {
-    seenAlert = dialog.message();
+  // 既存の受注を書き換える取込は、確認（confirm）→ 結果（alert）の2つのダイアログが出る
+  const dialogs = [];
+  page.on('dialog', async dialog => {
+    dialogs.push(dialog.message());
     await dialog.accept();
   });
 
@@ -847,7 +848,8 @@ test('csv import updates an existing order instead of duplicating it', async ({ 
     buffer: Buffer.from(csvText, 'utf8')
   });
 
-  await expect.poll(() => seenAlert).toContain('CSVファイルをインポートしました（1件）');
+  await expect.poll(() => dialogs.join('\n')).toContain('CSVファイルをインポートしました（1件）');
+  expect(dialogs[0]).toContain('登録済みの受注');
   await expect(page.locator('#tableBody tr')).toHaveCount(2);
   await expect(page.locator('#tableBody')).toContainText('更新トマト');
   await expect.poll(async () => {
@@ -1443,7 +1445,7 @@ test('invoice csv export uses only the selected month and groups that month cust
       amountNet: 1820,
       amountGross: 2002,
       instructions: '',
-      driver: '門脇悟大',
+      driver: 'テスト運転手B',
       vehicle: '北見100た55-66',
       instructionSheet: false,
       invoiceSent: false,
@@ -1577,7 +1579,7 @@ test('all four filters narrow the table and a single clear button reverts every 
 
   await page.locator('#searchInput').fill('サンプル');
   await page.locator('#dateFilter').fill('2026-03-20');
-  await page.selectOption('#driverFilter', '門脇悟大');
+  await page.selectOption('#driverFilter', 'テスト運転手B');
   await page.selectOption('#vehicleFilter', '帯広500た56-78');
 
   await expect(page.locator('#orderCount')).toHaveText('1件');
@@ -1644,7 +1646,7 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
       amountNet: 900,
       amountGross: 990,
       instructions: '',
-      driver: '門脇悟大',
+      driver: 'テスト運転手B',
       vehicle: '釧路100な77-88',
       instructionSheet: false,
       invoiceSent: false,
@@ -1663,7 +1665,7 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
 
   await page.locator('#searchInput').fill('サンプル');
   await page.locator('#dateFilter').fill('2026-03-20');
-  await page.selectOption('#driverFilter', '門脇悟大');
+  await page.selectOption('#driverFilter', 'テスト運転手B');
 
   await expect(page.locator('#orderCount')).toHaveText('1件');
   await expect(page.locator('#totalGross')).toHaveText('¥1,870');
@@ -1676,7 +1678,7 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
 
   await expect(page.locator('#searchInput')).toHaveValue('サンプル');
   await expect(page.locator('#dateFilter')).toHaveValue('2026-03-20');
-  await expect(page.locator('#driverFilter')).toHaveValue('門脇悟大');
+  await expect(page.locator('#driverFilter')).toHaveValue('テスト運転手B');
   await expect(page.locator('#orderCount')).toHaveText('2件');
   await expect(page.locator('#totalGross')).toHaveText('¥2,860');
   await expect.poll(async () => await visibleCustomers(page)).toEqual([
@@ -1760,7 +1762,7 @@ test('cloud master sync accepts empty customer and driver lists as the latest st
     return await page.locator('#driverFilter option').evaluateAll(options =>
       options.map(option => option.textContent?.trim() || '')
     );
-  }).toEqual(['全ドライバー', '混載流通', '門脇悟大']);
+  }).toEqual(['全ドライバー', 'テスト運転手B', '混載流通']);   // 並びは五十音順（カタカナが漢字より先）
 
   await page.locator('.action-bar').getByRole('button', { name: /顧客マスタ/ }).click();
   await expect(page.locator('#customerMasterBody tr')).toHaveCount(0);

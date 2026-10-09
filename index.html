@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>運送業受注明細管理システム</title>
     <!-- ?v= はキャッシュ更新用。styles.css / utils.js を変更したら数字を上げる -->
-    <link rel="stylesheet" href="styles.css?v=20260717b">
+    <link rel="stylesheet" href="styles.css?v=20261009b">
 </head>
 <body>
     <!-- ブラウザ互換性チェック -->
@@ -15,8 +15,9 @@
         try {
             // Promise / fetch（IE非対応）
             if (typeof Promise === 'undefined' || typeof fetch === 'undefined') ok = false;
-            // Arrow function（IE非対応）
-            eval('var _t = () => {}');
+            // Arrow function・オブジェクトのスプレッド・async/await（このアプリで使っている構文）
+            eval('var _t = () => {}; var _p = {a: 1}; var _o = {..._p}; async function _f() { await 0; }');
+            if (typeof Promise.allSettled !== 'function') ok = false;
         } catch(e) { ok = false; }
         if (!ok) {
             document.write('<div style="position:fixed;top:0;left:0;width:100%;background:#ef4444;color:#fff;padding:16px;text-align:center;z-index:99999;font-size:15px;font-weight:bold;">このブラウザには対応していません。<b>Microsoft Edge</b>・<b>Google Chrome</b>・<b>Safari</b> の最新版でお開きください。</div>');
@@ -237,7 +238,7 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="quantity">数量</label>
-                            <input type="number" class="form-input-full numeric-input" id="quantity" onchange="calculateAmount()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
+                            <input type="number" class="form-input-full numeric-input" id="quantity" min="0" onchange="calculateAmount()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="unit">単位</label>
@@ -253,11 +254,11 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="unitPrice">単価（税抜）</label>
-                            <input type="number" class="form-input-full numeric-input" id="unitPrice" onchange="calculateAmount()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
+                            <input type="number" class="form-input-full numeric-input" id="unitPrice" min="0" onchange="calculateAmount()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="amountNet">金額（税別）</label>
-                            <input type="number" class="form-input-full numeric-input" id="amountNet" onchange="calculateGrossFromNet()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
+                            <input type="number" class="form-input-full numeric-input" id="amountNet" min="0" onchange="calculateGrossFromNet()" onwheel="this.blur()" onkeydown="if(event.key==='ArrowUp'||event.key==='ArrowDown')event.preventDefault()" inputmode="decimal">
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="amountGross">金額（税込）</label>
@@ -317,8 +318,8 @@
                 </div>
                 <div class="note" style="font-size: 0.85rem; color: #666;">
                     ・テーブル名は <code>orders</code> を使用します。<br>
-                    ・RLSを有効化し、社内ドメイン認証を推奨します。<br>
-                    ・保存時はローカルにもバックアップします。
+                    ・通常は共有設定（cloud-config.json）が使われ、ここは変更できません。保守のときだけ使います。<br>
+                    ・保存時はこの端末にも控えを残します。
                 </div>
             </div>
             <div class="modal-footer">
@@ -353,8 +354,8 @@
                 <div class="master-search-bar">
                     <input type="text" class="form-input-full jp-input" id="customerSearchBox"
                         placeholder="顧客名・住所・電話番号で検索..." lang="ja" inputmode="text"
-                        oninput="renderCustomerMaster()">
-                    <select class="master-sort-select" id="customerSortMode" onchange="renderCustomerMaster()">
+                        oninput="captureCustomerMasterEdits(); renderCustomerMaster()">
+                    <select class="master-sort-select" id="customerSortMode" onchange="captureCustomerMasterEdits(); renderCustomerMaster()">
                         <option value="date">登録日順</option>
                         <option value="name">名前順</option>
                     </select>
@@ -483,7 +484,7 @@
 
 
     <!-- 純関数ユーティリティ（DOM・状態に依存しない共通関数）。メインスクリプトより前に読み込む -->
-    <script src="utils.js?v=20260904a"></script>
+    <script src="utils.js?v=20261009a"></script>
     <script>
         // データストレージ
         let orders = [];
@@ -497,6 +498,7 @@
         // 会社情報（きょうしん輸送株式会社のデフォルト値を設定）
         let companyInfo = {
             name: 'きょうしん輸送株式会社',
+            shortName: 'きょうしん輸送',     // ファイル名・月次レポートのフッター用
             address: '夕張郡栗山町字旭台23番地129',
             tel: '0123-76-9950'
         };
@@ -512,22 +514,8 @@
             delivery: { activeIndex: -1 }
         };
 
-        // 顧客マスタ
-        let customerMaster = [
-            { name: '㈱北海道青果', address: '札幌市中央区南1条西5丁目', tel: '011-211-1111' },
-            { name: '㈱札幌市場', address: '札幌市中央区北12条西20丁目', tel: '011-611-3111' },
-            { name: '㈱道南物産', address: '函館市若松町9-19', tel: '0138-22-3333' },
-            { name: '㈱北海道市場', address: '札幌市東区北9条東4丁目', tel: '011-711-2222' },
-            { name: '㈱旭川青果', address: '旭川市流通団地1条2丁目', tel: '0166-48-1111' },
-            { name: '㈱帯広市場', address: '帯広市西20条南1丁目', tel: '0155-33-3333' },
-            { name: '㈱釧路水産', address: '釧路市新富士町6丁目', tel: '0154-51-2222' },
-            { name: '㈱函館青果', address: '函館市西桔梗町589', tel: '0138-49-5555' },
-            { name: 'JA北海道', address: '札幌市中央区北4条西1丁目', tel: '011-232-6000' },
-            { name: 'JAさっぽろ', address: '札幌市中央区北10条西24丁目', tel: '011-621-1111' },
-            { name: '堀田 淳一', address: '夕張郡栗山町鳩山４', tel: '0123-72-1234' },
-            { name: 'JAそらち南栗山町馬鈴薯集出荷貯蔵センター', address: '夕張郡栗山町富士', tel: '0123-73-5678' },
-            { name: 'JAそらち南本所販売部', address: '夕張郡栗山町角田165番地', tel: '0123-72-1468' }
-        ];
+        // 顧客マスタ（共有クラウドから読み込む。公開リポジトリに実在の取引先を書かないため既定値は空）
+        let customerMaster = [];
 
         // その他のマスタデータ
         let cargoMaster = ['トマト', 'じゃがいも', '玉ねぎ', 'キャベツ', '人参', 'メロン', 'とうもろこし', 'かぼちゃ', 'いか', '鮭', 'ホタテ', '鮮魚', '冷凍食品', 'その他'];
@@ -538,7 +526,9 @@
         const PRINT_DELAY_MS = 500;              // 印刷実行までの待機時間
         const MULTI_ORDERS_PER_PAGE = 4;         // 複数案件印刷時の1ページ当たり最大件数
         const MF_WITHHOLDING = '含まない';        // MF請求書CSVの源泉徴収指定
-        const TAX_RATE_STR = '10%';              // MF請求書CSVの品目消費税率
+        const ORDER_NO_PREFIX = 'R';             // 受注番号の頭文字（R + YYMMDD + - + 連番）
+        const TAX_RATE_PERCENT = 10;             // 消費税率（%）。受注の税込計算・請求書の消費税・MF請求書CSVの品目消費税率はすべてここを参照
+        const TAX_RATE_STR = TAX_RATE_PERCENT + '%';   // MF請求書CSVの品目消費税率
         const CSV_CRLF = '\r\n';               // CSV改行コード（CRLF）
         const CSV_BOM  = '\uFEFF';              // CSV BOM（UTF-8）
 
@@ -640,87 +630,6 @@
         // =================================================================
         // 月次レポートPDF出力機能（巡回指導・監査用）
         // =================================================================
-        // PDF保存先（File System Access API で選択されたフォルダ）
-        let exportPdfDirHandle = null;
-        const _IDB_KEY_PDF = 'exportPdfDir';
-
-        async function _savePdfDirHandle(handle) {
-            try {
-                const db = await _openHandleIDB();
-                const tx = db.transaction(_IDB_STORE, 'readwrite');
-                tx.objectStore(_IDB_STORE).put(handle, _IDB_KEY_PDF);
-                await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
-                db.close();
-            } catch(e) {}
-            try { localStorage.setItem('lastPdfDirName', handle.name); } catch(_) {}
-        }
-        async function _loadPdfDirHandle() {
-            try {
-                const db = await _openHandleIDB();
-                const handle = await new Promise((res, rej) => {
-                    const r = db.transaction(_IDB_STORE, 'readonly').objectStore(_IDB_STORE).get(_IDB_KEY_PDF);
-                    r.onsuccess = e => res(e.target.result || null);
-                    r.onerror = e => rej(e.target.error);
-                });
-                db.close();
-                return handle;
-            } catch(e) { return null; }
-        }
-        function _updatePdfDirBtn() {
-            const btn = document.getElementById('pdfDirBtn');
-            if (!btn) return;
-            btn.textContent = exportPdfDirHandle
-                ? `📂 ${exportPdfDirHandle.name}`
-                : '📂 PDF保存先フォルダ設定';
-        }
-
-        async function chooseExportPdfDir() {
-            if (!window.showDirectoryPicker) {
-                alert('このブラウザはフォルダ保存に未対応です。Chrome/Edge等をご利用ください。\n（未対応の場合は通常のダウンロードで保存します）');
-                return;
-            }
-            if (!exportPdfDirHandle) exportPdfDirHandle = await _loadPdfDirHandle();
-            try {
-                const opts = { mode: 'readwrite' };
-                if (exportPdfDirHandle) opts.startIn = exportPdfDirHandle;
-                exportPdfDirHandle = await window.showDirectoryPicker(opts);
-                await _savePdfDirHandle(exportPdfDirHandle);
-                _updatePdfDirBtn();
-                alert(`PDF保存先を「${exportPdfDirHandle.name}」に設定しました`);
-            } catch(e) {
-                if (e?.name !== 'AbortError') console.error(e);
-            }
-        }
-
-        async function savePdfToDir(blob, filename) {
-            if (!exportPdfDirHandle) {
-                exportPdfDirHandle = await _loadPdfDirHandle();
-                _updatePdfDirBtn();
-            }
-            if (!exportPdfDirHandle) return false;
-            try {
-                const perm = await exportPdfDirHandle.queryPermission({ mode: 'readwrite' });
-                if (perm !== 'granted') {
-                    const req = await exportPdfDirHandle.requestPermission({ mode: 'readwrite' });
-                    if (req !== 'granted') return false;
-                }
-            } catch(e) {
-                exportPdfDirHandle = null;
-                _updatePdfDirBtn();
-                return false;
-            }
-            try {
-                const fileHandle = await exportPdfDirHandle.getFileHandle(filename, { create: true });
-                const writable = await fileHandle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-                return true;
-            } catch (err) {
-                console.error('PDF保存に失敗:', err);
-                return false;
-            }
-        }
-
         function _reiwaLabel(year, month) {
             // 西暦 → 令和表記
             const reiwaYear = year - 2018;
@@ -754,10 +663,10 @@
             const reiwaLabel = _reiwaLabel(year, month);
             const today = new Date();
             const todayStr = `${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
-            const filename = `きょうしん輸送_運行計画実績_${reiwaLabel}`;
+            const filename = `${companyInfo.shortName}_運行計画実績_${reiwaLabel}`;
 
             // テーブル本体生成
-            const escape = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            const escape = escHtml;
             let tbody = '';
             rows.forEach((o, i) => {
                 const zebra = i % 2 === 0 ? '' : 'zebra';
@@ -863,7 +772,7 @@
         「送信先」を <strong>「PDFに保存」</strong>（Chromeの場合）または「PDFとして保存」に変更して保存してください。
         ファイル名は「<strong>${filename}.pdf</strong>」に設定済みです。
     </div>
-    <div class="title">きょうしん輸送株式会社  運行計画・実績一覧  ${reiwaLabel}</div>
+    <div class="title">${escape(companyInfo.name)}  運行計画・実績一覧  ${reiwaLabel}</div>
     <div class="summary">件数: ${rows.length}件  ／  期間: ${reiwaLabel}  ／  出力日: ${todayStr}  ／  出典: 受注管理システム</div>
     <table>
         <thead>
@@ -882,7 +791,7 @@
         </thead>
         <tbody>${tbody}</tbody>
     </table>
-    <div class="footer">きょうしん輸送㈱ 運行計画・実績  ${reiwaLabel}</div>
+    <div class="footer">${escape(companyInfo.shortName)} 運行計画・実績  ${reiwaLabel}</div>
     <script>
         // ファイル名をデフォルトにするためtitleをセット
         document.title = "${filename}";
@@ -912,8 +821,9 @@
 
         // 純関数（generateLocalId / escHtml / toNumber / fmtDate / parseCsvLine / csvQ）は utils.js で定義
 
-        let driverMaster = ['混載流通', '門脇悟大', '道管サービス', '佐川急便', '山田太郎', '鈴木次郎', '田中三郎', '渡辺流雅'];
-        let vehicleMaster = ['札幌100あ12-34', '札幌300み22-33', '札幌400す11-22', '札幌500な33-44', '帯広500た56-78', '旭川400す11-22', '函館300ら90-12', '函館400て99-00', '釧路100あ77-88', '85-82 日野大型車'];
+        // ドライバー・車両マスタ（共有クラウドから読み込む。公開リポジトリに従業員名を書かないため既定値は空）
+        let driverMaster = [];
+        let vehicleMaster = [];
         const SHARED_CLOUD_CONFIG_PATH = 'cloud-config.json';
         // cloud-config.json が消えても新しい端末で起動できるよう、最終確定値を埋め込みで保持
         const EMBEDDED_SHARED_CLOUD_CONFIG = {
@@ -927,18 +837,9 @@
             loadCloudConfig();
             await loadSharedCloudConfig();
 
-            // 初回起動チェック：セットアップ未完了ならウィザードへリダイレクト
-            let setupCompleted = localStorage.getItem('setupCompleted');
-            if (!setupCompleted && cloudEnabled()) {
-                localStorage.setItem('setupCompleted', 'true');
-                localStorage.setItem('setupMode', 'cloud');
-                setupCompleted = 'true';
-            }
-            if (!setupCompleted) {
-                window.location.href = 'setup-wizard.html';
-                return;
-            }
-            
+            // 共有クラウド設定（cloud-config.json または埋め込み設定）で起動する。
+            // 旧セットアップウィザード（setup-wizard.html）は本番では到達しないため 2026-10-09 に削除した
+
             // 現在の月を設定
             currentMonth = new Date();
             currentMonth.setDate(1); // 月の1日に設定
@@ -971,12 +872,9 @@
             try {
                 const hint = localStorage.getItem('lastCsvDirName');
                 if (hint) { const b = document.getElementById('csvDirBtn'); if (b) b.textContent = `💾 ${hint}`; }
-                const pdfHint = localStorage.getItem('lastPdfDirName');
-                if (pdfHint) { const b = document.getElementById('pdfDirBtn'); if (b) b.textContent = `📂 ${pdfHint}`; }
             } catch(_) {}
             // ② IndexedDB からハンドルを非同期復元して正式更新
             _loadDirHandle().then(h => { if (h) { exportBaseDirHandle = h; _updateCsvDirBtn(); } }).catch(()=>{});
-            _loadPdfDirHandle().then(h => { if (h) { exportPdfDirHandle = h; _updatePdfDirBtn(); } }).catch(()=>{});
 
             // クリックイベントでオートコンプリートを閉じる
             document.addEventListener('click', function(e) {
@@ -1205,11 +1103,22 @@
             });
         }
 
+        // localStorage の JSON を安全に読む（壊れていても起動を止めない）
+        function safeParseLocalStorage(key, fallback) {
+            try {
+                var raw = localStorage.getItem(key);
+                if (raw) return JSON.parse(raw);
+            } catch (e) {
+                logWarn('safeParseLocalStorage', key + ' の読み込みに失敗（データ破損の可能性）', e);
+            }
+            return fallback;
+        }
+
         // データ読み込み
         function loadData() {
-            const saved = localStorage.getItem('orders');
-            if (saved) {
-                orders = JSON.parse(saved);
+            const saved = safeParseLocalStorage('orders', null);
+            if (Array.isArray(saved)) {
+                orders = saved;
                 // ID欠損の補完（CSV取込や旧データ対策）
                 let changed = false;
                 orders.forEach((o) => {
@@ -1219,38 +1128,21 @@
                     }
                 });
                 if (changed) saveData();
+            } else if (cloudEnabled()) {
+                // 共有クラウド運用では、クラウドから取得するまで空で表示する
+                orders = [];
             } else {
-                // サンプルデータ
+                // サンプルデータ（この端末だけで使う場合の初回表示用。架空の値）
                 orders = [
                     {
                         id: 1, orderNo: 'R240901-001', date: '2024-09-01',
-                        customerName: '㈱北海道青果', pickupLocation: '札幌市場',
-                        pickupAddress: '札幌市中央区北12条西20丁目', deliveryLocation: '旭川市場',
-                        deliveryAddress: '旭川市永山2条5丁目', deliveryTel: '0166-48-2311',
+                        customerName: 'サンプル青果㈱', pickupLocation: 'サンプル市場',
+                        pickupAddress: '札幌市（サンプル）', deliveryLocation: 'サンプル倉庫',
+                        deliveryAddress: '旭川市（サンプル）', deliveryTel: '000-0000-0000',
                         cargo: 'トマト', quantity: 150, unit: 'ケース', packaging: 'ダンボール',
                         unitPrice: 120, amountNet: 18000, amountGross: 19800,
-                        instructions: '※冷蔵輸送必須\n※8時～10時到着厳守', driver: '混載流通',
-                        vehicle: '札幌100あ12-34', instructionSheet: false, invoiceSent: false, paymentReceived: false, orderCompleted: false
-                    },
-                    {
-                        id: 2, orderNo: 'R240902-001', date: '2024-09-02',
-                        customerName: '㈱札幌市場', pickupLocation: '帯広市場',
-                        pickupAddress: '帯広市西20条南1丁目', deliveryLocation: '札幌中央市場',
-                        deliveryAddress: '札幌市中央区北12条', deliveryTel: '011-611-3111',
-                        cargo: 'じゃがいも', quantity: 200, unit: '袋', packaging: '麻袋20kg',
-                        unitPrice: 85, amountNet: 17000, amountGross: 18700,
-                        instructions: '※午前中配送\n※フォークリフト荷降ろし', driver: '門脇悟大',
-                        vehicle: '帯広500た56-78', instructionSheet: true, invoiceSent: false, paymentReceived: false, orderCompleted: false
-                    },
-                    {
-                        id: 3, orderNo: 'ROW7', date: '2025-09-03',
-                        customerName: 'JAそらち南本所販売部', pickupLocation: '堀田 淳一',
-                        pickupAddress: '夕張郡栗山町鳩山４', deliveryLocation: 'JAそらち南栗山町馬鈴薯集出荷貯蔵センター',
-                        deliveryAddress: '夕張郡栗山町富士', deliveryTel: '0123-73-5678',
-                        cargo: 'かぼちゃ', quantity: 368, unit: 'ケース', packaging: '10kg DB',
-                        unitPrice: 95, amountNet: 34960, amountGross: 38456,
-                        instructions: '※集荷時ケース数異なる場合有', driver: '渡辺流雅',
-                        vehicle: '85-82 日野大型車', instructionSheet: false, invoiceSent: false, paymentReceived: false, orderCompleted: false
+                        instructions: '※冷蔵輸送必須', driver: '', vehicle: '',
+                        instructionSheet: false, invoiceSent: false, paymentReceived: false, orderCompleted: false
                     }
                 ];
             }
@@ -1258,15 +1150,7 @@
 
         // マスタデータ読み込み
         function loadMasters() {
-            function safeParse(key, fallback) {
-                try {
-                    var raw = localStorage.getItem(key);
-                    if (raw) return JSON.parse(raw);
-                } catch (e) {
-                    logWarn('loadMasters', key + ' の読み込みに失敗（データ破損の可能性）', e);
-                }
-                return fallback;
-            }
+            var safeParse = safeParseLocalStorage;
             customerMaster = safeParse('customerMaster', customerMaster);
             cargoMaster = safeParse('cargoMaster', cargoMaster);
             packagingMaster = safeParse('packagingMaster', packagingMaster);
@@ -1275,17 +1159,37 @@
             vehicleMaster = safeParse('vehicleMaster', vehicleMaster);
         }
 
-        // データ保存
+        // データ保存（この端末への控え）
+        // 共有クラウド運用では、端末には「直近13か月＋未送信分」だけを控える。全件はクラウドにある。
+        // ブラウザの保存容量（約5〜10MB）の上限に将来ぶつからないようにするため（2026-10-09）
+        const LOCAL_CACHE_MONTHS = 13;
+        function ordersForLocalCache() {
+            if (!cloudEnabled()) return orders;
+            const now = new Date();
+            const cutoff = toYmdLocal(new Date(now.getFullYear(), now.getMonth() - (LOCAL_CACHE_MONTHS - 1), 1));
+            return orders.filter(o => !o || !o.updatedAt || !o.date || String(o.date) >= cutoff);
+        }
+        let saveDataFailureNotified = false;
         function saveData() {
-            localStorage.setItem('orders', JSON.stringify(orders));
-            // localStorage 容量を監視（3MB 超でセッション中1回だけ警告）
+            try {
+                localStorage.setItem('orders', JSON.stringify(ordersForLocalCache()));
+            } catch (e) {
+                // 容量不足などで保存できなくても、画面の表示や後続の処理（クラウドへの送信）は止めない
+                logError('saveData', e);
+                if (!saveDataFailureNotified) {
+                    saveDataFailureNotified = true;
+                    try { showToast('この端末への控えの保存に失敗しました（保存容量の不足）。画面とクラウドのデータは最新です。保守担当に連絡してください。', 'warn'); } catch(_){}
+                }
+                return false;
+            }
             if (typeof checkLocalStorageUsage === 'function') checkLocalStorageUsage();
+            return true;
         }
 
         // ====== localStorage 容量監視 ======
-        // ブラウザの localStorage は通常 5〜10MB 上限。3MB を超えたら空き容量アラートを出し
-        // クラウド同期への切替を促す。false を返す = 警告不要、true = 警告済。
-        const LOCAL_STORAGE_WARN_BYTES = 3 * 1024 * 1024; // 3MB
+        // ブラウザの localStorage は 5〜10MB 程度が上限。控えを直近13か月に絞っているので通常は届かないが、
+        // 6MB を超えたら保守担当への連絡を促す（セッション中1回）
+        const LOCAL_STORAGE_WARN_BYTES = 6 * 1024 * 1024; // 6MB
         let localStorageWarnShown = false;
         function measureLocalStorageBytes() {
             // UTF-16 として概算: key長 + value長（それぞれ 2byte/char）
@@ -1308,7 +1212,7 @@
             if (bytes < LOCAL_STORAGE_WARN_BYTES) return;
             localStorageWarnShown = true;
             const mb = (bytes / (1024 * 1024)).toFixed(1);
-            const msg = `ローカル保存データが ${mb}MB を超えています。そろそろクラウド同期（Supabase）への切替や古い受注の整理をおすすめします。`;
+            const msg = `この端末に保存しているデータが ${mb}MB になりました（上限の目安は5〜10MB）。保守担当に連絡してください。`;
             if (typeof showToast === 'function') {
                 showToast(msg, 'warn');
             } else {
@@ -1416,12 +1320,16 @@
         }
 
         function supabaseHeaders() {
-            return {
+            const key = cloudConfig.anonKey || '';
+            const headers = {
                 'Content-Type': 'application/json',
-                'apikey': cloudConfig.anonKey,
-                'Authorization': 'Bearer ' + cloudConfig.anonKey,
+                'apikey': key,
                 'Prefer': 'return=representation, resolution=merge-duplicates'
             };
+            // 旧形式（JWT: eyJ...）のキーだけ Authorization にも載せる。
+            // 新形式（sb_publishable_...）は apikey ヘッダのみで送るのが Supabase の仕様（旧形式は2026年末までに廃止予定）
+            if (key.indexOf('eyJ') === 0) headers['Authorization'] = 'Bearer ' + key;
+            return headers;
         }
 
         // ネットワーク＆フェッチ安定化ラッパー
@@ -1452,11 +1360,16 @@
                         attempt++;
                         continue;
                     }
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    if (!res.ok) {
+                        const httpErr = new Error('HTTP ' + res.status);
+                        httpErr.status = res.status;
+                        throw httpErr;
+                    }
                     return res;
                 } catch(e) {
                     clearTimeout(timer);
-                    if (attempt < retries) {
+                    // 400/404 などは何度送っても同じ結果なので再試行しない（429・5xx は上で再試行済み）
+                    if (attempt < retries && !(e && typeof e.status === 'number')) {
                         const delay = backoffBaseMs * Math.pow(backoffFactor, attempt);
                         await new Promise(r => setTimeout(r, delay + Math.floor(Math.random()*100)));
                         attempt++;
@@ -1468,113 +1381,191 @@
         }
 
         // オフライン同期キュー
+        // クラウドへの書き込みに失敗した変更をこの端末に保存し、通信が戻ったら順番に送り直す。
+        // 2026-10-09 修正: 送信済みの項目だけを「今のキュー」から取り除く方式に変更（以前は失敗した更新・削除を黙って捨てていた）
         const CLOUD_QUEUE_KEY = 'cloudSyncQueue';
+        const CLOUD_FAILED_KEY = 'cloudSyncFailed';   // 何度送っても受け付けられない変更（データ不正など）の退避先
         function getCloudQueue() {
-            try { const raw = localStorage.getItem(CLOUD_QUEUE_KEY); return raw ? JSON.parse(raw) : []; } catch(_) { return []; }
+            try {
+                const raw = localStorage.getItem(CLOUD_QUEUE_KEY);
+                const q = raw ? JSON.parse(raw) : [];
+                return Array.isArray(q) ? q : [];
+            } catch(_) { return []; }
         }
         function setCloudQueue(q) {
-            try { localStorage.setItem(CLOUD_QUEUE_KEY, JSON.stringify(q)); } catch(_) {}
+            try {
+                localStorage.setItem(CLOUD_QUEUE_KEY, JSON.stringify(q));
+                return true;
+            } catch(e) {
+                logError('CLOUD_QUEUE_SAVE', e);
+                try { showToast('未送信の変更をこの端末に保存できませんでした（保存容量の不足）。画面を閉じずに通信の回復を待ってください。', 'error'); } catch(_){}
+                return false;
+            }
         }
         function getCloudQueueLength() { try { return getCloudQueue().length; } catch(_) { return 0; } }
+        function getCloudSyncFailures() {
+            try { const raw = localStorage.getItem(CLOUD_FAILED_KEY); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : []; } catch(_) { return []; }
+        }
+        function recordCloudSyncFailures(entries) {
+            const list = getCloudSyncFailures().concat(entries).slice(-50);
+            try { localStorage.setItem(CLOUD_FAILED_KEY, JSON.stringify(list)); } catch(_){}
+            const nos = entries.map(e => describeQueueItem(e.item)).join('、');
+            try { showToast(`クラウドに保存できなかった変更があります（${nos}）。右上の接続表示を押すと内容を確認できます。`, 'error'); } catch(_){}
+        }
+        function describeQueueItem(item) {
+            const p = (item && item.payload) || {};
+            const label = { upsert: '保存', update: '更新', batchUpdate: '一括更新', delete: '削除' }[item && item.op] || '変更';
+            const no = p.orderNo || p.order_no || (Array.isArray(p.orderNos) ? p.orderNos.join('・') : '') || '受注No不明';
+            return `${no}の${label}`;
+        }
+        function showCloudSyncFailures() {
+            const list = getCloudSyncFailures();
+            const qlen = getCloudQueueLength();
+            if (!list.length) {
+                alert(qlen > 0 ? `送信待ちの変更が ${qlen} 件あります。通信が回復すると自動で送信されます。` : 'クラウドへの送信待ち・送信失敗はありません。');
+                return;
+            }
+            const lines = list.map(f => `・${describeQueueItem(f.item)}（${f.status ? 'HTTP ' + f.status : f.error}／${new Date(f.at).toLocaleString('ja-JP')}）`);
+            const msg = 'クラウドに保存できなかった変更:\n' + lines.join('\n') +
+                '\n\n該当の受注を開いて内容を確認し、もう一度保存してください。\n「OK」でこの一覧を消去します（受注データは消えません）。';
+            if (confirm(msg)) {
+                try { localStorage.removeItem(CLOUD_FAILED_KEY); } catch(_){}
+                updateCloudStatusUI();
+            }
+        }
         function safeClone(obj) { try { return JSON.parse(JSON.stringify(obj)); } catch(_) { return obj; } }
+        function newCloudQueueId() { return 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
         function enqueueCloudOp(op, payload) {
             const q = getCloudQueue();
-            q.push({ op, payload: safeClone(payload), createdAt: Date.now() });
+            q.push({ qid: newCloudQueueId(), op, payload: safeClone(payload), createdAt: Date.now() });
             setCloudQueue(q);
             try { compactCloudQueue(); } catch(_){}
             const newLen = getCloudQueueLength();
             try { logWarn('CLOUD_QUEUE', 'enqueue ' + op, newLen); } catch(_){}
             try { showToast(`Cloud同期待ち（キュー:${newLen}）`, 'warn'); } catch(_){}
         }
+        function queueOrderNoForLocalId(localId) {
+            const o = orders.find(x => String(x.id) === String(localId));
+            return o ? o.orderNo : '';
+        }
         function compactCloudQueue() {
             const q = getCloudQueue();
             if (!q.length) return;
             const map = new Map();
-            const localIdToOrderNo = new Map();
-            try {
-                for (const o of orders) {
-                    localIdToOrderNo.set(o.id, o.orderNo);
-                }
-            } catch(_){}
-            for (const item of q) {
+            for (const raw of q) {
+                const item = safeClone(raw);
+                if (!item.qid) item.qid = newCloudQueueId();   // 旧形式のキュー項目にも識別子を付ける
+                const p = item.payload || {};
                 let key = '';
                 if (item.op === 'update') {
-                    const lid = item.payload && item.payload.localId;
-                    const ono = localIdToOrderNo.get(lid) || '';
-                    key = 'U:' + (ono || lid);
+                    const ono = p.orderNo || queueOrderNoForLocalId(p.localId) || '';
+                    if (ono && !p.orderNo) p.orderNo = ono;
+                    key = 'U:' + (ono || p.localId);
                     const existing = map.get(key);
                     if (existing) {
-                        existing.payload.patch = { ...(existing.payload.patch||{}), ...(item.payload.patch||{}) };
+                        existing.payload.patch = { ...(existing.payload.patch||{}), ...(p.patch||{}) };
                     } else {
-                        map.set(key, safeClone(item));
+                        map.set(key, item);
                     }
                 } else if (item.op === 'upsert') {
-                    const ono = (item.payload && (item.payload.orderNo || item.payload.order_no)) || '';
+                    const ono = p.orderNo || p.order_no || '';
                     key = 'P:' + ono;
-                    map.set(key, safeClone(item));
+                    const existing = map.get(key);
+                    if (existing) { existing.payload = p; } else { map.set(key, item); }
                 } else if (item.op === 'delete') {
-                    const ono = item.payload && item.payload.orderNo;
+                    const ono = p.orderNo;
                     key = 'D:' + ono;
                     // deleteは最優先。関連するupdate/upsertを上書き
-                    map.set(key, safeClone(item));
+                    map.set(key, item);
                     map.delete('U:' + ono);
                     map.delete('P:' + ono);
                 } else if (item.op === 'batchUpdate') {
-                    const ids = (item.payload && item.payload.localIds) || [];
+                    const ids = p.localIds || [];
+                    if (!Array.isArray(p.orderNos)) p.orderNos = ids.map(queueOrderNoForLocalId).filter(Boolean);
                     key = 'B:' + ids.slice().sort().join(',');
                     const existing = map.get(key);
                     if (existing) {
-                        existing.payload.patch = { ...(existing.payload.patch||{}), ...(item.payload.patch||{}) };
+                        existing.payload.patch = { ...(existing.payload.patch||{}), ...(p.patch||{}) };
                     } else {
-                        map.set(key, safeClone(item));
+                        map.set(key, item);
                     }
                 } else {
-                    key = 'X:' + JSON.stringify(item.payload || {});
-                    map.set(key, safeClone(item));
+                    key = 'X:' + JSON.stringify(p);
+                    map.set(key, item);
                 }
             }
             const compacted = Array.from(map.values());
             setCloudQueue(compacted);
             try { logInfo('CLOUD_QUEUE_COMPACT', 'size', compacted.length); } catch(_){}
         }
+        async function runCloudQueueItem(item) {
+            const p = item.payload || {};
+            if (item.op === 'upsert') return cloudUpsertOrder(p, { fromQueue: true });
+            if (item.op === 'delete') return cloudDeleteOrderByOrderNo(p.orderNo, { fromQueue: true });
+            if (item.op === 'update') return cloudUpdateOrder(p.localId, p.patch, { fromQueue: true, orderNo: p.orderNo });
+            if (item.op === 'batchUpdate') return cloudBatchUpdate(p.localIds, p.patch, { fromQueue: true, orderNos: p.orderNos });
+            logWarn('CLOUD_QUEUE', '不明な種類の項目を破棄', item.op);
+        }
+        let cloudQueueFlushing = false;
+        let lastCloudError = null;
         async function flushCloudQueue(limit) {
-            if (!cloudEnabled()) return;
-            try { compactCloudQueue(); } catch(_){}
-            const q = getCloudQueue();
-            if (!q.length) { updateCloudStatusUI(cloudReadSucceeded ? true : false); return; }
-            updateCloudStatusUI();
-            const toProcess = typeof limit === 'number' ? q.slice(0, limit) : q.slice();
-            let processed = 0;
-            for (const item of toProcess) {
-                try {
-                    if (item.op === 'upsert') {
-                        await cloudUpsertOrder(item.payload);
-                    } else if (item.op === 'delete') {
-                        await cloudDeleteOrderByOrderNo(item.payload.orderNo);
-                    } else if (item.op === 'update') {
-                        await cloudUpdateOrder(item.payload.localId, item.payload.patch);
-                    } else if (item.op === 'batchUpdate') {
-                        await cloudBatchUpdate(item.payload.localIds, item.payload.patch);
+            if (!cloudEnabled() || cloudQueueFlushing) return;
+            if (!isOnline()) { if (getCloudQueueLength()) updateCloudStatusUI(false); return; }
+            cloudQueueFlushing = true;
+            try {
+                try { compactCloudQueue(); } catch(_){}
+                const q = getCloudQueue();
+                if (!q.length) { updateCloudStatusUI(cloudReadSucceeded ? true : false); return; }
+                updateCloudStatusUI();
+                const toProcess = typeof limit === 'number' ? q.slice(0, limit) : q.slice();
+                const finished = [];      // 送信済み・または退避済み（キューから取り除く）
+                const failures = [];      // 何度送っても受け付けられない項目
+                let transientError = null;
+                for (const item of toProcess) {
+                    const sig = JSON.stringify(item.payload);
+                    try {
+                        await runCloudQueueItem(item);
+                        finished.push({ qid: item.qid, sig });
+                    } catch(e) {
+                        try { logError('CLOUD_QUEUE_FLUSH', e); } catch(_){ }
+                        if (isPermanentCloudError(e)) {
+                            // 後続の正常な変更を塞がないよう退避して先へ進む
+                            failures.push({ item: safeClone(item), status: cloudErrorStatus(e), error: String(e && e.message || e), at: Date.now() });
+                            finished.push({ qid: item.qid, sig });
+                            continue;
+                        }
+                        transientError = e;
+                        break; // 一時的なエラー（通信・サーバー）なので次回に再試行
                     }
-                    processed++;
-                } catch(e) {
-                    try { logError('CLOUD_QUEUE_FLUSH', e); } catch(_){ }
-                    break; // 次回に再試行
                 }
+                // 処理済みの項目だけを「今のキュー」から取り除く。
+                // 送信中に追加・統合された項目（中身が変わった項目）は残して、次回送る
+                if (finished.length) {
+                    const remaining = getCloudQueue().filter(it =>
+                        !finished.some(f => f.qid === it.qid && f.sig === JSON.stringify(it.payload)));
+                    setCloudQueue(remaining);
+                }
+                if (failures.length) recordCloudSyncFailures(failures);
+                const sent = finished.length - failures.length;
+                if (sent > 0) { try { showToast(`Cloud同期処理（${sent}件）`); } catch(_){ } }
+                if (transientError) {
+                    lastCloudError = transientError;
+                    updateCloudStatusUI(false);
+                } else if (!getCloudQueueLength()) {
+                    updateCloudStatusUI(cloudReadSucceeded ? true : false);
+                } else {
+                    updateCloudStatusUI();
+                }
+            } finally {
+                cloudQueueFlushing = false;
             }
-            if (processed > 0) {
-                const remaining = q.slice(processed);
-                setCloudQueue(remaining);
-                try { showToast(`Cloud同期処理（${processed}件）`); } catch(_){ }
-            }
-            if (!getCloudQueue().length) updateCloudStatusUI(cloudReadSucceeded ? true : false);
         }
         window.addEventListener('online', () => {
             try { flushCloudQueue(); } catch(_){}
             try { refreshCloudData({ includeMasters: false, showStatus: true }); } catch(_){}
         });
         setInterval(() => { try { flushCloudQueue(3); } catch(_){} }, 30000);
-        setInterval(() => { try { refreshCloudData({ includeMasters: false, showStatus: false }); } catch(_){} }, 60000);
+        setInterval(() => { try { refreshCloudData({ includeMasters: false, showStatus: false, incremental: true }).catch(() => {}); } catch(_){} }, 60000);
 
         // クイックバー表示制御: アクションバー（業務ボタン行）が画面の上に消えたときだけ表示する
         (function setupQuickBar() {
@@ -1625,8 +1616,15 @@
         function updateCloudStatusUI(connected) {
             const el = document.getElementById('cloudStatus');
             if (!el) return;
+            if (!el.dataset.clickBound) {
+                el.dataset.clickBound = '1';
+                el.style.cursor = 'pointer';
+                el.title = '押すと、クラウドへの送信待ち・送信できなかった変更を確認できます';
+                el.addEventListener('click', function() { try { showCloudSyncFailures(); } catch(_){} });
+            }
             const qlen = (typeof getCloudQueueLength === 'function') ? getCloudQueueLength() : 0;
-            const queueText = qlen > 0 ? `・キュー:${qlen}` : '';
+            const flen = (typeof getCloudSyncFailures === 'function') ? getCloudSyncFailures().length : 0;
+            const queueText = (qlen > 0 ? `・キュー:${qlen}` : '') + (flen > 0 ? `・未保存:${flen}` : '');
             if (!cloudEnabled()) {
                 el.textContent = '接続: ローカル';
                 el.style.background = '#eee';
@@ -1636,7 +1634,8 @@
                 el.style.background = '#e7f7ef';
                 el.style.color = '#0a7a3b';
             } else if (connected === false) {
-                el.textContent = `接続: Cloud（エラー${queueText ? ' ' + queueText : ''}）`;
+                const keyProblem = (typeof isAuthCloudError === 'function') && lastCloudError && isAuthCloudError(lastCloudError);
+                el.textContent = `接続: Cloud（${keyProblem ? '接続キーが無効' : 'エラー'}${queueText ? ' ' + queueText : ''}）`;
                 el.style.background = '#fdecea';
                 el.style.color = '#b71c1c';
             } else {
@@ -1691,6 +1690,7 @@
         function logError(tag, ...args) {
             try { logStats.error[tag] = (logStats.error[tag] || 0) + 1; console.error(`[ERROR:${tag}]`, ...args); } catch(_){}
         }
+        // 調査用: ブラウザのコンソールで printLogStats() と打つと、ログの件数を種類別に表示する
         function printLogStats() {
             try { console.table(logStats); } catch(_) { console.log('LOG_STATS', JSON.stringify(logStats)); }
         }
@@ -1782,29 +1782,105 @@
             }
         }
 
-        async function cloudFetchOrders(opts = {}) {
+        // Supabase（PostgREST）から全件をページングで取得する共通処理。
+        // 1回の応答は最大1,000行なので、次の開始位置は「実際に受け取った件数」で進める
+        async function cloudFetchAllPages(pathAndQuery, opts = {}) {
             const timeoutMs = typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 20000;
-            const retries = typeof opts.retries === 'number' ? opts.retries : 3;
+            const retries = typeof opts.retries === 'number' ? opts.retries : 2;
             const base = getSupabaseBase();
             const pageSize = 1000;
-            var rows = [];
-            var start = 0;
-
+            let rows = [];
+            let start = 0;
             while (true) {
-                var end = start + pageSize - 1;
-                var res = await cloudFetchRetry(
-                    base + '/orders?select=*&order=date.asc,order_no.asc',
-                    { headers: Object.assign({}, supabaseHeaders(), { 'Range': start + '-' + end, 'Prefer': 'count=exact' }), cache: 'no-store' },
+                const res = await cloudFetchRetry(
+                    base + pathAndQuery,
+                    { headers: Object.assign({}, supabaseHeaders(), { 'Range': start + '-' + (start + pageSize - 1), 'Prefer': 'count=exact' }), cache: 'no-store' },
                     { retries: retries, timeoutMs: timeoutMs }
                 );
-                var chunk = await res.json();
+                const chunk = await res.json();
                 if (!Array.isArray(chunk) || chunk.length === 0) break;
                 rows = rows.concat(chunk);
                 if (chunk.length < pageSize) break;
-                start += pageSize;
+                start += chunk.length;
             }
-
             return rows;
+        }
+
+        async function cloudFetchOrders(opts = {}) {
+            return cloudFetchAllPages('/orders?select=*&order=date.asc,order_no.asc', {
+                timeoutMs: typeof opts.timeoutMs === 'number' ? opts.timeoutMs : 20000,
+                retries: typeof opts.retries === 'number' ? opts.retries : 3
+            });
+        }
+
+        // ===== 差分同期（2026-10-09）=====
+        // 60秒ごとの同期で毎回全件を取ると、件数が増えるほど通信量が増える（現在でも1端末あたり月1GB超）。
+        // 通常は「前回以降に変更された行（updated_at）」と「件数」だけを取り、10分ごとに全件を取り直して整合を取る。
+        const FULL_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+        let lastFullSyncAt = 0;
+        let lastOrdersCursor = null;   // 取得済みの updated_at の最大値
+        function maxUpdatedAtOf(rows) {
+            let m = null;
+            (rows || []).forEach(r => {
+                const u = r && (r.updated_at || r.updatedAt);
+                if (u && (!m || String(u) > String(m))) m = String(u);
+            });
+            return m;
+        }
+        function noteFullSync(rows) {
+            lastFullSyncAt = Date.now();
+            lastOrdersCursor = maxUpdatedAtOf(rows);
+        }
+        async function cloudFetchOrdersChangedSince(cursor) {
+            return cloudFetchAllPages('/orders?select=*&updated_at=gte.' + encodeURIComponent(cursor) + '&order=updated_at.asc,order_no.asc',
+                { retries: 1, timeoutMs: 15000 });
+        }
+        async function cloudCountOrders() {
+            const base = getSupabaseBase();
+            const res = await cloudFetchRetry(base + '/orders?select=id',
+                { headers: Object.assign({}, supabaseHeaders(), { 'Range': '0-0', 'Prefer': 'count=exact' }), cache: 'no-store' },
+                { retries: 1, timeoutMs: 10000 });
+            const cr = res.headers.get('Content-Range') || '';
+            const m = /\/(\d+)\s*$/.exec(cr);
+            return m ? Number(m[1]) : null;
+        }
+        // 差分を手元の一覧に反映。画面の描画し直しが必要な変更があれば true
+        async function tryIncrementalOrdersSync() {
+            if (!cloudReadSucceeded || !lastOrdersCursor) return false;
+            if (Date.now() - lastFullSyncAt >= FULL_SYNC_INTERVAL_MS) return false;
+            if (getCloudQueueLength() > 0) return false;   // 未送信分がある間は全件で取り直す
+            const changed = await cloudFetchOrdersChangedSince(lastOrdersCursor);
+            const total = await cloudCountOrders();
+            if (total === null) return false;
+            const byNo = new Map();
+            orders.forEach(o => byNo.set(String(o.orderNo), o));
+            let needsRender = false;
+            changed.forEach(row => {
+                const n = normalizeOrderRow(row);
+                const cur = byNo.get(String(n.orderNo));
+                if (!cur || buildOrderConflictSignature(cur) !== buildOrderConflictSignature(n)) {
+                    byNo.set(String(n.orderNo), n);
+                    needsRender = true;
+                } else {
+                    cur.id = n.id;
+                    cur.updatedAt = n.updatedAt;
+                }
+            });
+            const next = Array.from(byNo.values());
+            const cloudCount = next.filter(o => o && o.updatedAt).length;
+            if (cloudCount !== total) return false;   // 削除や取りこぼしがある → 全件で取り直す
+            const newCursor = maxUpdatedAtOf(changed);
+            if (newCursor && newCursor > lastOrdersCursor) lastOrdersCursor = newCursor;
+            if (needsRender) {
+                const prevFilterState = captureTableFilterState();
+                orders = next;
+                renderTable();
+                updateStats();
+                setupFilters();
+                restoreTableFilterState(prevFilterState);
+                saveData();
+            }
+            return true;
         }
 
         async function cloudFetchOrderByOrderNo(orderNo) {
@@ -1874,21 +1950,70 @@
             window.scrollTo({ top: typeof state.scrollY === 'number' ? state.scrollY : window.scrollY, behavior: 'auto' });
         }
 
+        // 未送信キューにある変更を、クラウドから取得した一覧に重ねる
+        // （送信前の新規受注や変更が、定期同期のたびに画面から一時的に消えないように）
+        function overlayPendingCloudQueue(list) {
+            const q = getCloudQueue();
+            if (!q.length) return list;
+            const byNo = new Map();
+            list.forEach(o => byNo.set(String(o.orderNo), o));
+            const applyPatch = (no, patch) => {
+                const cur = byNo.get(String(no));
+                if (cur && patch) byNo.set(String(no), { ...cur, ...patch });
+            };
+            for (const item of q) {
+                const p = (item && item.payload) || {};
+                if (item.op === 'upsert') {
+                    const no = String(p.orderNo || p.order_no || '');
+                    if (!no) continue;
+                    const pending = normalizeOrderRow(p);
+                    const cur = byNo.get(no);
+                    byNo.set(no, cur
+                        ? { ...cur, ...pending, id: cur.id, updatedAt: cur.updatedAt }
+                        : { ...pending, id: p.id || generateLocalId(), updatedAt: null });
+                } else if (item.op === 'update') {
+                    applyPatch(p.orderNo || queueOrderNoForLocalId(p.localId), p.patch);
+                } else if (item.op === 'batchUpdate') {
+                    const nos = Array.isArray(p.orderNos) ? p.orderNos : (p.localIds || []).map(queueOrderNoForLocalId);
+                    nos.forEach(no => applyPatch(no, p.patch));
+                } else if (item.op === 'delete') {
+                    byNo.delete(String(p.orderNo));
+                }
+            }
+            return Array.from(byNo.values());
+        }
+
+        let cloudEmptyGuardNotified = false;
         function applyFetchedOrders(fetched) {
-            if (!Array.isArray(fetched)) return;
+            if (!Array.isArray(fetched)) return false;
+            // この端末にクラウド由来の受注があるのに、クラウドが0件を返した → 誤設定・障害の可能性が高い。
+            // 上書きすると端末側の控えまで消えるので、取り込まずに知らせる
+            if (fetched.length === 0 && orders.some(o => o && o.updatedAt)) {
+                logWarn('applyFetchedOrders', 'クラウドが0件を返したため反映を保留');
+                if (!cloudEmptyGuardNotified) {
+                    cloudEmptyGuardNotified = true;
+                    try { showToast('クラウドから受注が1件も返ってきませんでした。誤って消えるのを防ぐため、この端末の表示は保持しています。保守担当に連絡してください。', 'error'); } catch(_){}
+                }
+                return false;
+            }
+            cloudEmptyGuardNotified = false;
             const prevFilterState = captureTableFilterState();
-            orders = fetched.map(row => normalizeOrderRow(row));
+            let next = fetched.map(row => normalizeOrderRow(row));
+            next = overlayPendingCloudQueue(next);
             // ID欠損の受注に一意なIDを補完
-            orders.forEach((o) => {
+            next.forEach((o) => {
                 if (o.id === undefined || o.id === null || o.id === '') {
                     o.id = generateLocalId();
                 }
             });
-            saveData();
+            orders = next;
+            // 画面を先に更新する（端末への保存に失敗しても表示は最新にする）
             renderTable();
             updateStats();
             setupFilters();
             restoreTableFilterState(prevFilterState);
+            saveData();
+            return true;
         }
 
         async function refreshCloudData(options = {}) {
@@ -1900,6 +2025,18 @@
 
             cloudRefreshPromise = (async () => {
                 if (showStatus) updateCloudStatusUI();
+
+                // 定期同期は、まず差分だけで済むか試す（失敗・不一致なら下の全件取得へ）
+                if (options.incremental && !includeMasters) {
+                    try {
+                        if (await tryIncrementalOrdersSync()) {
+                            updateCloudStatusUI(true);
+                            return orders;
+                        }
+                    } catch (e) {
+                        logWarn('incrementalSync', e);
+                    }
+                }
 
                 const orderPromise = cloudFetchOrders({ timeoutMs: 20000, retries: 3 });
                 const masterPromise = includeMasters ? loadMastersFromCloud() : Promise.resolve(null);
@@ -1913,13 +2050,15 @@
 
                 if (orderResult.status !== 'fulfilled' || !Array.isArray(orderResult.value)) {
                     cloudReadSucceeded = false;
+                    if (orderResult.status === 'rejected') lastCloudError = orderResult.reason;
                     updateCloudStatusUI(false);
                     throw (orderResult.status === 'rejected' ? orderResult.reason : new Error('Cloud orders response invalid'));
                 }
 
-                applyFetchedOrders(orderResult.value);
-                cloudReadSucceeded = true;
-                updateCloudStatusUI(true);
+                const applied = applyFetchedOrders(orderResult.value);
+                cloudReadSucceeded = applied;
+                if (applied) noteFullSync(orderResult.value);
+                updateCloudStatusUI(applied ? true : false);
                 return orderResult.value;
             })();
 
@@ -1930,8 +2069,28 @@
             }
         }
 
-        async function cloudUpsertOrder(order) {
+        // クラウドから返ってきた行の id・updated_at を手元の受注に反映する
+        // （反映しないと、直後にもう一度編集したとき「別の端末で更新されています」と誤って止められる）
+        function applyCloudRowMeta(row) {
+            if (!row || !row.order_no) return;
+            const local = orders.find(o => String(o.orderNo) === String(row.order_no));
+            if (!local) return;
+            if (row.id !== undefined && row.id !== null && row.id !== '') local.id = row.id;
+            if (row.updated_at) local.updatedAt = row.updated_at;
+        }
+        function applyCloudRowsMeta(rows) {
+            if (!Array.isArray(rows)) return;
+            rows.forEach(applyCloudRowMeta);
+        }
+        async function readJsonSafely(res) {
+            try { return await res.json(); } catch(_) { return null; }
+        }
+
+        // 受注1件をクラウドへ保存（あれば更新・なければ追加）
+        // opts.fromQueue: 未送信キューからの再送。失敗したらキューに積まずに例外を投げる（キュー側で扱う）
+        async function cloudUpsertOrder(order, opts = {}) {
             if (!cloudEnabled()) return;
+            const fromQueue = !!opts.fromQueue;
             updateCloudStatusUI();
             const base = getSupabaseBase();
             const patchBody = serializeOrderForCloud(order);
@@ -1941,16 +2100,31 @@
                 console.warn('order_noが不明のためクラウド同期をスキップ');
                 return;
             }
+            const handleFailure = (e, tag) => {
+                try { logError(tag, e); } catch(_){}
+                lastCloudError = e;
+                if (fromQueue) throw e;
+                enqueueCloudOp('upsert', order);
+                updateCloudStatusUI(false);
+                try { showToast('Cloud同期に失敗（キューに追加）', 'error'); } catch(_){}
+                return false;
+            };
             // 1) order_noでPATCH（存在しなければ空配列が返る）
             const urlPatch = `${base}/orders?order_no=eq.${encodeURIComponent(orderNo)}`;
-            const resPatch = await cloudFetchRetry(urlPatch, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(patchBody) }, { retries: 2, timeoutMs: 10000 });
-            let updatedRows = [];
-            try { updatedRows = await resPatch.json(); } catch(_) { /* representationが返らない場合 */ }
+            let resPatch;
+            try {
+                resPatch = await cloudFetchRetry(urlPatch, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(patchBody) }, { retries: 2, timeoutMs: 10000 });
+            } catch(e) {
+                return handleFailure(e, 'CLOUD_UPSERT_PATCH');
+            }
+            const updatedRows = await readJsonSafely(resPatch);
             if (Array.isArray(updatedRows) && updatedRows.length > 0) {
                 const row = updatedRows[0];
                 if (row && row.id) order.id = row.id; // Supabaseのidを反映
+                if (row && row.updated_at) order.updatedAt = row.updated_at;
+                applyCloudRowMeta(row);
                 updateCloudStatusUI(true);
-                return; // 更新で完了
+                return true; // 更新で完了
             }
             // 2) 既存行がなければPOST（idは送らない）
             const insertBody = serializeOrderForCloud(order);
@@ -1958,97 +2132,113 @@
             const urlPost = `${base}/orders?on_conflict=order_no`;
             try {
                 const resPost = await cloudFetchRetry(urlPost, { method: 'POST', headers: supabaseHeaders(), body: JSON.stringify(insertBody) }, { retries: 2, timeoutMs: 10000 });
-                const rows = await resPost.json();
-                if (rows && rows[0] && rows[0].id) {
-                    order.id = rows[0].id;
+                const rows = await readJsonSafely(resPost);
+                if (rows && rows[0]) {
+                    if (rows[0].id) order.id = rows[0].id;
+                    if (rows[0].updated_at) order.updatedAt = rows[0].updated_at;
+                    applyCloudRowMeta(rows[0]);
                 }
                 updateCloudStatusUI(true);
             } catch(e) {
-                const msg = String(e && e.message || '');
-                if (msg.includes('HTTP 409')) {
+                if (cloudErrorStatus(e) === 409) {
+                    // 同時に別端末が同じ受注Noを登録した: 更新として送り直す
                     try {
-                        const urlPatch2 = `${base}/orders?order_no=eq.${encodeURIComponent(orderNo)}`;
-                        await cloudFetchRetry(urlPatch2, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(patchBody) }, { retries: 2, timeoutMs: 10000 });
+                        const res2 = await cloudFetchRetry(urlPatch, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(patchBody) }, { retries: 2, timeoutMs: 10000 });
+                        applyCloudRowsMeta(await readJsonSafely(res2));
                         updateCloudStatusUI(true);
-                        try { flushCloudQueue(2); } catch(_){}
                     } catch(e2) {
-                        try { logError('CLOUD_UPSERT_CONFLICT_PATCH', e2); } catch(_){}
-                        enqueueCloudOp('upsert', order);
-                        updateCloudStatusUI(false);
-                        try { showToast('Cloud同期競合（キューに追加）', 'error'); } catch(_){}
+                        return handleFailure(e2, 'CLOUD_UPSERT_CONFLICT_PATCH');
                     }
                 } else {
-                    try { logError('CLOUD_UPSERT_POST', e); } catch(_){}
-                    enqueueCloudOp('upsert', order);
-                    updateCloudStatusUI(false);
-                    try { showToast('Cloud同期に失敗（キューに追加）', 'error'); } catch(_){}
+                    return handleFailure(e, 'CLOUD_UPSERT_POST');
                 }
             }
+            if (!fromQueue) { try { flushCloudQueue(2); } catch(_){} }
+            return true;
         }
 
-        async function cloudUpdateOrder(localId, patch) {
+        // チェック欄など一部の項目だけを更新する。送るのは変更した項目だけ
+        // （以前は行全体を送っていたため、他の端末が直前に直した住所などを古い値で上書きしていた）
+        async function cloudUpdateOrder(localId, patch, opts = {}) {
             if (!cloudEnabled()) return;
+            const fromQueue = !!opts.fromQueue;
             updateCloudStatusUI();
             const base = getSupabaseBase();
-            const o = orders.find(x => String(x.id) === String(localId));
-            if (!o) return;
-            const body = serializeOrderForCloud({ ...o, ...patch });
+            const orderNo = opts.orderNo || queueOrderNoForLocalId(localId);
+            if (!orderNo) {
+                logWarn('CLOUD_UPDATE', '受注Noが分からないため送信できません', localId);
+                return;
+            }
+            const body = serializeOrderForCloud(patch || {});
             delete body.id;
-            const url = `${base}/orders?order_no=eq.${encodeURIComponent(o.orderNo)}`;
+            delete body.order_no;
+            const url = `${base}/orders?order_no=eq.${encodeURIComponent(orderNo)}`;
             try {
                 const res = await cloudFetchRetry(url, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                const rows = await readJsonSafely(res);
+                applyCloudRowsMeta(rows);
                 updateCloudStatusUI(true);
-                try { flushCloudQueue(2); } catch(_){}
-                return await res.json();
+                if (!fromQueue) { try { flushCloudQueue(2); } catch(_){} }
+                return rows;
             } catch(e) {
                 try { logError('CLOUD_UPDATE', e); } catch(_){}
-                enqueueCloudOp('update', { localId, patch });
+                lastCloudError = e;
+                if (fromQueue) throw e;
+                enqueueCloudOp('update', { localId, orderNo, patch });
                 updateCloudStatusUI(false);
                 try { showToast('Cloud更新に失敗（キューに追加）', 'error'); } catch(_){}
             }
         }
 
-        async function cloudBatchUpdate(localIds, patch) {
+        async function cloudBatchUpdate(localIds, patch, opts = {}) {
             if (!cloudEnabled() || !localIds || localIds.length === 0) return;
+            const fromQueue = !!opts.fromQueue;
             updateCloudStatusUI();
             var base = getSupabaseBase();
-            var orderNos = localIds.map(function(id) {
-                var o = orders.find(function(x) { return String(x.id) === String(id); });
-                return o ? o.orderNo : null;
-            }).filter(function(v) { return v; });
+            var orderNos = Array.isArray(opts.orderNos) && opts.orderNos.length
+                ? opts.orderNos.slice()
+                : localIds.map(queueOrderNoForLocalId).filter(function(v) { return v; });
             if (orderNos.length === 0) return;
-            var body = serializeOrderForCloud(patch);
+            var body = serializeOrderForCloud(patch || {});
             delete body.id;
+            delete body.order_no;
             try {
                 // URL長超過を防ぐため、50件ずつチャンク分割して送信
                 var chunkSize = 50;
                 for (var i = 0; i < orderNos.length; i += chunkSize) {
                     var chunk = orderNos.slice(i, i + chunkSize);
-                    var inParam = 'in.(' + chunk.map(function(x) { return encodeURIComponent(String(x)); }).join(',') + ')';
+                    // 受注Noにカンマ等が含まれても壊れないよう、値はダブルクォートで囲む（PostgREST の in 演算子の書式）
+                    var inParam = 'in.(' + chunk.map(function(x) { return '"' + encodeURIComponent(String(x).replace(/"/g, '\\"')) + '"'; }).join(',') + ')';
                     var url = base + '/orders?order_no=' + inParam;
-                    await cloudFetchRetry(url, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                    var res = await cloudFetchRetry(url, { method: 'PATCH', headers: supabaseHeaders(), body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                    applyCloudRowsMeta(await readJsonSafely(res));
                 }
                 updateCloudStatusUI(true);
-                try { flushCloudQueue(2); } catch(_){}
+                if (!fromQueue) { try { flushCloudQueue(2); } catch(_){} }
             } catch(e) {
                 try { logError('CLOUD_BATCH_UPDATE', e); } catch(_){}
-                enqueueCloudOp('batchUpdate', { localIds, patch });
+                lastCloudError = e;
+                if (fromQueue) throw e;
+                enqueueCloudOp('batchUpdate', { localIds, orderNos, patch });
                 updateCloudStatusUI(false);
                 try { showToast('Cloud一括更新に失敗（キューに追加）', 'error'); } catch(_){}
             }
         }
 
-        async function cloudDeleteOrderByOrderNo(orderNo) {
+        async function cloudDeleteOrderByOrderNo(orderNo, opts = {}) {
             if (!cloudEnabled()) return;
+            const fromQueue = !!opts.fromQueue;
             updateCloudStatusUI();
             const base = getSupabaseBase();
             const url = `${base}/orders?order_no=eq.${encodeURIComponent(orderNo)}`;
             try {
                 await cloudFetchRetry(url, { method: 'DELETE', headers: supabaseHeaders() }, { retries: 2, timeoutMs: 10000 });
                 updateCloudStatusUI(true);
-                try { flushCloudQueue(2); } catch(_){}
+                if (!fromQueue) { try { flushCloudQueue(2); } catch(_){} }
             } catch(e) {
                 try { logError('CLOUD_DELETE', e); } catch(_){ }
+                lastCloudError = e;
+                if (fromQueue) throw e;
                 try { enqueueCloudOp('delete', { orderNo }); } catch(_){}
                 updateCloudStatusUI(false);
                 try { showToast('Cloud削除に失敗（キューに追加）', 'error'); } catch(_){}
@@ -2114,25 +2304,7 @@
         async function cloudFetchCustomers() {
             if (!cloudEnabled()) return null;
             try {
-                const base = getSupabaseBase();
-                const pageSize = 1000;
-                const rows = [];
-                let start = 0;
-
-                while (true) {
-                    const end = start + pageSize - 1;
-                    const resp = await cloudFetchRetry(`${base}/customers?select=*&order=created_at.asc,id.asc`, {
-                        headers: { ...supabaseHeaders(), 'Range': `${start}-${end}`, 'Prefer': 'count=exact' },
-                        cache: 'no-store'
-                    });
-                    const chunk = await resp.json();
-                    if (!Array.isArray(chunk) || chunk.length === 0) break;
-                    rows.push(...chunk);
-                    if (chunk.length < pageSize) break;
-                    start += pageSize;
-                }
-
-                return rows;
+                return await cloudFetchAllPages('/customers?select=*&order=created_at.asc,id.asc');
             } catch (err) {
                 logError('cloudFetchCustomers', err);
                 return null;
@@ -2167,63 +2339,73 @@
             return normalizeCustomerRecord(Array.isArray(rows) && rows[0] ? rows[0] : customer);
         }
 
-        // 顧客マスタをSupabaseに保存（全件削除後再挿入）
-        async function cloudSaveCustomers(customers) {
-            if (!cloudEnabled()) return;
-            
-            try {
-                const base = getSupabaseBase();
-                const headers = supabaseHeaders();
-                const safeCustomers = Array.isArray(customers) ? customers : [];
-                
-                // 全レコードを削除（URLにID一覧を並べると件数が多い場合に400エラーになるため、id=not.is.nullで全件削除）
-                // DELETE失敗時はINSERTせずに中止する（重複蓄積の防止）
-                await cloudFetchRetry(`${base}/customers?id=not.is.null`, {
-                    method: 'DELETE',
-                    headers: { ...headers, 'Prefer': 'return=minimal' }
-                }, { retries: 2 });
-                logInfo('cloudSaveCustomers', 'Deleted all existing records');
-                
-                // 新しいデータを挿入
-                if (safeCustomers.length > 0) {
-                    const resp = await cloudFetchRetry(`${base}/customers`, {
-                        method: 'POST',
-                        headers: { ...headers, 'Prefer': 'return=minimal' },
-                        body: JSON.stringify(safeCustomers.map(serializeCustomerForCloud))
-                    });
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-                }
-                
-                logInfo('cloudSaveCustomers', `Saved ${safeCustomers.length} customers`);
-            } catch (err) {
-                logError('cloudSaveCustomers', err);
-                throw err;
-            }
+        // PostgREST の in 演算子用に値を並べる（"..." で囲み、カンマや括弧を含んでも壊れないようにする）
+        function postgrestInList(values) {
+            return 'in.(' + values.map(v => '"' + encodeURIComponent(String(v).replace(/"/g, '\\"')) + '"').join(',') + ')';
         }
-        
+
+        // 顧客マスタの変更をクラウドへ反映する（2026-10-09: 全件削除→再登録をやめ、変わった行だけ送る）
+        //   desired    : 画面上の顧客一覧（id があれば既存、なければ新規）
+        //   removedIds : この画面で利用者が削除した顧客の id
+        // 他の端末が後から追加した顧客は removedIds に入らないので消えない。
+        // 追加 → 更新 → 削除 の順に送るので、途中で通信が切れても「全部消えた」状態にはならない。
+        async function cloudSyncCustomers(desired, removedIds) {
+            const result = { inserted: 0, updated: 0, deleted: 0, skipped: 0 };
+            if (!cloudEnabled()) return result;
+            const base = getSupabaseBase();
+            const current = await cloudFetchCustomers();
+            if (!Array.isArray(current)) throw new Error('顧客マスタの最新状態を取得できませんでした');
+            const byId = new Map(current.map(r => [String(r.id), r]));
+            const fields = ['customer_name', 'pickup_address', 'delivery_address', 'phone_number'];
+            const toInsert = [];
+            const toUpdate = [];
+            (desired || []).forEach(c => {
+                const row = serializeCustomerForCloud(c);
+                if (!String(row.customer_name || '').trim()) return;
+                if (c.id && byId.has(String(c.id))) {
+                    const cur = byId.get(String(c.id));
+                    if (fields.some(k => String(cur[k] || '') !== String(row[k] || ''))) toUpdate.push(row);
+                } else if (c.id) {
+                    result.skipped++;   // 別の端末で削除済みの顧客は復活させない
+                } else {
+                    delete row.id;
+                    toInsert.push(row);
+                }
+            });
+            const headers = { ...supabaseHeaders(), 'Prefer': 'return=minimal' };
+            if (toInsert.length) {
+                await cloudFetchRetry(`${base}/customers`, { method: 'POST', headers, body: JSON.stringify(toInsert) }, { retries: 2, timeoutMs: 15000 });
+                result.inserted = toInsert.length;
+            }
+            for (const row of toUpdate) {
+                const body = { ...row }; delete body.id;
+                await cloudFetchRetry(`${base}/customers?id=eq.${encodeURIComponent(row.id)}`, { method: 'PATCH', headers, body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                result.updated++;
+            }
+            const delIds = (removedIds || []).map(String).filter(id => byId.has(id));
+            for (let i = 0; i < delIds.length; i += 50) {
+                const chunk = delIds.slice(i, i + 50);
+                await cloudFetchRetry(`${base}/customers?id=${postgrestInList(chunk)}`, { method: 'DELETE', headers }, { retries: 2, timeoutMs: 10000 });
+                result.deleted += chunk.length;
+            }
+            logInfo('cloudSyncCustomers', result);
+            return result;
+        }
+
+        // クラウドの顧客マスタを取り直して画面・端末の控えに反映
+        async function reloadCustomersFromCloud() {
+            const rows = await cloudFetchCustomers();
+            if (!Array.isArray(rows)) return false;
+            customerMaster = rows.map(normalizeCustomerRecord);
+            try { localStorage.setItem('customerMaster', JSON.stringify(customerMaster)); } catch(_){}
+            return true;
+        }
+
         // シンプルマスタをSupabaseから取得（ページング対応）
         async function cloudFetchSimpleMaster(masterType) {
             if (!cloudEnabled()) return null;
             try {
-                var base = getSupabaseBase();
-                var pageSize = 1000;
-                var rows = [];
-                var start = 0;
-
-                while (true) {
-                    var end = start + pageSize - 1;
-                    var resp = await cloudFetchRetry(
-                        base + '/simple_masters?master_type=eq.' + masterType + '&select=*&order=sort_order.asc',
-                        { headers: Object.assign({}, supabaseHeaders(), { 'Range': start + '-' + end, 'Prefer': 'count=exact' }) }
-                    );
-                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                    var chunk = await resp.json();
-                    if (!Array.isArray(chunk) || chunk.length === 0) break;
-                    rows = rows.concat(chunk);
-                    if (chunk.length < pageSize) break;
-                    start += pageSize;
-                }
-
+                const rows = await cloudFetchAllPages('/simple_masters?master_type=eq.' + encodeURIComponent(masterType) + '&select=*&order=sort_order.asc,id.asc');
                 return rows.map(function(item) { return item.name; });
             } catch (err) {
                 logError('cloudFetchSimpleMaster', masterType, err);
@@ -2231,39 +2413,52 @@
             }
         }
         
-        // シンプルマスタをSupabaseに保存（全件削除後再挿入）
-        async function cloudSaveSimpleMaster(masterType, items) {
-            if (!cloudEnabled()) return;
-            try {
-                const base = getSupabaseBase();
-                const headers = supabaseHeaders();
-                
-                // 既存データを削除
-                await cloudFetchRetry(`${base}/simple_masters?master_type=eq.${masterType}`, {
-                    method: 'DELETE',
-                    headers: { ...headers, 'Prefer': 'return=minimal' }
-                });
-                
-                // 新しいデータを挿入
-                if (items.length > 0) {
-                    const resp = await cloudFetchRetry(`${base}/simple_masters`, {
-                        method: 'POST',
-                        headers: { ...headers, 'Prefer': 'return=minimal' },
-                        body: JSON.stringify(items.map((name, index) => ({
-                            master_type: masterType,
-                            name: name,
-                            sort_order: index
-                        })))
-                    });
-                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        // シンプルマスタ（積荷・荷姿・単位・ドライバー・車両）の変更をクラウドへ反映する
+        // （2026-10-09: 全件削除→再登録をやめ、追加・並び順・削除の差分だけ送る）
+        //   names        : 画面上の並び順どおりの名前一覧
+        //   removedNames : この画面で利用者が削除した名前（他の端末が追加した項目は消さない）
+        async function cloudSyncSimpleMaster(masterType, names, removedNames) {
+            const result = { inserted: 0, reordered: 0, deleted: 0 };
+            if (!cloudEnabled()) return result;
+            const base = getSupabaseBase();
+            const res = await cloudFetchRetry(`${base}/simple_masters?master_type=eq.${encodeURIComponent(masterType)}&select=id,name,sort_order&order=sort_order.asc,id.asc`,
+                { headers: supabaseHeaders(), cache: 'no-store' }, { retries: 2, timeoutMs: 10000 });
+            const current = await res.json();
+            if (!Array.isArray(current)) throw new Error('マスタの最新状態を取得できませんでした');
+            const used = new Set();
+            const toInsert = [];
+            const toReorder = [];
+            (names || []).forEach((rawName, index) => {
+                const name = String(rawName == null ? '' : rawName).trim();
+                if (!name) return;
+                const row = current.find(r => r.name === name && !used.has(String(r.id)));
+                if (row) {
+                    used.add(String(row.id));
+                    if (Number(row.sort_order) !== index) toReorder.push({ id: row.id, sort_order: index });
+                } else {
+                    toInsert.push({ master_type: masterType, name, sort_order: index });
                 }
-                logInfo('cloudSaveSimpleMaster', masterType, `Saved ${items.length} items`);
-            } catch (err) {
-                logError('cloudSaveSimpleMaster', masterType, err);
-                throw err;
+            });
+            const removedSet = new Set((removedNames || []).map(n => String(n).trim()));
+            const toDelete = current.filter(r => !used.has(String(r.id)) && removedSet.has(r.name)).map(r => r.id);
+            const headers = { ...supabaseHeaders(), 'Prefer': 'return=minimal' };
+            if (toInsert.length) {
+                await cloudFetchRetry(`${base}/simple_masters`, { method: 'POST', headers, body: JSON.stringify(toInsert) }, { retries: 2, timeoutMs: 10000 });
+                result.inserted = toInsert.length;
             }
+            for (const r of toReorder) {
+                await cloudFetchRetry(`${base}/simple_masters?id=eq.${encodeURIComponent(r.id)}`, { method: 'PATCH', headers, body: JSON.stringify({ sort_order: r.sort_order }) }, { retries: 2, timeoutMs: 10000 });
+                result.reordered++;
+            }
+            for (let i = 0; i < toDelete.length; i += 50) {
+                const chunk = toDelete.slice(i, i + 50);
+                await cloudFetchRetry(`${base}/simple_masters?id=${postgrestInList(chunk)}`, { method: 'DELETE', headers }, { retries: 2, timeoutMs: 10000 });
+                result.deleted += chunk.length;
+            }
+            logInfo('cloudSyncSimpleMaster', masterType, result);
+            return result;
         }
-        
+
         // 全マスタデータをSupabaseから読み込む
         async function loadMastersFromCloud() {
             if (!cloudEnabled()) return;
@@ -2381,13 +2576,20 @@ function hexLuminance(hex) {
     const a = [r,g,b].map(v => v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4));
     return 0.2126*a[0] + 0.7152*a[1] + 0.0722*a[2];
 }
-/* === ドライバー個別の色を強制指定（この2名は固定色） === */
+/* === ドライバー個別の色を強制指定（2名は固定色） ===
+   公開リポジトリに氏名を書かないよう、名前そのものでなく名前のハッシュ（hashString の36進表記）で指定する。
+   対象を変えるときは、ブラウザのコンソールで 'h' + hashString('氏名').toString(36) を計算して差し替える */
 var COLOR_OVERRIDES = {
   driver: {
-    '渡曾羊一': { bg: '#0EA5E9', fg: '#FFFFFF', _hue: 198 }, // 明るいスカイブルー
-    '門馬将太': { bg: '#F97316', fg: '#FFFFFF', _hue: 24 }    // 濃いオレンジ
+    'h1fr739q': { bg: '#0EA5E9', fg: '#FFFFFF', _hue: 198 }, // 明るいスカイブルー
+    'h1lz2y01': { bg: '#F97316', fg: '#FFFFFF', _hue: 24 }    // 濃いオレンジ
   }
 };
+function colorOverrideFor(ns, name) {
+  var ovr = COLOR_OVERRIDES[ns] || {};
+  var key = 'h' + hashString(String(name || '').trim()).toString(36);
+  return ovr.hasOwnProperty(key) ? ovr[key] : null;
+}
 
 // === ここから追記：色の被りを避けるユーティリティ ===
 function hueDiff(a, b) {
@@ -2439,11 +2641,12 @@ function rebuildColorMapFor(ns, namesArray) {
   var used = [];
 
   // 1) まず強制指定（OVERRIDE）を先に確定して used に登録
-  var ovr = (COLOR_OVERRIDES[ns] || {});
-  for (var k in ovr) {
-    if (ovr.hasOwnProperty(k)) {
-      map[k] = ovr[k];
-      if (typeof ovr[k]._hue === 'number') used.push(ovr[k]._hue);
+  for (var j = 0; j < names.length; j++) {
+    var nmo = (names[j] || '').trim();
+    var fixed = nmo ? colorOverrideFor(ns, nmo) : null;
+    if (fixed) {
+      map[nmo] = fixed;
+      if (typeof fixed._hue === 'number') used.push(fixed._hue);
     }
   }
 
@@ -2468,12 +2671,12 @@ function nameToColor(ns, nameRaw) {
   var name = (nameRaw || '').trim();
 
 // ★個別上書きがあればそれを即返す
-var ovr = (COLOR_OVERRIDES[ns] || {});
-if (ovr[name]) {
+var fixedColor = colorOverrideFor(ns, name);
+if (fixedColor) {
   var map0 = getColorMap(ns) || {};
-  map0[name] = ovr[name];
+  map0[name] = fixedColor;
   setColorMap(ns, map0);
-  return ovr[name];
+  return fixedColor;
 }
   if (!name) return { bg:'#e5e7eb', fg:'#111827' };
 
@@ -2586,8 +2789,8 @@ updateStatsFromView();
             if (order) {
                 order.invoiceSent = !order.invoiceSent;
                 saveData();
-                // クラウド更新
-                try { if (cloudEnabled()) cloudUpdateOrder(id, { invoiceSent: order.invoiceSent }); } catch(e) {}
+                // クラウド更新（失敗時は関数内で未送信キューに入る）
+                if (cloudEnabled()) cloudUpdateOrder(id, { invoiceSent: order.invoiceSent });
             }
         }
 
@@ -2597,8 +2800,8 @@ updateStatsFromView();
             if (order) {
                 order.paymentReceived = !order.paymentReceived;
                 saveData();
-                // クラウド更新
-                try { if (cloudEnabled()) cloudUpdateOrder(id, { paymentReceived: order.paymentReceived }); } catch(e) {}
+                // クラウド更新（失敗時は関数内で未送信キューに入る）
+                if (cloudEnabled()) cloudUpdateOrder(id, { paymentReceived: order.paymentReceived });
             }
         }
 
@@ -2620,83 +2823,49 @@ updateStatsFromView();
             });
         }
 
-        // 統計更新（初期表示用。通常は updateStatsFromView が可視行から再集計する）
-        function updateStats() {
-            // 初期統計は常に「当月」を基準（viewMode の影響を受けない）
-            const monthOrders = getMonthOrders('single');
+        // 上部の統計カードに表示する（集計は1か所にまとめる）
+        //   list           : 売上高・件数・未完了の集計対象
+        //   deliverySource : 本日・翌日の配送件数の集計対象
+        function renderStatsCards(list, deliverySource) {
             // 税込合計は受注ごとの税込額の足し算ではなく、顧客×月（請求書単位）で消費税を四捨五入して算出（マネーフォワードと一致させる）
-            const invoiceTotals = calcInvoiceTotals(monthOrders);
-            const totalGross = invoiceTotals.gross;
-            const totalNet = invoiceTotals.net;
-            const totalTax = invoiceTotals.tax;
-            const incomplete = monthOrders.filter(order => !order.orderCompleted).length;
-            
-            // 本日と翌日の配送予定件数を計算
+            const invoiceTotals = calcInvoiceTotals(list, TAX_RATE_PERCENT);
+            const incomplete = list.filter(o => !o.orderCompleted).length;
             const today = new Date();
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
-            
-            const todayStr = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
-            const tomorrowStr = `${tomorrow.getFullYear()}-${(tomorrow.getMonth() + 1).toString().padStart(2, '0')}-${tomorrow.getDate().toString().padStart(2, '0')}`;
-            
-            const todayDeliveries = orders.filter(order => 
-                order.date === todayStr && !order.orderCompleted
-            ).length;
-            
-            const tomorrowDeliveries = orders.filter(order => 
-                order.date === tomorrowStr && !order.orderCompleted
-            ).length;
-            
-            document.getElementById('totalGross').textContent = `¥${totalGross.toLocaleString()}`;
-            document.getElementById('totalNet').textContent = `¥${totalNet.toLocaleString()}`;
-            document.getElementById('totalTax').textContent = `¥${totalTax.toLocaleString()}`;
-            document.getElementById('orderCount').textContent = `${monthOrders.length}件`;
-            document.getElementById('incompleteCount').textContent = `${incomplete}件`;
-            document.getElementById('todayDeliveryCount').textContent = `${todayDeliveries}件`;
-            document.getElementById('tomorrowDeliveryCount').textContent = `${tomorrowDeliveries}件`;
+            const todayStr = toYmdLocal(today);
+            const tomorrowStr = toYmdLocal(tomorrow);
+            const todayDeliveries = deliverySource.filter(o => o.date === todayStr && !o.orderCompleted).length;
+            const tomorrowDeliveries = deliverySource.filter(o => o.date === tomorrowStr && !o.orderCompleted).length;
+            const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+            setText('totalGross', `¥${invoiceTotals.gross.toLocaleString()}`);
+            setText('totalNet', `¥${invoiceTotals.net.toLocaleString()}`);
+            setText('totalTax', `¥${invoiceTotals.tax.toLocaleString()}`);
+            setText('orderCount', `${list.length}件`);
+            setText('incompleteCount', `${incomplete}件`);
+            setText('todayDeliveryCount', `${todayDeliveries}件`);
+            setText('tomorrowDeliveryCount', `${tomorrowDeliveries}件`);
         }
-// ===== 表示中の一覧（#tableBody の可視行）から集計して上部カードに反映 =====
-function updateStatsFromView() {
-    const rows = document.querySelectorAll('#tableBody tr');
-    let visibleIds = [];
-    rows.forEach(tr => {
-        if (tr.style.display !== 'none') {
-            const id = tr.getAttribute('data-order-id');
-            if (id) visibleIds.push(id);
+
+        // 統計更新（初期表示用。通常は updateStatsFromView が可視行から再集計する）
+        // 初期統計は常に「当月」を基準（viewMode の影響を受けない）。本日・翌日の配送は全受注から数える
+        function updateStats() {
+            renderStatsCards(getMonthOrders('single'), orders);
         }
-    });
 
-    const visibleOrders = orders.filter(o => visibleIds.includes(String(o.id)));
-
-    // 請求書単位（顧客×月）で消費税を四捨五入（マネーフォワードと一致させる）
-    const invoiceTotals = calcInvoiceTotals(visibleOrders);
-    const totalGross = invoiceTotals.gross;
-    const totalNet   = invoiceTotals.net;
-    const totalTax   = invoiceTotals.tax;
-    const count      = visibleOrders.length;
-    const incomplete = visibleOrders.filter(o => !o.orderCompleted).length;
-
-    // 本日・翌日配送も「表示中」の一覧から集計する
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-    const todayDeliveries = visibleOrders.filter(o => o.date === todayStr && !o.orderCompleted).length;
-    const tomorrowDeliveries = visibleOrders.filter(o => o.date === tomorrowStr && !o.orderCompleted).length;
-
-    document.getElementById('totalGross').textContent = `¥${totalGross.toLocaleString()}`;
-    document.getElementById('totalNet').textContent   = `¥${totalNet.toLocaleString()}`;
-    const totalTaxEl = document.getElementById('totalTax');
-    if (totalTaxEl) totalTaxEl.textContent = `¥${totalTax.toLocaleString()}`;
-    document.getElementById('orderCount').textContent = `${count}件`;
-    document.getElementById('incompleteCount').textContent = `${incomplete}件`;
-    const todayEl = document.getElementById('todayDeliveryCount');
-    const tomorrowEl = document.getElementById('tomorrowDeliveryCount');
-    if (todayEl) todayEl.textContent = `${todayDeliveries}件`;
-    if (tomorrowEl) tomorrowEl.textContent = `${tomorrowDeliveries}件`;
-}
-
+        // 表示中の一覧（#tableBody の可視行）から集計して上部カードに反映
+        function updateStatsFromView() {
+            const visibleIds = new Set();
+            document.querySelectorAll('#tableBody tr').forEach(tr => {
+                if (tr.style.display !== 'none') {
+                    const id = tr.getAttribute('data-order-id');
+                    if (id) visibleIds.add(id);
+                }
+            });
+            const visibleOrders = orders.filter(o => visibleIds.has(String(o.id)));
+            // 本日・翌日配送も「表示中」の一覧から集計する
+            renderStatsCards(visibleOrders, visibleOrders);
+        }
 
         // 月表示更新
         function updateMonth() {
@@ -2758,8 +2927,6 @@ function updateStatsFromView() {
         }
 
         // 後方互換（他所から呼ばれていても壊れないよう残す）
-        function clearDateFilter() { clearAllFilters(); }
-        function clearCustomerFilter() { clearAllFilters(); }
 
         // モーダル開く
         function openModal() {
@@ -2767,7 +2934,8 @@ function updateStatsFromView() {
             clearEditSessionBaseline();
             document.getElementById('modalTitle').textContent = '新規受注登録';
             document.getElementById('orderForm').reset();
-            document.getElementById('orderDate').value = new Date().toISOString().split('T')[0];
+            document.getElementById('orderDate').value = toYmdLocal(new Date());
+            setOrderNoEditable(true);
             generateOrderNo();
             document.getElementById('orderModal').style.display = 'block';
             const content = document.querySelector('#orderModal .modal-content');
@@ -2783,9 +2951,13 @@ function updateStatsFromView() {
         }
 
         // 顧客マスタモーダル開く
+        let customerMasterOpenIds = [];
         function openCustomerMaster() {
             const searchBox = document.getElementById('customerSearchBox');
             if (searchBox) searchBox.value = '';
+            // 保存せずに閉じた変更は捨てて、保存済みの状態から始める
+            customerMaster = safeParseLocalStorage('customerMaster', customerMaster);
+            customerMasterOpenIds = customerMaster.map(c => c && c.id).filter(Boolean).map(String);
             renderCustomerMaster();
             document.getElementById('customerMasterModal').style.display = 'block';
         }
@@ -2856,41 +3028,81 @@ function updateStatsFromView() {
             `).join('');
         }
 
-        // 顧客追加行
-        function addCustomerRow() {
-            customerMaster.push({ name: '', address: '', tel: '' });
-            renderCustomerMaster();
+        // 画面の入力欄の内容を customerMaster に取り込む（再描画の前に呼ぶ）
+        // 以前は「ある行を編集→別の行を削除・検索・並べ替え」で、保存前の編集内容が消えていた（2026-10-09 修正）
+        function captureCustomerMasterEdits() {
+            document.querySelectorAll('#customerMasterBody input[data-index]').forEach(input => {
+                const index = parseInt(input.dataset.index);
+                const field = input.dataset.field;
+                if (customerMaster[index] && field) customerMaster[index][field] = input.value.trim();
+            });
         }
 
         // 顧客削除
         function deleteCustomer(index) {
+            captureCustomerMasterEdits();
             customerMaster.splice(index, 1);
             renderCustomerMaster();
         }
 
-        // 顧客マスタ保存
+        // 顧客マスタ保存（変わった行だけをクラウドへ送る）
         async function saveCustomerMaster() {
-            const inputs = document.querySelectorAll('#customerMasterBody input');
-            inputs.forEach(input => {
-                const index = parseInt(input.dataset.index);
-                const field = input.dataset.field;
-                customerMaster[index][field] = input.value.trim();
-            });
+            captureCustomerMasterEdits();
+            const keepIds = new Set(customerMaster.map(c => c && c.id).filter(Boolean).map(String));
+            const removedIds = customerMasterOpenIds.filter(id => !keepIds.has(id));
 
-            localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
-
-            // Supabaseにも保存
+            const saveBtn = document.querySelector('#customerMasterModal .modal-footer .btn-primary');
+            if (saveBtn) saveBtn.disabled = true;
             try {
-                await cloudSaveCustomers(customerMaster);
+                if (cloudEnabled()) {
+                    const r = await cloudSyncCustomers(customerMaster, removedIds);
+                    await reloadCustomersFromCloud();
+                    customerMasterOpenIds = customerMaster.map(c => c && c.id).filter(Boolean).map(String);
+                    setupFilters();
+                    closeCustomerMaster();
+                    alert(`顧客マスタを保存しました（追加 ${r.inserted}件・変更 ${r.updated}件・削除 ${r.deleted}件）` +
+                        (r.skipped ? `\n※別の端末で削除済みの顧客 ${r.skipped}件は反映しませんでした` : ''));
+                    return;
+                }
+                localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
+                setupFilters();
+                closeCustomerMaster();
+                alert('顧客マスタを保存しました');
             } catch (e) {
                 logError('saveCustomerMaster', e);
-                alert('クラウドへの保存に失敗しました。ローカルには保存済みです。\n接続状態を確認してから再度お試しください。');
-                return;
+                alert('クラウドへの保存に失敗しました。顧客マスタは変更前のまま残っています（消えてはいません）。\n接続状態を確認してから、もう一度「保存」を押してください。');
+            } finally {
+                if (saveBtn) saveBtn.disabled = false;
             }
+        }
 
-            setupFilters();
-            closeCustomerMaster();
-            alert('顧客マスタを保存しました');
+        // シンプルマスタの種類ごとの情報（保存キー・表示名）。種類ごとの switch 文の重複をここに集約
+        const SIMPLE_MASTER_META = {
+            cargo:     { storageKey: 'cargoMaster',     label: '積荷マスタ' },
+            packaging: { storageKey: 'packagingMaster', label: '荷姿マスタ' },
+            unit:      { storageKey: 'unitMaster',      label: '単位マスタ' },
+            driver:    { storageKey: 'driverMaster',    label: 'ドライバーマスタ' },
+            vehicle:   { storageKey: 'vehicleMaster',   label: '車両マスタ' }
+        };
+        function getSimpleMasterData(type) {
+            switch (type) {
+                case 'cargo': return cargoMaster;
+                case 'packaging': return packagingMaster;
+                case 'unit': return unitMaster;
+                case 'driver': return driverMaster;
+                case 'vehicle': return vehicleMaster;
+                default: return [];
+            }
+        }
+        function setSimpleMasterData(type, list) {
+            const arr = Array.isArray(list) ? list : [];
+            switch (type) {
+                case 'cargo': cargoMaster = arr; break;
+                case 'packaging': packagingMaster = arr; break;
+                case 'unit': unitMaster = arr; break;
+                case 'driver': driverMaster = arr; break;
+                case 'vehicle': vehicleMaster = arr; break;
+            }
         }
 
         // シンプルマスタモーダル開く（共通）
@@ -2905,9 +3117,15 @@ function updateStatsFromView() {
             }
         }
 
+        let simpleMasterOpenNames = [];
         function openSimpleMaster(type) {
+            var meta = SIMPLE_MASTER_META[type];
+            if (!meta) return;
+            // 保存せずに閉じた変更は捨てて、保存済みの状態から始める
+            setSimpleMasterData(type, safeParseLocalStorage(meta.storageKey, getSimpleMasterData(type)));
             var info = getSimpleMasterByType(type);
             if (!info) return;
+            simpleMasterOpenNames = (info.data || []).slice();
             currentMasterType = type;
             document.getElementById('simpleMasterTitle').textContent = info.title;
             renderSimpleMaster(info.data);
@@ -2972,15 +3190,7 @@ function updateStatsFromView() {
 
         // シンプルマスタ検索フィルター呼び出し
         function filterSimpleMaster() {
-            let masterData = [];
-            switch(currentMasterType) {
-                case 'cargo':     masterData = cargoMaster;     break;
-                case 'packaging': masterData = packagingMaster; break;
-                case 'unit':      masterData = unitMaster;      break;
-                case 'driver':    masterData = driverMaster;    break;
-                case 'vehicle':   masterData = vehicleMaster;   break;
-            }
-            renderSimpleMaster(masterData);
+            renderSimpleMaster(getSimpleMasterData(currentMasterType));
         }
 
         // ドラッグ&ドロップ設定
@@ -3045,13 +3255,8 @@ function updateStatsFromView() {
                 newOrder.push(name);
             });
             
-            switch(currentMasterType) {
-                case 'cargo': cargoMaster = newOrder; renderSimpleMaster(cargoMaster); break;
-                case 'packaging': packagingMaster = newOrder; renderSimpleMaster(packagingMaster); break;
-                case 'unit': unitMaster = newOrder; renderSimpleMaster(unitMaster); break;
-                case 'driver': driverMaster = newOrder; renderSimpleMaster(driverMaster); break;
-                case 'vehicle': vehicleMaster = newOrder; renderSimpleMaster(vehicleMaster); break;
-            }
+            setSimpleMasterData(currentMasterType, newOrder);
+            renderSimpleMaster(getSimpleMasterData(currentMasterType));
         }
 
         // シンプルマスタアイテム追加
@@ -3059,27 +3264,21 @@ function updateStatsFromView() {
             const input = document.getElementById('simpleMasterInput');
             const value = input.value.trim();
             if (!value) return;
-            
-            switch(currentMasterType) {
-                case 'cargo': cargoMaster.push(value); renderSimpleMaster(cargoMaster); break;
-                case 'packaging': packagingMaster.push(value); renderSimpleMaster(packagingMaster); break;
-                case 'unit': unitMaster.push(value); renderSimpleMaster(unitMaster); break;
-                case 'driver': driverMaster.push(value); renderSimpleMaster(driverMaster); break;
-                case 'vehicle': vehicleMaster.push(value); renderSimpleMaster(vehicleMaster); break;
+            const data = getSimpleMasterData(currentMasterType);
+            if (data.indexOf(value) !== -1) {
+                showToast('「' + value + '」は既に登録されています', 'warn');
+                return;
             }
-            
+            data.push(value);
+            renderSimpleMaster(data);
             input.value = '';
         }
 
         // シンプルマスタアイテム削除
         function deleteSimpleMasterItem(index) {
-            switch(currentMasterType) {
-                case 'cargo': cargoMaster.splice(index, 1); renderSimpleMaster(cargoMaster); break;
-                case 'packaging': packagingMaster.splice(index, 1); renderSimpleMaster(packagingMaster); break;
-                case 'unit': unitMaster.splice(index, 1); renderSimpleMaster(unitMaster); break;
-                case 'driver': driverMaster.splice(index, 1); renderSimpleMaster(driverMaster); break;
-                case 'vehicle': vehicleMaster.splice(index, 1); renderSimpleMaster(vehicleMaster); break;
-            }
+            const data = getSimpleMasterData(currentMasterType);
+            data.splice(index, 1);
+            renderSimpleMaster(data);
         }
 
         // シンプルマスタモーダル閉じる
@@ -3090,170 +3289,125 @@ function updateStatsFromView() {
             if (searchBox) searchBox.value = '';
         }
 
-        // シンプルマスタ保存
+        // シンプルマスタ保存（追加・並び順・削除の差分だけをクラウドへ送り、成功してから端末に保存）
         async function saveSimpleMaster() {
-            let masterData = [];
-            
-            switch(currentMasterType) {
-                case 'cargo': 
-                    localStorage.setItem('cargoMaster', JSON.stringify(cargoMaster));
-                    masterData = cargoMaster;
-                    break;
-                case 'packaging': 
-                    localStorage.setItem('packagingMaster', JSON.stringify(packagingMaster));
-                    masterData = packagingMaster;
-                    break;
-                case 'unit': 
-                    localStorage.setItem('unitMaster', JSON.stringify(unitMaster));
-                    masterData = unitMaster;
-                    break;
-                case 'driver': 
-                    localStorage.setItem('driverMaster', JSON.stringify(driverMaster));
-                    masterData = driverMaster;
-                    break;
-                case 'vehicle': 
-                    localStorage.setItem('vehicleMaster', JSON.stringify(vehicleMaster));
-                    masterData = vehicleMaster;
-                    break;
-            }
-            
-            // Supabaseにも保存
+            const type = currentMasterType;
+            const meta = SIMPLE_MASTER_META[type];
+            if (!meta) return;
+            const masterData = getSimpleMasterData(type);
+            const keep = new Set(masterData);
+            const removedNames = simpleMasterOpenNames.filter(n => !keep.has(n));
+            const saveBtn = document.querySelector('#simpleMasterModal .modal-footer .btn-primary');
+            if (saveBtn) saveBtn.disabled = true;
             try {
-                await cloudSaveSimpleMaster(currentMasterType, masterData);
+                await cloudSyncSimpleMaster(type, masterData, removedNames);
             } catch (e) {
                 logError('saveSimpleMaster', e);
-                alert('クラウドへの保存に失敗しました。ローカルには保存済みです。\n接続状態を確認してから再度お試しください。');
+                alert('クラウドへの保存に失敗しました。マスタは変更前のまま残っています（消えてはいません）。\n接続状態を確認してから、もう一度「保存」を押してください。');
+                if (saveBtn) saveBtn.disabled = false;
                 return;
             }
+            if (saveBtn) saveBtn.disabled = false;
+            // 他の端末で追加された項目も含めて、クラウドの最新状態を取り直す
+            if (cloudEnabled()) {
+                const latest = await cloudFetchSimpleMaster(type);
+                if (Array.isArray(latest)) setSimpleMasterData(type, latest);
+            }
+            try { localStorage.setItem(meta.storageKey, JSON.stringify(getSimpleMasterData(type))); } catch(_){}
+            simpleMasterOpenNames = getSimpleMasterData(type).slice();
 
             updateSelectOptions();
             setupFilters();
             closeSimpleMaster();
-            alert(document.getElementById('simpleMasterTitle').textContent.replace('管理', '') + 'を保存しました');
+            alert(meta.label + 'を保存しました');
         }
 
         // シンプルマスタCSV出力
         async function exportSimpleMasterCSV() {
-            let masterData, masterName;
-            switch(currentMasterType) {
-                case 'cargo': masterData = cargoMaster; masterName = '積荷マスタ'; break;
-                case 'packaging': masterData = packagingMaster; masterName = '荷姿マスタ'; break;
-                case 'unit': masterData = unitMaster; masterName = '単位マスタ'; break;
-                case 'driver': masterData = driverMaster; masterName = 'ドライバーマスタ'; break;
-                case 'vehicle': masterData = vehicleMaster; masterName = '車両マスタ'; break;
-                default: alert('マスタタイプが不明です'); return;
-            }
-            
-            const headers = ['名称'];
-            let csv = headers.join(',') + CSV_CRLF;
+            const meta = SIMPLE_MASTER_META[currentMasterType];
+            if (!meta) { alert('マスタタイプが不明です'); return; }
+            const masterData = getSimpleMasterData(currentMasterType);
+            const masterName = meta.label;
+
+            let csv = '名称' + CSV_CRLF;
             masterData.forEach(item => {
                 // 文字列配列とオブジェクト配列の両方に対応
                 const name = typeof item === 'string' ? item : item.name;
-                csv += `"${name}"\n`;
+                csv += csvQ(name) + CSV_CRLF;
             });
             
             const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
-            const date = new Date();
-            const dateStr = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
-            const fname = `${masterName}_${dateStr}.csv`;
-            
-            if (await saveCsvToDir(blob, fname)) {
-                alert('CSVを保存しました（設定フォルダ）');
-                return;
-            }
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = fname;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            await deliverCsvFile(blob, `${masterName}_${ymdCompact(new Date())}.csv`);
         }
 
         // シンプルマスタCSV取込
+        // 「名称」1列のCSV（このアプリの出力）と、Supabase のバックアップCSV（id,master_type,name,... の列）の両方を読める
         function importSimpleMasterCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
-            let masterData, masterName;
-            switch(currentMasterType) {
-                case 'cargo': masterData = cargoMaster; masterName = '積荷マスタ'; break;
-                case 'packaging': masterData = packagingMaster; masterName = '荷姿マスタ'; break;
-                case 'unit': masterData = unitMaster; masterName = '単位マスタ'; break;
-                case 'driver': masterData = driverMaster; masterName = 'ドライバーマスタ'; break;
-                case 'vehicle': masterData = vehicleMaster; masterName = '車両マスタ'; break;
-                default: alert('マスタタイプが不明です'); return;
-            }
-            
+            const type = currentMasterType;
+            const meta = SIMPLE_MASTER_META[type];
+            if (!meta) { alert('マスタタイプが不明です'); return; }
+            const masterData = getSimpleMasterData(type);
+
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
+                let importCount = 0;
+                let skipCount = 0;
                 try {
-                    const text = e.target.result;
-                    const lines = text.split('\n');
-                    
-                    // ヘッダー行をスキップ
-                    const hasHeader = lines[0].includes('名称');
-                    const startIndex = hasHeader ? 1 : 0;
-                    
-                    let importCount = 0;
-                    let skipCount = 0;
-                    
-                    for (let i = startIndex; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!line) continue;
-                        
-                        // CSVをパース（ダブルクォートに対応）
-                        const nameVal = line.replace(/^"|"$/g, '').trim();
-                        
-                        if (!nameVal) {
-                            skipCount++;
-                            continue;
-                        }
-                        
-                        // 重複チェック（文字列配列として扱う）
-                        const exists = masterData.includes(nameVal);
-                        if (!exists) {
-                            masterData.push(nameVal);
-                            importCount++;
-                        } else {
-                            skipCount++;
-                        }
+                    const text = String(e.target.result || '').replace(/^﻿/, '');
+                    const rows = splitCsvRows(text).filter(r => r.trim() !== '');
+                    if (!rows.length) { alert('CSVにデータがありません'); return; }
+                    const header = parseCsvLine(rows[0]).map(h => h.trim());
+                    let nameCol = 0;
+                    let typeCol = -1;
+                    let startIndex = 0;
+                    if (header.indexOf('name') !== -1) {
+                        nameCol = header.indexOf('name');
+                        typeCol = header.indexOf('master_type');
+                        startIndex = 1;
+                    } else if (header.indexOf('名称') !== -1) {
+                        nameCol = header.indexOf('名称');
+                        startIndex = 1;
                     }
-                    
-                    // マスタデータを更新
-                    switch(currentMasterType) {
-                        case 'cargo': cargoMaster = masterData; break;
-                        case 'packaging': packagingMaster = masterData; break;
-                        case 'unit': unitMaster = masterData; break;
-                        case 'driver': driverMaster = masterData; break;
-                        case 'vehicle': vehicleMaster = masterData; break;
+                    for (let i = startIndex; i < rows.length; i++) {
+                        const cols = parseCsvLine(rows[i]);
+                        if (typeCol !== -1 && String(cols[typeCol] || '').trim() !== type) continue;   // 別の種類の行は対象外
+                        const nameVal = String(cols[nameCol] == null ? '' : cols[nameCol]).trim();
+                        if (!nameVal || masterData.indexOf(nameVal) !== -1) { skipCount++; continue; }
+                        masterData.push(nameVal);
+                        importCount++;
                     }
-                    
-                    // localStorageに即時保存（saveSimpleMasterと同じキー）
-                    const _storageKeyMap = {
-                        cargo: 'cargoMaster', packaging: 'packagingMaster',
-                        unit: 'unitMaster', driver: 'driverMaster', vehicle: 'vehicleMaster'
-                    };
-                    const _storageKey = _storageKeyMap[currentMasterType];
-                    if (_storageKey) localStorage.setItem(_storageKey, JSON.stringify(masterData));
-
-                    renderSimpleMaster(masterData);
-
-                    // Supabaseに保存
-                    if (cloudEnabled()) {
-                        cloudSaveSimpleMaster(currentMasterType, masterData).then(() => {
-                            logInfo('importSimpleMasterCSV', `${currentMasterType} saved to Supabase`);
-                        }).catch(err => {
-                            logError('importSimpleMasterCSV', `Failed to save ${currentMasterType} to Supabase`, err);
-                        });
-                    }
-                    
-                    alert(`${masterName}CSV取込完了\n追加: ${importCount}件\nスキップ: ${skipCount}件（重複または空）`);
                 } catch (error) {
                     console.error('CSV取込エラー:', error);
                     alert('CSVファイルの読み込みに失敗しました');
+                    return;
                 }
+                renderSimpleMaster(masterData);
+
+                // クラウドへの保存が終わってから結果を表示する
+                let cloudOk = true;
+                if (cloudEnabled() && importCount > 0) {
+                    try {
+                        await cloudSyncSimpleMaster(type, masterData, []);
+                        const latest = await cloudFetchSimpleMaster(type);
+                        if (Array.isArray(latest)) setSimpleMasterData(type, latest);
+                    } catch (err) {
+                        cloudOk = false;
+                        logError('importSimpleMasterCSV', err);
+                    }
+                }
+                if (cloudOk) {
+                    try { localStorage.setItem(meta.storageKey, JSON.stringify(getSimpleMasterData(type))); } catch(_){}
+                    simpleMasterOpenNames = getSimpleMasterData(type).slice();
+                    updateSelectOptions();
+                    setupFilters();
+                }
+                renderSimpleMaster(getSimpleMasterData(type));
+                alert(`${meta.label}CSV取込完了\n追加: ${importCount}件\nスキップ: ${skipCount}件（重複または空）` +
+                    (cloudOk ? '' : '\n\n⚠ クラウドへの保存に失敗しました。画面の「保存」をもう一度押してください。'));
             };
-            
+
             reader.readAsText(file);
             event.target.value = '';
         }
@@ -3347,28 +3501,36 @@ function updateStatsFromView() {
         }
 
         // 受注番号生成（同日・同プレフィックスの最大番号+1）
-        function generateOrderNo() {
-            const dateInput = document.getElementById('orderDate');
-            const dateStr = (dateInput && dateInput.value) ? dateInput.value : new Date().toISOString().split('T')[0];
-            const [yearFull, monthRaw, dayRaw] = dateStr.split('-');
+        // 受注番号の採番: R + 年月日(YYMMDD) + '-' + その日の連番3桁（同日・同プレフィックスの最大番号+1）
+        // extraTaken: まだ orders に入っていないが使用済みの番号（CSV取込で連続採番するとき用）
+        function nextOrderNoForDate(ymd, extraTaken) {
+            const [yearFull, monthRaw, dayRaw] = String(ymd || toYmdLocal(new Date())).split('-');
             const yy = String(yearFull || '').slice(2);
             const mm = String(monthRaw || '').padStart(2, '0');
             const dd = String(dayRaw || '').padStart(2, '0');
-            const prefix = `R${yy}${mm}${dd}-`;
+            const prefix = `${ORDER_NO_PREFIX}${yy}${mm}${dd}-`;
             let maxN = 0;
-            if (Array.isArray(orders)) {
-                for (const o of orders) {
-                    const on = o && o.orderNo ? String(o.orderNo) : '';
-                    if (on.startsWith(prefix)) {
-                        const n = parseInt(on.slice(prefix.length), 10);
-                        if (!Number.isNaN(n)) maxN = Math.max(maxN, n);
-                    }
+            const consider = (on) => {
+                on = on ? String(on) : '';
+                if (on.startsWith(prefix)) {
+                    const n = parseInt(on.slice(prefix.length), 10);
+                    if (!Number.isNaN(n)) maxN = Math.max(maxN, n);
                 }
-            }
-            const next = maxN + 1;
-            const orderNo = `${prefix}${String(next).padStart(3, '0')}`;
+            };
+            if (Array.isArray(orders)) orders.forEach(o => consider(o && o.orderNo));
+            (extraTaken || []).forEach(consider);
+            return `${prefix}${String(maxN + 1).padStart(3, '0')}`;
+        }
+        function generateOrderNo() {
+            const dateInput = document.getElementById('orderDate');
+            const dateStr = (dateInput && dateInput.value) ? dateInput.value : toYmdLocal(new Date());
             const input = document.getElementById('orderNo');
-            if (input) input.value = orderNo;
+            if (input) input.value = nextOrderNoForDate(dateStr);
+        }
+
+        // 受注1件の税込金額（受注一覧の「金額（税込）」欄用。請求書の消費税は calcInvoiceTax で別に計算する）
+        function grossFromNet(net) {
+            return Math.round((Number(net) || 0) * (100 + TAX_RATE_PERCENT) / 100);
         }
 
         // 金額計算（数量×単価から計算）
@@ -3378,7 +3540,7 @@ function updateStatsFromView() {
             
             if (quantity && unitPrice) {
                 const amountNet = quantity * unitPrice;
-                const amountGross = Math.round(amountNet * 1.1);
+                const amountGross = grossFromNet(amountNet);
                 
                 document.getElementById('amountNet').value = amountNet;
                 document.getElementById('amountGross').value = amountGross;
@@ -3388,7 +3550,7 @@ function updateStatsFromView() {
         // 税別金額から税込金額を計算
         function calculateGrossFromNet() {
             const amountNet = parseFloat(document.getElementById('amountNet').value) || 0;
-            const amountGross = Math.round(amountNet * 1.1);
+            const amountGross = grossFromNet(amountNet);
             document.getElementById('amountGross').value = amountGross;
         }
 
@@ -3396,11 +3558,12 @@ function updateStatsFromView() {
         // 受注保存
         async function saveOrder() {
             // フォーム入力値の取得と検証
-            const orderNo = document.getElementById('orderNo').value;
+            const orderNo = document.getElementById('orderNo').value.trim();
             const orderDate = document.getElementById('orderDate').value;
-            const customerName = document.getElementById('customerName').value;
-            const pickupLocation = document.getElementById('pickupLocation').value;
-            const deliveryLocation = document.getElementById('deliveryLocation').value;
+            // 前後の空白は取り除く（「㈱A社」と「㈱A社 」が別の請求書に分かれないように）
+            const customerName = document.getElementById('customerName').value.trim();
+            const pickupLocation = document.getElementById('pickupLocation').value.trim();
+            const deliveryLocation = document.getElementById('deliveryLocation').value.trim();
             const cargo = document.getElementById('cargo').value;
             const quantity = document.getElementById('quantity').value;
             const unit = document.getElementById('unit').value;
@@ -3411,6 +3574,14 @@ function updateStatsFromView() {
             // 必須項目のチェック（数量、単位、単価は必須から除外）
             if (!orderNo || !orderDate || !customerName || !pickupLocation || !deliveryLocation || !cargo) {
                 alert('必須項目を入力してください');
+                return;
+            }
+            if (!isValidYmd(orderDate)) {
+                alert('日付が正しくありません');
+                return;
+            }
+            if ((parseFloat(quantity) || 0) < 0 || (parseFloat(unitPrice) || 0) < 0 || (parseFloat(amountNet) || 0) < 0) {
+                alert('数量・単価・金額にマイナスの値は入力できません');
                 return;
             }
             // 受注No重複チェック（編集時は自身を除外）
@@ -3425,10 +3596,10 @@ function updateStatsFromView() {
                 date: orderDate,
                 customerName: customerName,
                 pickupLocation: pickupLocation,
-                pickupAddress: document.getElementById('pickupAddress').value,
+                pickupAddress: document.getElementById('pickupAddress').value.trim(),
                 deliveryLocation: deliveryLocation,
-                deliveryAddress: document.getElementById('deliveryAddress').value,
-                deliveryTel: document.getElementById('deliveryTel').value,
+                deliveryAddress: document.getElementById('deliveryAddress').value.trim(),
+                deliveryTel: document.getElementById('deliveryTel').value.trim(),
                 cargo: cargo,
                 quantity: parseFloat(quantity) || 0,
                 unit: unit || '',
@@ -3457,15 +3628,22 @@ function updateStatsFromView() {
                 } else if (latest.ok && !latest.order && !hasPendingCloudUpsert(editSessionBaseline.orderNo)) {
                     alert('この受注は別の端末で削除、または受注Noが変更されている可能性があります。最新の内容を読み直してから再度操作してください。');
                     return;
+                } else if (!latest.ok) {
+                    // 通信できず最新状態を確かめられない。黙って保存すると他の端末の変更を上書きするおそれがある
+                    if (!confirm('通信できないため、他の端末でこの受注が変更されていないか確認できませんでした。\nこのまま保存すると、他の端末での変更を上書きする可能性があります。\n\n保存しますか？（通信回復後に自動で送信されます）')) {
+                        return;
+                    }
                 }
             }
 
             if (editingId) {
                 // 既存データの更新（instructionSheet/invoiceSent/paymentReceived/orderCompleted は保持）
                 const index = orders.findIndex(o => String(o.id) === String(editingId));
-                if (index !== -1) {
-                    orders[index] = { ...orders[index], ...formData, id: editingId };
+                if (index === -1) {
+                    alert('この受注は一覧から消えています（別の端末で削除された可能性があります）。保存できませんでした。');
+                    return;
                 }
+                orders[index] = { ...orders[index], ...formData, id: editingId };
             } else {
                 // 新規データの追加（フラグは初期値false）
                 formData.id = generateLocalId();
@@ -3484,7 +3662,7 @@ function updateStatsFromView() {
                 const target = editingId ? orders.find(o => String(o.id) === String(editingId)) : formData;
                 if (cloudEnabled() && target) {
                     cloudUpsertOrder(target)
-                        .then(() => { logInfo('CLOUD_SYNC', 'upsert ok', target.orderNo); showToast('Cloud同期完了'); try { flushCloudQueue(2); } catch(_){} })
+                        .then((ok) => { if (ok) { logInfo('CLOUD_SYNC', 'upsert ok', target.orderNo); showToast('Cloud同期完了'); } })
                         .catch(err => { logError('CLOUD_SYNC', err); enqueueCloudOp('upsert', target); updateCloudStatusUI(false); showToast('Cloud同期に失敗（キューに追加）', 'error'); });
                 }
             } catch(e) { logError('CLOUD_SYNC_UNCAUGHT', e); }
@@ -3524,6 +3702,15 @@ function updateStatsFromView() {
             if (savedOk) { showToast(editingId ? '編集を保存しました' : '新規受注を保存しました'); } else { showToast('ローカル保存に失敗しました', 'error'); }
         }
 
+        // 受注番号欄の編集可否（編集時は変更不可。番号を変えると旧番号の行がクラウドに残り、二重計上になるため）
+        function setOrderNoEditable(editable) {
+            var el = document.getElementById('orderNo');
+            if (!el) return;
+            el.readOnly = !editable;
+            el.title = editable ? '' : '登録済みの受注番号は変更できません';
+            el.classList.toggle('input-readonly', !editable);
+        }
+
         // 受注フォームにデータを流し込む共通ヘルパー
         // overrides: フィールドごとに上書きしたい値（例: { orderDate: '', driver: '' }）
         function populateOrderForm(order, overrides) {
@@ -3541,7 +3728,20 @@ function updateStatsFromView() {
             fields.forEach(function(pair) {
                 var elId = pair[0], key = pair[1];
                 var val = (elId in ov) ? ov[elId] : (order[key] || '');
-                document.getElementById(elId).value = val;
+                var el = document.getElementById(elId);
+                // 選択式の欄で、マスタから外れた値（退職したドライバー等）を持つ受注は、その値を一時的な選択肢として出す
+                // （出さないと未選択になり、保存したときにその項目が空で上書きされる）
+                if (el && el.tagName === 'SELECT' && val !== '' && val != null) {
+                    var exists = Array.prototype.some.call(el.options, function(o) { return o.value === String(val); });
+                    if (!exists) {
+                        var opt = document.createElement('option');
+                        opt.value = String(val);
+                        opt.textContent = String(val) + '（マスタに無い値）';
+                        opt.setAttribute('data-off-master', '1');
+                        el.appendChild(opt);
+                    }
+                }
+                el.value = val;
             });
         }
 
@@ -3571,6 +3771,7 @@ function updateStatsFromView() {
             setEditSessionBaseline(order);
             document.getElementById('modalTitle').textContent = '受注編集';
             populateOrderForm(order);
+            setOrderNoEditable(false);
 
             document.getElementById('orderModal').style.display = 'block';
             var content = document.querySelector('#orderModal .modal-content');
@@ -3588,6 +3789,7 @@ function updateStatsFromView() {
             document.getElementById('orderForm').reset();
 
             populateOrderForm(order, { orderDate: '', orderNo: '', driver: '', vehicle: '' });
+            setOrderNoEditable(true);
             generateOrderNo();
 
             document.getElementById('orderModal').style.display = 'block';
@@ -3945,6 +4147,7 @@ function updateStatsFromView() {
                 <html lang="ja">
                 <head>
                     <meta charset="UTF-8">
+                    <meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'">
                     <title>運行指示書</title>
                     <style>
                         @page { 
@@ -4105,7 +4308,6 @@ function updateStatsFromView() {
             `;
             
             // 複数案件を1枚にまとめる場合
-            const MULTI_ORDERS_PER_PAGE = 4;
             
             for (let startIdx = 0; startIdx < printOrders.length; startIdx += MULTI_ORDERS_PER_PAGE) {
                 const chunk = printOrders.slice(startIdx, startIdx + MULTI_ORDERS_PER_PAGE);
@@ -4117,9 +4319,9 @@ function updateStatsFromView() {
                         <div class="header">
                             <div class="title">運行指示書（貨物）</div>
                             <div class="company-info">
-                                ${companyInfo.name}<br>
-                                ${companyInfo.address}<br>
-                                TEL・FAX ${companyInfo.tel}
+                                ${escHtml(companyInfo.name)}<br>
+                                ${escHtml(companyInfo.address)}<br>
+                                TEL・FAX ${escHtml(companyInfo.tel)}
                             </div>
                         </div>
                 `;
@@ -4140,10 +4342,10 @@ function updateStatsFromView() {
                     printContent += `
                         <div class="dispatch-time">
                             <div style="display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap;">
-                                <div style="margin: 5px;"><strong>日付:</strong> ${orderDate}</div>
-                                <div style="margin: 5px;"><strong>ドライバー:</strong> ${driverName}</div>
-                                <div style="margin: 5px;"><strong>車両:</strong> ${vehicleName}</div>
-                                <div style="margin: 5px;"><strong>1件目の配車時間:</strong> ${dispatchTime}</div>
+                                <div style="margin: 5px;"><strong>日付:</strong> ${escHtml(orderDate)}</div>
+                                <div style="margin: 5px;"><strong>ドライバー:</strong> ${escHtml(driverName)}</div>
+                                <div style="margin: 5px;"><strong>車両:</strong> ${escHtml(vehicleName)}</div>
+                                <div style="margin: 5px;"><strong>1件目の配車時間:</strong> ${escHtml(dispatchTime)}</div>
                             </div>
                         </div>
                     `;
@@ -4271,7 +4473,7 @@ function updateStatsFromView() {
 
             setTimeout(() => {
                 printWindow.print();
-            }, 500);
+            }, PRINT_DELAY_MS);
             
             // 指示書発行フラグ更新
             printOrders.forEach(order => {
@@ -4345,6 +4547,7 @@ function updateStatsFromView() {
                 <html lang="ja">
                 <head>
                     <meta charset="UTF-8">
+                    <meta http-equiv="Content-Security-Policy" content="script-src 'none'; object-src 'none'">
                     <title>貨物引取書・荷渡書</title>
                     <style>
                         @page { 
@@ -4469,32 +4672,27 @@ function updateStatsFromView() {
                 <body>
             `;
             
-            // 各受注ごとに貨物引取書・荷渡書を生成
-            printOrders.forEach((order, index) => {
-                const formattedDate = formatPickupSlipDate(order.date);
-                
-                printContent += `
-                    <div class="page">
-                        <!-- お客様控え -->
+            // 引取書1枚分（お客様控／原本は見出しと、原本だけの受領確認欄が違うだけなので1つの部品にまとめる）
+            const renderPickupSlip = (order, formattedDate, label, isOriginal) => `
                         <div class="slip">
-                            <div class="slip-type">《お客様控》</div>
+                            <div class="slip-type">${label}</div>
                             <div class="title">貨物引取書・荷渡書</div>
                             <div class="company-info">
-                                ${companyInfo.name}《お客様控》<br>
-                                ${companyInfo.address}<br>
-                                TEL・FAX ${companyInfo.tel}
+                                ${escHtml(companyInfo.name)}${label}<br>
+                                ${escHtml(companyInfo.address)}<br>
+                                TEL・FAX ${escHtml(companyInfo.tel)}
                             </div>
                             
                             <table class="info-table">
                                 <tr>
                                     <td style="width: 15%;">配達日</td>
-                                    <td style="width: 35%;"><strong>${formattedDate}</strong></td>
+                                    <td style="width: 35%;"><strong>${escHtml(formattedDate)}</strong></td>
                                     <td style="width: 15%;">車番</td>
-                                    <td style="width: 35%;"><strong>${order.vehicle || ''}</strong></td>
+                                    <td style="width: 35%;"><strong>${escHtml(order.vehicle || '')}</strong></td>
                                 </tr>
                                 <tr>
                                     <td>運転者</td>
-                                    <td colspan="3"><strong>${order.driver || ''}</strong></td>
+                                    <td colspan="3"><strong>${escHtml(order.driver || '')}</strong></td>
                                 </tr>
                             </table>
                             
@@ -4519,7 +4717,7 @@ function updateStatsFromView() {
                                 </tr>
                             </table>
                             
-                            <table class="main-table">
+                            <table class="main-table"${isOriginal ? ' style="margin-bottom: 8px;"' : ''}>
                                 <tr>
                                     <th style="width: 16%;">品名</th>
                                     <th style="width: 14%;">品種</th>
@@ -4546,90 +4744,11 @@ function updateStatsFromView() {
                                 </tr>
                                 <tr>
                                     <td colspan="4" style="text-align: right; background: #d8d8d8;">合計</td>
-                                    <td style="font-weight: bold;">${order.quantity}</td>
-                                    <td style="font-weight: bold;">${order.unit}</td>
+                                    <td style="font-weight: bold;">${escHtml(order.quantity)}</td>
+                                    <td style="font-weight: bold;">${escHtml(order.unit)}</td>
                                 </tr>
                             </table>
-                        </div>
-                        
-                        <div class="cut-line"></div>
-                        
-                        <!-- 原本（保管用） -->
-                        <div class="slip">
-                            <div class="slip-type">《原本（保管用）》</div>
-                            <div class="title">貨物引取書・荷渡書</div>
-                            <div class="company-info">
-                                ${companyInfo.name}《原本（保管用）》<br>
-                                ${companyInfo.address}<br>
-                                TEL・FAX ${companyInfo.tel}
-                            </div>
-                            
-                            <table class="info-table">
-                                <tr>
-                                    <td style="width: 15%;">配達日</td>
-                                    <td style="width: 35%;"><strong>${formattedDate}</strong></td>
-                                    <td style="width: 15%;">車番</td>
-                                    <td style="width: 35%;"><strong>${order.vehicle || ''}</strong></td>
-                                </tr>
-                                <tr>
-                                    <td>運転者</td>
-                                    <td colspan="3"><strong>${order.driver || ''}</strong></td>
-                                </tr>
-                            </table>
-                            
-                            <table class="address-table" style="margin-bottom: 4px;">
-                                <tr>
-                                    <td class="address-label">引取先</td>
-                                    <td>${formatPickupSlipParty(order.pickupLocation, order.pickupAddress)}</td>
-                                </tr>
-                            </table>
-                            
-                            <table class="address-table" style="margin-bottom: 4px;">
-                                <tr>
-                                    <td class="address-label">荷渡先</td>
-                                    <td>${formatPickupSlipParty(order.deliveryLocation, order.deliveryAddress)}</td>
-                                </tr>
-                            </table>
-                            
-                            <table class="address-table" style="margin-bottom: 8px;">
-                                <tr>
-                                    <td class="address-label">ご依頼主</td>
-                                    <td>${order.customerName ? `${escHtml(order.customerName)} 様` : ''}</td>
-                                </tr>
-                            </table>
-                            
-                            <table class="main-table" style="margin-bottom: 8px;">
-                                <tr>
-                                    <th style="width: 16%;">品名</th>
-                                    <th style="width: 14%;">品種</th>
-                                    <th style="width: 14%;">規格</th>
-                                    <th style="width: 14%;">荷姿</th>
-                                    <th style="width: 14%;">個数</th>
-                                    <th style="width: 14%;">単位</th>
-                                </tr>
-                                <tr>
-                                    <td>${escHtml(order.cargo)}</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td>${escHtml(order.packaging || '')}</td>
-                                    <td>${escHtml(order.quantity)}</td>
-                                    <td>${escHtml(order.unit)}</td>
-                                </tr>
-                                <tr style="height: 20px;">
-                                    <td>&nbsp;</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                </tr>
-                                <tr>
-                                    <td colspan="4" style="text-align: right; background: #d8d8d8;">合計</td>
-                                    <td style="font-weight: bold;">${order.quantity}</td>
-                                    <td style="font-weight: bold;">${order.unit}</td>
-                                </tr>
-                            </table>
-                            
+${isOriginal ? `
                             <div class="receipt-section">
                                 <div class="receipt-title">受領確認（お客様ご記入）</div>
                                 <table class="receipt-table">
@@ -4650,7 +4769,20 @@ function updateStatsFromView() {
                                     </tr>
                                 </table>
                             </div>
-                        </div>
+` : ''}                        </div>
+`;
+
+            // 各受注ごとに貨物引取書・荷渡書を生成
+            printOrders.forEach((order, index) => {
+                const formattedDate = formatPickupSlipDate(order.date);
+                printContent += `
+                    <div class="page">
+                        <!-- お客様控え -->
+${renderPickupSlip(order, formattedDate, '《お客様控》', false)}
+                        <div class="cut-line"></div>
+
+                        <!-- 原本（保管用） -->
+${renderPickupSlip(order, formattedDate, '《原本（保管用）》', true)}
                     </div>
                 `;
             });
@@ -4676,89 +4808,29 @@ function updateStatsFromView() {
             if (fmt === null) return; // キャンセル
 
             // CSV出力は常に「当月のみ」（絞り込み・表示モードの影響を受けない）
+            // 全期間のデータは自動バックアップ（非公開リポジトリ kyoshin-order-backups）にある
             const monthOrders = getMonthOrders('single');
-            let headers, csv, fname;
-
-            if (fmt === 'supabase') {
-                // Supabase形式
-                headers = ['order_no', 'date', 'customer_name', 'pickup_location', 'pickup_address', 'delivery_location', 'delivery_address', 'delivery_tel', 'cargo', 'quantity', 'unit', 'packaging', 'unit_price', 'amount_net', 'amount_gross', 'driver', 'vehicle', 'instructions', 'instruction_sheet', 'invoice_sent', 'payment_received', 'order_completed'];
-                
-                csv = headers.join(',') + CSV_CRLF;
-                monthOrders.forEach(order => {
-                    const row = [
-                        order.orderNo || '',
-                        order.date || '',
-                        order.customerName || '',
-                        order.pickupLocation || '',
-                        order.pickupAddress || '',
-                        order.deliveryLocation || '',
-                        order.deliveryAddress || '',
-                        order.deliveryTel || '',
-                        order.cargo || '',
-                        order.quantity || '',
-                        order.unit || '',
-                        order.packaging || '',
-                        toNumber(order.unitPrice) || '',
-                        toNumber(order.amountNet) || '',
-                        toNumber(order.amountGross) || '',
-                        order.driver || '',
-                        order.vehicle || '',
-                        order.instructions || '',
-                        order.instructionSheet ? 'true' : 'false',
-                        order.invoiceSent ? 'true' : 'false',
-                        order.paymentReceived ? 'true' : 'false',
-                        order.orderCompleted ? 'true' : 'false'
-                    ];
-                    csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
-                });
-                fname = `受注明細_Supabase形式_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
-            } else { // fmt === 'internal'
-                // 社内用形式（全項目対応）
-                headers = ['受注番号', '日付', '顧客名', '引取先', '引取先住所', '配送先', '配送先住所', '配送先電話番号', '積荷', '数量', '単位', '荷姿', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両', '備考', '指示書', '請求済', '入金済', '完了'];
-                
-                csv = headers.join(',') + CSV_CRLF;
-                monthOrders.forEach(order => {
-                    const row = [
-                        order.orderNo || '',
-                        order.date || '',
-                        order.customerName || '',
-                        order.pickupLocation || '',
-                        order.pickupAddress || '',
-                        order.deliveryLocation || '',
-                        order.deliveryAddress || '',
-                        order.deliveryTel || '',
-                        order.cargo || '',
-                        order.quantity || '',
-                        order.unit || '',
-                        order.packaging || '',
-                        toNumber(order.unitPrice) || '',
-                        toNumber(order.amountNet) || '',
-                        toNumber(order.amountGross) || '',
-                        order.driver || '',
-                        order.vehicle || '',
-                        order.instructions || '',
-                        order.instructionSheet ? 'true' : 'false',
-                        order.invoiceSent ? 'true' : 'false',
-                        order.paymentReceived ? 'true' : 'false',
-                        order.orderCompleted ? 'true' : 'false'
-                    ];
-                    csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
-                });
-                fname = `受注明細_${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月.csv`;
-            }
+            const headers = fmt === 'supabase'
+                ? ['order_no', 'date', 'customer_name', 'pickup_location', 'pickup_address', 'delivery_location', 'delivery_address', 'delivery_tel', 'cargo', 'quantity', 'unit', 'packaging', 'unit_price', 'amount_net', 'amount_gross', 'driver', 'vehicle', 'instructions', 'instruction_sheet', 'invoice_sent', 'payment_received', 'order_completed']
+                : ['受注番号', '日付', '顧客名', '引取先', '引取先住所', '配送先', '配送先住所', '配送先電話番号', '積荷', '数量', '単位', '荷姿', '単価', '金額(税別)', '金額(税込)', 'ドライバー', '車両', '備考', '指示書', '請求済', '入金済', '完了'];
+            // 列の中身は2形式とも同じ（見出しだけが違う）
+            const rowOf = order => [
+                order.orderNo || '', order.date || '', order.customerName || '',
+                order.pickupLocation || '', order.pickupAddress || '',
+                order.deliveryLocation || '', order.deliveryAddress || '', order.deliveryTel || '',
+                order.cargo || '', order.quantity || '', order.unit || '', order.packaging || '',
+                toNumber(order.unitPrice) || '', toNumber(order.amountNet) || '', toNumber(order.amountGross) || '',
+                order.driver || '', order.vehicle || '', order.instructions || '',
+                order.instructionSheet ? 'true' : 'false', order.invoiceSent ? 'true' : 'false',
+                order.paymentReceived ? 'true' : 'false', order.orderCompleted ? 'true' : 'false'
+            ];
+            let csv = headers.join(',') + CSV_CRLF;
+            monthOrders.forEach(order => { csv += rowOf(order).map(v => csvQ(v)).join(',') + CSV_CRLF; });
+            const monthLabel = `${currentMonth.getFullYear()}年${currentMonth.getMonth() + 1}月`;
+            const fname = fmt === 'supabase' ? `受注明細_Supabase形式_${monthLabel}.csv` : `受注明細_${monthLabel}.csv`;
 
             const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
-            // 案件CSV フォルダへ保存（フォルダ設定済みなら）
-            if (await saveCsvToDir(blob, fname)) {
-                alert('CSVを保存しました（設定フォルダ）');
-                return;
-            }
-            // フォールバック：通常ダウンロード
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = fname;
-            link.click();
-            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            await deliverCsvFile(blob, fname);
         }
 
         // CSVインポート（ヘッダーマッピング機能付き、Supabase自動同期）
@@ -4783,181 +4855,142 @@ function updateStatsFromView() {
             return rows;
         }
 
+        // 受注CSV取込（このアプリの出力形式・Supabase のバックアップCSVの両方に対応）
+        // - 受注番号が既存と同じ行は、その受注を更新する（重複登録しない）。更新がある場合は取込前に確認する
+        // - 空欄のセルは既存の値を消さない（Excel で一部の列だけ直したCSVでも、他の項目が消えない）
+        // - 金額の「12,000」のような桁区切り、真偽値の t / f（バックアップCSV）も読める
+        // - 日付が読めない行は取り込まずに件数を知らせる
+        const CSV_ORDER_HEADER_MAPPING = {
+            // Supabase形式（週次・日次バックアップCSVと同じ列名）
+            'order_no': 'orderNo', 'date': 'date', 'customer_name': 'customerName',
+            'pickup_location': 'pickupLocation', 'pickup_address': 'pickupAddress',
+            'delivery_location': 'deliveryLocation', 'delivery_address': 'deliveryAddress', 'delivery_tel': 'deliveryTel',
+            'cargo': 'cargo', 'quantity': 'quantity', 'unit': 'unit', 'packaging': 'packaging',
+            'unit_price': 'unitPrice', 'amount_net': 'amountNet', 'amount_gross': 'amountGross',
+            'driver': 'driver', 'vehicle': 'vehicle', 'instructions': 'instructions',
+            'instruction_sheet': 'instructionSheet', 'invoice_sent': 'invoiceSent',
+            'payment_received': 'paymentReceived', 'order_completed': 'orderCompleted',
+            // 社内用形式（全項目対応）
+            '受注番号': 'orderNo', '日付': 'date', '顧客名': 'customerName',
+            '引取先': 'pickupLocation', '引取先住所': 'pickupAddress',
+            '配送先': 'deliveryLocation', '配送先住所': 'deliveryAddress', '配送先電話番号': 'deliveryTel',
+            '積荷': 'cargo', '数量': 'quantity', '単位': 'unit', '荷姿': 'packaging',
+            '単価': 'unitPrice', '金額(税別)': 'amountNet', '金額(税込)': 'amountGross',
+            'ドライバー': 'driver', '車両': 'vehicle', '備考': 'instructions',
+            '指示書': 'instructionSheet', '請求済': 'invoiceSent', '入金済': 'paymentReceived', '完了': 'orderCompleted'
+        };
+        const CSV_NUMBER_FIELDS = ['quantity', 'unitPrice', 'amountNet', 'amountGross'];
+        const CSV_BOOL_FIELDS = ['instructionSheet', 'invoiceSent', 'paymentReceived', 'orderCompleted'];
+        function normalizeCsvDate(v) {
+            const t = String(v || '').trim();
+            const m = /^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/.exec(t);
+            if (!m) return '';
+            const ymd = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+            return isValidYmd(ymd) ? ymd : '';
+        }
+        function emptyImportedOrder() {
+            return {
+                orderNo: '', date: '', customerName: '', pickupLocation: '', pickupAddress: '',
+                deliveryLocation: '', deliveryAddress: '', deliveryTel: '', cargo: '',
+                quantity: 0, unit: '', packaging: '', unitPrice: 0, amountNet: 0, amountGross: 0,
+                driver: '', vehicle: '', instructions: '',
+                instructionSheet: false, invoiceSent: false, paymentReceived: false, orderCompleted: false
+            };
+        }
+
         function importCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const text = e.target.result;
+            reader.onload = async function(e) {
+                const text = String(e.target.result || '').replace(/^﻿/, '');
                 const lines = splitCsvRows(text);
-                const csvHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-                
-                // ヘッダーマッピング定義
-                const headerMapping = {
-                    // Supabase形式
-                    'order_no': 'orderNo',
-                    'date': 'date',
-                    'customer_name': 'customerName',
-                    'pickup_location': 'pickupLocation',
-                    'pickup_address': 'pickupAddress',
-                    'delivery_location': 'deliveryLocation',
-                    'delivery_address': 'deliveryAddress',
-                    'delivery_tel': 'deliveryTel',
-                    'cargo': 'cargo',
-                    'quantity': 'quantity',
-                    'unit': 'unit',
-                    'packaging': 'packaging',
-                    'unit_price': 'unitPrice',
-                    'amount_net': 'amountNet',
-                    'amount_gross': 'amountGross',
-                    'driver': 'driver',
-                    'vehicle': 'vehicle',
-                    'instructions': 'instructions',
-                    'instruction_sheet': 'instructionSheet',
-                    'invoice_sent': 'invoiceSent',
-                    'payment_received': 'paymentReceived',
-                    'order_completed': 'orderCompleted',
-                    // 社内用形式（全項目対応）
-                    '受注番号': 'orderNo',
-                    '日付': 'date',
-                    '顧客名': 'customerName',
-                    '引取先': 'pickupLocation',
-                    '引取先住所': 'pickupAddress',
-                    '配送先': 'deliveryLocation',
-                    '配送先住所': 'deliveryAddress',
-                    '配送先電話番号': 'deliveryTel',
-                    '積荷': 'cargo',
-                    '数量': 'quantity',
-                    '単位': 'unit',
-                    '荷姿': 'packaging',
-                    '単価': 'unitPrice',
-                    '金額(税別)': 'amountNet',
-                    '金額(税込)': 'amountGross',
-                    'ドライバー': 'driver',
-                    '車両': 'vehicle',
-                    '備考': 'instructions',
-                    '指示書': 'instructionSheet',
-                    '請求済': 'invoiceSent',
-                    '入金済': 'paymentReceived',
-                    '完了': 'orderCompleted'
-                };
-                
-                // ヘッダーのマッピング
-                const mappedHeaders = csvHeaders.map(header => headerMapping[header] || null);
-                const importedOrders = [];
-                
+                const csvHeaders = parseCsvLine(lines[0] || '').map(h => h.trim());
+                const mappedHeaders = csvHeaders.map(header => CSV_ORDER_HEADER_MAPPING[header] || null);
+
+                // 1) 行を読み取る（まだ反映しない）
+                const parsedRows = [];
+                let badDateRows = 0;
+                const generatedNos = [];
                 for (let i = 1; i < lines.length; i++) {
-                    if (!lines[i]) continue;
-                    
-                    const cleanValues = parseCsvLine(lines[i]).map(v => v.trim());
-                    
-                    // マッピングされたデータオブジェクトを作成
-                    const order = {
-                        id: generateLocalId(),
-                        orderNo: '',
-                        date: '',
-                        customerName: '',
-                        pickupLocation: '',
-                        pickupAddress: '',
-                        deliveryLocation: '',
-                        deliveryAddress: '',
-                        deliveryTel: '',
-                        cargo: '',
-                        quantity: 0,
-                        unit: '',
-                        packaging: '',
-                        unitPrice: 0,
-                        amountNet: 0,
-                        amountGross: 0,
-                        driver: '',
-                        vehicle: '',
-                        instructions: '',
-                        instructionSheet: false,
-                        invoiceSent: false,
-                        paymentReceived: false,
-                        orderCompleted: false
-                    };
-                    
-                    // マッピングに従ってデータを割り当て
-                    mappedHeaders.forEach((mappedHeader, index) => {
-                        if (mappedHeader && cleanValues[index]) {
-                            const value = cleanValues[index];
-                            if (mappedHeader === 'quantity' || mappedHeader === 'unitPrice' || mappedHeader === 'amountNet' || mappedHeader === 'amountGross') {
-                                order[mappedHeader] = parseFloat(value) || 0;
-                            } else if (mappedHeader === 'instructionSheet' || mappedHeader === 'invoiceSent' || mappedHeader === 'paymentReceived' || mappedHeader === 'orderCompleted') {
-                                order[mappedHeader] = value === 'true' || value === '1' || value === 'TRUE';
-                            } else {
-                                order[mappedHeader] = value;
-                            }
-                        }
+                    if (!lines[i] || !lines[i].trim()) continue;
+                    const cells = parseCsvLine(lines[i]).map(v => String(v == null ? '' : v).trim());
+                    const fields = {};
+                    mappedHeaders.forEach((key, idx) => {
+                        if (!key) return;
+                        const value = cells[idx];
+                        if (value === undefined || value === '') return;   // 空欄は「変更なし」
+                        if (CSV_NUMBER_FIELDS.indexOf(key) !== -1) fields[key] = toNumber(value);
+                        else if (CSV_BOOL_FIELDS.indexOf(key) !== -1) fields[key] = parseBoolLoose(value);
+                        else if (key === 'date') fields[key] = normalizeCsvDate(value);
+                        else fields[key] = value;
                     });
-                    
-                    // orderNoが空の場合は自動生成
-                    if (!order.orderNo) {
-                        order.orderNo = `R${new Date().getFullYear().toString().slice(2)}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${(orders.length + i).toString().padStart(3, '0')}`;
+                    if ('date' in fields && !fields.date) { badDateRows++; continue; }
+                    if (!fields.orderNo) {
+                        fields.orderNo = nextOrderNoForDate(toYmdLocal(new Date()), generatedNos);
+                        generatedNos.push(fields.orderNo);
                     }
-                    
-                    // 受注No重複チェック（既存データを上書き更新）
-                    const dupIdx = orders.findIndex(o => String(o.orderNo) === String(order.orderNo));
-                    if (dupIdx !== -1) {
-                        orders[dupIdx] = { ...orders[dupIdx], ...order, id: orders[dupIdx].id };
-                    } else {
-                        orders.push(order);
-                    }
-                    importedOrders.push(order);
+                    parsedRows.push(fields);
                 }
-                
+                const existingCount = parsedRows.filter(f => orders.some(o => String(o.orderNo) === String(f.orderNo))).length;
+
+                // 2) 既存の受注を書き換える行があるときは確認する
+                if (existingCount > 0) {
+                    const ok = confirm(`CSVの ${parsedRows.length} 件のうち ${existingCount} 件は、登録済みの受注（同じ受注番号）を書き換えます。\n` +
+                        `空欄のセルは今の値のまま残します。\n\n取り込みますか？`);
+                    if (!ok) { event.target.value = ''; return; }
+                }
+
+                // 3) 反映
+                const importedOrders = [];
+                parsedRows.forEach(fields => {
+                    const dupIdx = orders.findIndex(o => String(o.orderNo) === String(fields.orderNo));
+                    if (dupIdx !== -1) {
+                        orders[dupIdx] = { ...orders[dupIdx], ...fields, id: orders[dupIdx].id };
+                        importedOrders.push(orders[dupIdx]);
+                    } else {
+                        const order = { ...emptyImportedOrder(), ...fields, id: generateLocalId() };
+                        orders.push(order);
+                        importedOrders.push(order);
+                    }
+                });
+
                 saveData();
                 renderTable();
                 updateStats();
                 setupFilters();
-                
-                // Supabase自動同期（クラウド有効の場合のみ）
+
+                let message = `CSVファイルをインポートしました（${importedOrders.length}件）`;
+                if (badDateRows > 0) message += `\n日付が読めないため取り込まなかった行: ${badDateRows}件（日付は 2026-10-09 または 2026/10/9 の形式）`;
+
+                // 4) クラウドへ1件ずつ保存（終わってから結果を表示）
                 if (cloudEnabled() && importedOrders.length > 0) {
-                    (async () => {
+                    let okCount = 0;
+                    let queuedCount = 0;
+                    for (const order of importedOrders) {
                         try {
-                            for (const order of importedOrders) {
-                                try {
-                                    await cloudUpsertOrder(order);
-                                } catch(err) {
-                                    console.error('Cloud同期エラー:', err);
-                                }
-                            }
-                            showToast(`CSVインポート完了、Supabase同期完了（${importedOrders.length}件）`, 'success');
+                            if (await cloudUpsertOrder(order)) okCount++; else queuedCount++;
                         } catch(err) {
-                            console.error('CSVインポート同期エラー:', err);
+                            queuedCount++;
+                            console.error('Cloud同期エラー:', err);
                         }
-                    })();
-                } else {
-                    alert(`CSVファイルをインポートしました（${lines.length - 1}件）`);
+                    }
+                    message += `\nクラウドへの保存: ${okCount}件` + (queuedCount ? `（${queuedCount}件は送信待ち。通信が戻ると自動で送信します）` : '');
+                    if (!queuedCount) showToast(`CSVインポート完了、Supabase同期完了（${okCount}件）`, 'success');
                 }
+                alert(message);
             };
-            
+
             reader.readAsText(file);
             event.target.value = '';
         }
 
         // 顧客マスタCSVエクスポート
-        async function exportCustomerCSV() {
-            const headers = ['顧客名', '住所', '電話番号'];
-            
-            let csv = headers.join(',') + CSV_CRLF;
-            customerMaster.forEach(customer => {
-                const row = [
-                    customer.name,
-                    customer.address,
-                    customer.tel
-                ];
-                csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
-            });
-            
-            const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
-            const date = new Date();
-            const dateStr = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
-            const fname = `顧客マスタ_${dateStr}.csv`;
+        // CSV ファイルを「CSV保存先フォルダ」へ保存。未設定・非対応ならダウンロードにする（共通処理）
+        async function deliverCsvFile(blob, fname, savedMessage) {
             if (await saveCsvToDir(blob, fname)) {
-                alert('CSVを保存しました（設定フォルダ）');
+                alert(savedMessage || 'CSVを保存しました（設定フォルダ）');
                 return;
             }
             const link = document.createElement('a');
@@ -4966,87 +4999,91 @@ function updateStatsFromView() {
             link.click();
             setTimeout(() => URL.revokeObjectURL(link.href), 1000);
         }
+        function ymdCompact(date) {
+            return toYmdLocal(date).replace(/-/g, '');
+        }
+
+        async function exportCustomerCSV() {
+            // 配送先住所は画面には出ていないが、取込→出力の往復で消えないよう4列目に出す
+            const headers = ['顧客名', '住所', '電話番号', '配送先住所'];
+            let csv = headers.join(',') + CSV_CRLF;
+            customerMaster.forEach(customer => {
+                const row = [customer.name, customer.address, customer.tel, customer.deliveryAddress || ''];
+                csv += row.map(v => csvQ(v)).join(',') + CSV_CRLF;
+            });
+            const blob = new Blob([CSV_BOM + csv], { type: 'text/csv;charset=utf-8;' });
+            await deliverCsvFile(blob, `顧客マスタ_${ymdCompact(new Date())}.csv`);
+        }
 
         // 顧客マスタCSVインポート
+        // 読める形式: このアプリの出力（顧客名,住所,電話番号[,配送先住所]）／Supabase のバックアップCSV（id,customer_name,pickup_address,...）
+        // 既にある顧客名は追加しない（上書きもしない）。クラウドには新しい顧客だけを追加する
         function importCustomerCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
             reader.onload = async function(e) {
+                let importCount = 0;
+                let skipCount = 0;
+                const added = [];
                 try {
-                    const text = e.target.result;
-                    const lines = text.split('\n');
-
-                    // ヘッダー行をスキップ
-                    const hasHeader = lines[0].includes('顧客名') || lines[0].includes('住所') || lines[0].includes('電話番号');
-                    const startIndex = hasHeader ? 1 : 0;
-                    
-                    let importCount = 0;
-                    let skipCount = 0;
-                    
-                    for (let i = startIndex; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (!line) continue;
-                        
-                        // CSVをパース（RFC 4180準拠）
-                        const cleanValues = parseCsvLine(line).map(v => v.trim());
-                        
-                        // 列不足は空文字で補完（住所・電話が空でも取り込む）
-                        const nameVal = cleanValues[0] != null ? cleanValues[0] : '';
-                        const addressVal = cleanValues[1] != null ? cleanValues[1] : '';
-                        const telVal = cleanValues[2] != null ? cleanValues[2] : '';
-
-                        const newCustomer = {
-                            name: nameVal,
-                            address: addressVal,
-                            tel: telVal
-                        };
-                        
-                        // 重複チェック（顧客名が同じものは追加しない）
-                        const exists = customerMaster.some(c => c.name === newCustomer.name);
-                        if (!exists && newCustomer.name) {
-                            customerMaster.push(newCustomer);
-                            importCount++;
-                        } else {
-                            skipCount++;
-                        }
+                    const text = String(e.target.result || '').replace(/^﻿/, '');
+                    const rows = splitCsvRows(text).filter(r => r.trim() !== '');
+                    if (!rows.length) { alert('CSVにデータがありません'); return; }
+                    const header = parseCsvLine(rows[0]).map(h => h.trim());
+                    const col = (names, fallback) => {
+                        for (const n of names) { const i = header.indexOf(n); if (i !== -1) return i; }
+                        return fallback;
+                    };
+                    const hasHeader = ['顧客名', '住所', '電話番号', 'customer_name'].some(h => header.indexOf(h) !== -1);
+                    const iName = hasHeader ? col(['顧客名', 'customer_name'], 0) : 0;
+                    const iAddr = hasHeader ? col(['住所', 'pickup_address'], 1) : 1;
+                    const iTel = hasHeader ? col(['電話番号', 'phone_number'], 2) : 2;
+                    const iDeliv = hasHeader ? col(['配送先住所', 'delivery_address'], -1) : -1;
+                    const existingNames = new Set(customerMaster.map(c => String(c.name || '').trim()));
+                    for (let i = hasHeader ? 1 : 0; i < rows.length; i++) {
+                        const v = parseCsvLine(rows[i]).map(x => String(x == null ? '' : x).trim());
+                        const name = v[iName] || '';
+                        if (!name || existingNames.has(name)) { skipCount++; continue; }
+                        const c = { name, address: v[iAddr] || '', tel: v[iTel] || '', deliveryAddress: iDeliv !== -1 ? (v[iDeliv] || '') : '' };
+                        existingNames.add(name);
+                        customerMaster.push(c);
+                        added.push(c);
+                        importCount++;
                     }
-                    
-                    // マスタを保存して画面を更新
-                    localStorage.setItem('customerMaster', JSON.stringify(customerMaster));
-                    renderCustomerMaster();
-                    setupFilters(); // フィルターを更新
-                    
-                    // Supabaseに保存（完了を待ってから結果表示。途中でページを閉じるとDELETEだけ実行される危険を防ぐ）
-                    var cloudSaveOk = true;
-                    if (cloudEnabled()) {
-                        try {
-                            await cloudSaveCustomers(customerMaster);
-                            logInfo('importCustomerCSV', 'Saved to Supabase');
-                        } catch (err) {
-                            cloudSaveOk = false;
-                            logError('importCustomerCSV', 'Failed to save to Supabase', err);
-                        }
-                    }
-
-                    // 結果を表示
-                    var message = 'CSVインポート完了\n';
-                    message += '追加: ' + importCount + '件';
-                    if (skipCount > 0) {
-                        message += '\nスキップ: ' + skipCount + '件（重複または不正なデータ）';
-                    }
-                    if (!cloudSaveOk) {
-                        message += '\n\n⚠ クラウド保存に失敗しました。ローカルには保存済みです。\n次回の同期で自動的に反映されます。';
-                    }
-                    alert(message);
-                    
                 } catch (error) {
                     alert('CSVファイルの読み込みに失敗しました。\nファイル形式を確認してください。');
-                    // エラーはアラートで通知（不要なコンソール出力は削除）
+                    return;
                 }
+
+                // クラウドへの追加が終わってから結果を表示する（新しい顧客だけを追加。既存の顧客は消さない）
+                let cloudSaveOk = true;
+                if (cloudEnabled() && added.length) {
+                    try {
+                        await cloudSyncCustomers(added, []);
+                        await reloadCustomersFromCloud();
+                    } catch (err) {
+                        cloudSaveOk = false;
+                        logError('importCustomerCSV', 'Failed to save to Supabase', err);
+                    }
+                }
+                if (cloudSaveOk) {
+                    try { localStorage.setItem('customerMaster', JSON.stringify(customerMaster)); } catch(_){}
+                    customerMasterOpenIds = customerMaster.map(c => c && c.id).filter(Boolean).map(String);
+                } else {
+                    // クラウドに入らなかった分は画面からも外す（次の同期で消えて混乱しないように）
+                    customerMaster = safeParseLocalStorage('customerMaster', customerMaster.filter(c => added.indexOf(c) === -1));
+                }
+                renderCustomerMaster();
+                setupFilters();
+
+                let message = 'CSVインポート完了\n追加: ' + (cloudSaveOk ? importCount : 0) + '件';
+                if (skipCount > 0) message += '\nスキップ: ' + skipCount + '件（登録済みの顧客名・空行）';
+                if (!cloudSaveOk) message += '\n\n⚠ クラウドへの保存に失敗したため、追加しませんでした。\n接続状態を確認してから、もう一度取り込んでください。';
+                alert(message);
             };
-            
+
             reader.readAsText(file);
             event.target.value = ''; // 同じファイルを再度選択できるようにリセット
         }
@@ -5058,6 +5095,19 @@ async function exportInvoiceCSV() {
   if (!monthOrders || monthOrders.length === 0) {
     alert('出力するデータがありません（当月の受注が0件）');
     return;
+  }
+
+  // 金額が0円の受注（「料金は後日」など）があれば、0円のまま請求書に載る前に知らせる
+  var zeroOrders = monthOrders.filter(function(o) { return !toNumber(o.amountNet); });
+  if (zeroOrders.length > 0) {
+    var zeroLines = zeroOrders.slice(0, 10).map(function(o) {
+      return '・' + (o.orderNo || '') + ' ' + (o.date || '') + ' ' + (o.customerName || '') + (o.instructions ? '（' + String(o.instructions).split('\n')[0].slice(0, 20) + '）' : '');
+    });
+    if (zeroOrders.length > 10) zeroLines.push('…ほか ' + (zeroOrders.length - 10) + ' 件');
+    if (!confirm('金額（税別）が0円の受注が ' + zeroOrders.length + ' 件あります。このまま出力すると0円で請求書に載ります。\n\n' +
+        zeroLines.join('\n') + '\n\n出力しますか？（「キャンセル」で中止して金額を入力できます）')) {
+      return;
+    }
   }
 
   // MFサンプルCSVの1行目（40列）と完全一致
@@ -5114,7 +5164,7 @@ async function exportInvoiceCSV() {
   });
   // 消費税は請求書（顧客）単位で税抜合計に対して1回だけ四捨五入（マネーフォワードの計算と一致させる）
   Object.values(byCustomer).forEach(sum => {
-    sum.tax   = calcInvoiceTax(sum.net);
+    sum.tax   = calcInvoiceTax(sum.net, TAX_RATE_PERCENT);
     sum.gross = sum.net + sum.tax;
   });
 

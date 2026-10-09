@@ -2,14 +2,19 @@
   "name": "order-management-system",
   "private": true,
   "version": "1.0.0",
-  "description": "Smoke tests for the order management system",
+  "description": "きょうしん輸送 受注管理システム（静的HTML + Supabase）のテスト・静的チェック",
   "scripts": {
+    "check": "node scripts/check-app.js",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
-    "test:ui:report": "playwright show-report"
+    "test:ui:report": "playwright show-report",
+    "test": "node scripts/check-app.js && playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "^1.54.2"
+    "@playwright/test": "1.63.0",
+    "acorn": "8.18.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
-
