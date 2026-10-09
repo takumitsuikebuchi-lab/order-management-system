@@ -76,7 +76,7 @@
 | `schema.sql` | Supabaseのテーブル定義（2026-10-09 に本番の列構成へ合わせた） |
 | `migrations/` | DB への追加変更（日付順に実行）。`2026-10-09_bulk_delete_guard_and_indexes.sql` は**未適用**（ユーザー確認待ち。状況は tasks/todo.md） |
 | `scripts/check-app.js` | `npm run check`: cloud-config.json と埋め込み設定の照合＋ ES2019 構文チェック（acorn） |
-| `tests/smoke.spec.js` / `tests/regression.spec.js` | Playwright の UI テスト（48件＋19件＝67件）。regression は偽の Supabase（メモリ上の PostgREST もどき）で同期・マスタ保存・キューを検証する |
+| `tests/smoke.spec.js` / `tests/regression.spec.js` | Playwright の UI テスト（48件＋20件＝68件）。regression は偽の Supabase（メモリ上の PostgREST もどき）で同期・マスタ保存・キューを検証する |
 | `.github/workflows/guard-and-sync.yml` | Guard And Deploy: `npm run check` → UI テスト → **合格したときだけ GitHub Pages へ反映**（Pages の配信元は GitHub Actions。2026-10-09〜）→ master へミラー |
 | （バックアップ） | 処理本体は**非公開リポジトリ `kyoshin-order-backups`** の `.github/workflows/backup.yml` と `scripts/backup.py`（毎日 0:00 JST、2026-10-09 にこのリポジトリから移設）。このリポジトリには無い |
 
@@ -160,7 +160,7 @@
 - **このリポジトリは Public（GitHub Pages は無料プランでは公開リポジトリのみ）** → 顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリの手動出力CSV）を絶対にコミットしない。`backups/`・`CSV保存/` は .gitignore 済み。2026-09-04 に過去分を非公開リポジトリ `kyoshin-order-backups` へ移設し、履歴からも除去した。**コードやテストにも実在の顧客名・従業員名・電話番号を書かない**（2026-10-09 に既定マスタ・サンプル・テストから除去。ドライバー2名の固定色は名前のハッシュで指定＝`COLOR_OVERRIDES`）
 - **公開リポジトリの定期実行（schedule）は60日間コミットが無いと自動停止される**（GitHub 公式）→ 定期処理（バックアップ等）は非公開リポジトリ側に置く
 - **同期キュー（未送信の変更）の作法**（2026-10-09 に作り直し）→ キュー項目は `qid` を持ち、送信に成功した項目だけを「今のキュー」から取り除く。キューからの再送は `cloudUpsertOrder / cloudUpdateOrder / cloudBatchUpdate / cloudDeleteOrderByOrderNo` を `{ fromQueue: true }` で呼び、失敗したら例外を投げる（関数内で再びキューに積まない）。400 など何度送っても通らない変更は `cloudSyncFailed` に退避して後続を止めない（右上の表示を押すと確認できる）。以前は失敗した更新・削除を黙って捨てていた
-- **定期同期は差分取得**（2026-10-09〜）→ 60秒ごとは `updated_at=gte.<前回の最大値>` と件数（`Prefer: count=exact` の Content-Range）だけ取得し、件数が合わなければ全件を取り直す。10分ごと・未送信キューがあるとき・起動時は全件。Supabase は Content-Range をブラウザに公開している（2026-10-09 本番で確認）
+- **定期同期の差分取得は、本番DBが updated_at を自動で進めるときだけ働く**（2026-10-09〜）→ 60秒ごとは `updated_at=gte.<前回の最大値>` と件数（`Prefer: count=exact` の Content-Range）だけ取得し、件数が合わなければ全件を取り直す。10分ごと・未送信キューがあるとき・起動時は全件。**本番DBには `trg_orders_updated_at` が入っておらず（全1,420件で updated_at＝登録日時。2026-10-09 判明）**、全件取得のたびに「登録後に updated_at が進んだ行があるか」を見て、無ければ差分同期を使わず毎回全件を取る（`serverBumpsUpdatedAt`）。トリガーは migrations/2026-10-09_... に含めてあり、適用後は自動で差分同期に切り替わる。Supabase は Content-Range をブラウザに公開している（2026-10-09 本番で確認）
 - **クラウドが0件を返しても一覧を上書きしない**（`applyFetchedOrders` のガード）→ 「この端末にクラウド由来（updatedAt あり）の受注があるのに0件」は誤設定・障害とみなす。テストで受注0件のクラウドを模すときは、端末側も0件にすること
 - **端末の localStorage には直近13か月分の受注だけを控える**（`ordersForLocalCache`）→ 全件はクラウドにある。オフラインで起動すると13か月より前は見えない（仕様）
 - **画面のスクリプトに ES2020 構文（`?.` `??` など）を書かない** → 古い事務所PCで画面全体が動かなくなる（2026-03-13 の事故）。`npm run check`（CI でも実行）が ES2019 で読めるか検査する

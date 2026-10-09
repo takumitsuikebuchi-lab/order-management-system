@@ -1819,6 +1819,10 @@
         const FULL_SYNC_INTERVAL_MS = 10 * 60 * 1000;
         let lastFullSyncAt = 0;
         let lastOrdersCursor = null;   // 取得済みの updated_at の最大値
+        // 差分同期は「更新のたびにサーバーが updated_at を進める」ことが前提。
+        // 本番DBにその仕組み（trg_orders_updated_at）が無いと、他の端末の編集を差分で拾えない（2026-10-09 判明）。
+        // 全件取得のたびに「登録後に updated_at が進んだ行があるか」を確かめ、無ければ差分同期を使わず毎回全件を取る
+        let serverBumpsUpdatedAt = false;
         function maxUpdatedAtOf(rows) {
             let m = null;
             (rows || []).forEach(r => {
@@ -1830,6 +1834,10 @@
         function noteFullSync(rows) {
             lastFullSyncAt = Date.now();
             lastOrdersCursor = maxUpdatedAtOf(rows);
+            serverBumpsUpdatedAt = (rows || []).some(r => {
+                const u = Date.parse(r && r.updated_at), c = Date.parse(r && r.created_at);
+                return isFinite(u) && isFinite(c) && u - c > 1000;
+            });
         }
         async function cloudFetchOrdersChangedSince(cursor) {
             return cloudFetchAllPages('/orders?select=*&updated_at=gte.' + encodeURIComponent(cursor) + '&order=updated_at.asc,order_no.asc',
@@ -1846,7 +1854,7 @@
         }
         // 差分を手元の一覧に反映。画面の描画し直しが必要な変更があれば true
         async function tryIncrementalOrdersSync() {
-            if (!cloudReadSucceeded || !lastOrdersCursor) return false;
+            if (!cloudReadSucceeded || !lastOrdersCursor || !serverBumpsUpdatedAt) return false;
             if (Date.now() - lastFullSyncAt >= FULL_SYNC_INTERVAL_MS) return false;
             if (getCloudQueueLength() > 0) return false;   // 未送信分がある間は全件で取り直す
             const changed = await cloudFetchOrdersChangedSince(lastOrdersCursor);

@@ -1,6 +1,25 @@
--- 2026-10-09 本番稼働1年レビューで提案した DB 側の保護策（データは一切変更・削除しない）
+-- 2026-10-09 本番稼働1年レビューで提案した DB 側の保護策（既存データの値は一切変更・削除しない）
 -- 状態: 未適用（ユーザーの確認後に Supabase の SQL Editor で実行する）
 -- 何度実行しても同じ結果になるように書いてある。取り消しは末尾の「元に戻す」を実行する。
+
+-- ---------------------------------------------------------------
+-- 0) 受注の updated_at を更新のたびに進める
+--    本番DBにはこの仕組みが入っていなかった（2026-10-09 判明: 全1,420件で updated_at＝登録日時のまま）。
+--    これが無いと、60秒ごとの差分同期で他の端末の編集を拾えない（アプリは自動で全件同期に切り替えて動く）。
+--    既存の行の値は変えない（次に更新されたときから進む）。
+-- ---------------------------------------------------------------
+create or replace function public.set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists trg_orders_updated_at on public.orders;
+create trigger trg_orders_updated_at
+  before update on public.orders
+  for each row execute function public.set_updated_at();
 
 -- ---------------------------------------------------------------
 -- 1) 一括削除の防止
@@ -53,8 +72,8 @@ create index if not exists idx_customers_customer_name on public.customers (cust
 create index if not exists idx_simple_masters_type_order on public.simple_masters (master_type, sort_order);
 
 -- ---------------------------------------------------------------
--- 確認用（実行後にこれで 3 行出れば適用済み）
--- select tgname from pg_trigger where tgname like 'trg_%_guard_bulk_delete';
+-- 確認用（実行後にこれで 4 行出れば適用済み）
+-- select tgname from pg_trigger where tgname in ('trg_orders_updated_at','trg_orders_guard_bulk_delete','trg_customers_guard_bulk_delete','trg_simple_masters_guard_bulk_delete');
 --
 -- 元に戻す（必要なときだけ）
 -- drop trigger if exists trg_orders_guard_bulk_delete on public.orders;

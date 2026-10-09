@@ -511,9 +511,10 @@ test('the sort selector switches between date order and registration order', asy
 });
 
 test('the periodic sync fetches only changed rows, and falls back to a full fetch when a row was deleted', async ({ page }) => {
+  // 2件目は登録後に更新されている（＝サーバーが更新のたびに updated_at を進めている）データ
   const fake = createFakeSupabase({ orders: [
     cloudOrder(1, 'R261009-001', '2026-10-09', '差分A商事'),
-    cloudOrder(2, 'R261009-002', '2026-10-09', '差分B商事')
+    cloudOrder(2, 'R261009-002', '2026-10-09', '差分B商事', { updated_at: '2026-10-02T00:00:00+00:00' })
   ] });
   await freezeDate(page, '2026-10-09T10:00:00+09:00');
   await useFakeCloud(page, fake);
@@ -555,4 +556,21 @@ test('an old-format (JWT) key is still sent as both apikey and Authorization', a
   await expect(page.locator('#tableBody')).toContainText('旧キー商事');
   const r = fake.requests.find(x => x.table === 'orders' && x.method === 'GET');
   expect(r.headers['authorization']).toMatch(/^Bearer eyJ/);
+});
+
+test('when the server does not advance updated_at on edits, the periodic sync keeps fetching everything', async ({ page }) => {
+  // 本番DBに updated_at の自動更新が無い状態（2026-10-09 判明）。差分では他の端末の編集を拾えないので全件で同期する
+  const fake = createFakeSupabase({ orders: [cloudOrder(1, 'R261009-001', '2026-10-09', '全件A商事')] });
+  await freezeDate(page, '2026-10-09T10:00:00+09:00');
+  await useFakeCloud(page, fake);
+  await page.goto('/');
+  await expect(page.locator('#tableBody')).toContainText('全件A商事');
+
+  fake.db.orders[0].customer_name = '全件A商事（別端末で修正・updated_at は変わらない）';
+  const before = fake.requests.length;
+  await page.evaluate(() => refreshCloudData({ includeMasters: false, showStatus: false, incremental: true }));
+  await expect(page.locator('#tableBody')).toContainText('別端末で修正');
+  const queries = fake.requests.slice(before).filter(r => r.table === 'orders').map(r => r.query);
+  expect(queries).toContain('?select=*&order=date.asc,order_no.asc');
+  expect(queries.some(q => q.includes('updated_at=gte.'))).toBe(false);
 });
