@@ -1638,6 +1638,65 @@ test('cargo filter narrows the table to rows with the selected cargo and offers 
   await expect(page.locator('#orderCount')).toHaveText('2件');
 });
 
+test('filters stay applied after moving to another month and back', async ({ page }) => {
+  const aprilOrders = [
+    { ...seededOrders[0], id: 'test-apr-1', orderNo: 'R260410-001', date: '2026-04-10', cargo: 'トマト', amountNet: 2000, amountGross: 2200 },
+    { ...seededOrders[1], id: 'test-apr-2', orderNo: 'R260411-001', date: '2026-04-11', cargo: 'じゃがいも', amountNet: 3000, amountGross: 3300 },
+    { ...seededOrders[1], id: 'test-apr-3', orderNo: 'R260412-001', date: '2026-04-12', cargo: 'トマト', amountNet: 4000, amountGross: 4400 }
+  ];
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.addInitScript(({ base, extra }) => {
+    localStorage.setItem('orders', JSON.stringify(base.concat(extra)));
+  }, { base: seededOrders, extra: aprilOrders });
+  await page.goto('/');
+
+  await page.selectOption('#cargoFilter', 'トマト');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+
+  // 4月へ移動しても積荷の絞り込みが効いたまま（トマトの2件だけ）
+  await page.getByRole('button', { name: '次月へ' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年4月');
+  await expect(page.locator('#cargoFilter')).toHaveValue('トマト');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+  await expect(page.locator('#totalGross')).toHaveText('¥6,600');
+
+  // 他の項目（ドライバー）を重ねても月をまたいで維持される
+  await page.selectOption('#driverFilter', 'テスト運転手B');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await page.getByRole('button', { name: '前月へ' }).click();
+  await expect(page.locator('#currentMonth')).toHaveText('2026年3月');
+  await expect(page.locator('#orderCount')).toHaveText('0件');
+  await page.getByRole('button', { name: '次月へ' }).click();
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#tableBody tr:visible')).toHaveCount(1);
+
+  await page.getByRole('button', { name: /すべてクリア/ }).click();
+  await expect(page.locator('#orderCount')).toHaveText('3件');
+});
+
+test('deleting an order keeps the current filters applied', async ({ page }) => {
+  const extra = [
+    { ...seededOrders[1], id: 'test-del-1', orderNo: 'R260321-001', date: '2026-03-21', cargo: 'トマト' }
+  ];
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.addInitScript(({ base, extra }) => {
+    localStorage.setItem('orders', JSON.stringify(base.concat(extra)));
+  }, { base: seededOrders, extra });
+  await page.goto('/');
+
+  await page.selectOption('#cargoFilter', 'トマト');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#tableBody tr[data-order-id="test-del-1"]').getByRole('button', { name: '削除' }).click();
+
+  await expect(page.locator('#cargoFilter')).toHaveValue('トマト');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeHidden();
+});
+
 test('vehicle filter narrows the table to rows with the selected vehicle', async ({ page }) => {
   await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);

@@ -2913,6 +2913,8 @@ updateStatsFromView();
             updateMonth();
             renderTable();
             updateStats();
+            // 一覧を描き直すと全行が表示に戻るので、選択中の絞り込みを再適用する
+            filterTable();
         }
 
         // 次月
@@ -2922,6 +2924,7 @@ updateStatsFromView();
             updateMonth();
             renderTable();
             updateStats();
+            filterTable();
         }
 
         // 全件表示⇔月表示トグル
@@ -3831,6 +3834,7 @@ updateStatsFromView();
             renderTable();
             updateStats();
             setupFilters();
+            filterTable();
             // クラウド同期
             if (target && cloudEnabled()) {
                 cloudDeleteOrderByOrderNo(target.orderNo).catch(err => logError('CLOUD_DELETE', err));
@@ -4541,6 +4545,7 @@ updateStatsFromView();
             } catch(e) {}
             renderTable();
             updateStats();
+            filterTable();
             } catch (error) {
                 console.error('printInstructionsWithSettingsエラー:', error);
                 alert('運行指示書の生成中にエラーが発生しました: ' + error.message);
@@ -5012,6 +5017,7 @@ ${renderPickupSlip(order, formattedDate, '《原本（保管用）》', true)}
                 renderTable();
                 updateStats();
                 setupFilters();
+                filterTable();
 
                 let message = `CSVファイルをインポートしました（${importedOrders.length}件）`;
                 if (badDateRows > 0) message += `\n日付が読めないため取り込まなかった行: ${badDateRows}件（日付は 2026-10-09 または 2026/10/9 の形式）`;
