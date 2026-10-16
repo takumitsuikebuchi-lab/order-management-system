@@ -796,7 +796,8 @@
             min-width: 220px;
         }
         .filter-group[data-filter-group="driver"] .filter-input,
-        .filter-group[data-filter-group="vehicle"] .filter-input {
+        .filter-group[data-filter-group="vehicle"] .filter-input,
+        .filter-group[data-filter-group="cargo"] .filter-input {
             min-width: 180px;
         }
         .filter-group.is-active .filter-input {

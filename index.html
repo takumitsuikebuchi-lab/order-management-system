@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>運送業受注明細管理システム</title>
     <!-- ?v= はキャッシュ更新用。styles.css / utils.js を変更したら数字を上げる -->
-    <link rel="stylesheet" href="styles.css?v=20261009b">
+    <link rel="stylesheet" href="styles.css?v=20261016a">
 </head>
 <body>
     <!-- ブラウザ互換性チェック -->
@@ -135,6 +135,12 @@
         <label class="filter-label" for="vehicleFilter">車両</label>
         <select class="form-select filter-input" id="vehicleFilter" onchange="filterTable()">
             <option value="">全車両</option>
+        </select>
+    </div>
+    <div class="filter-group" data-filter-group="cargo">
+        <label class="filter-label" for="cargoFilter">積荷</label>
+        <select class="form-select filter-input" id="cargoFilter" onchange="filterTable()">
+            <option value="">全積荷</option>
         </select>
     </div>
     <div class="filter-group filter-group--sort">
@@ -1918,6 +1924,7 @@
                 dateFilter: getValue('dateFilter'),
                 driverFilter: getValue('driverFilter'),
                 vehicleFilter: getValue('vehicleFilter'),
+                cargoFilter: getValue('cargoFilter'),
                 sortOrder: getValue('sortOrder'),
                 scrollY: window.scrollY
             };
@@ -1930,6 +1937,7 @@
             const dateFilter = document.getElementById('dateFilter');
             const driverFilter = document.getElementById('driverFilter');
             const vehicleFilter = document.getElementById('vehicleFilter');
+            const cargoFilter = document.getElementById('cargoFilter');
             const sortOrderEl = document.getElementById('sortOrder');
 
             if (searchInput) searchInput.value = state.search || '';
@@ -1943,6 +1951,11 @@
                 const desired = state.vehicleFilter || '';
                 const exists = Array.from(vehicleFilter.options).some(opt => opt.value === desired);
                 vehicleFilter.value = exists ? desired : '';
+            }
+            if (cargoFilter) {
+                const desired = state.cargoFilter || '';
+                const exists = Array.from(cargoFilter.options).some(opt => opt.value === desired);
+                cargoFilter.value = exists ? desired : '';
             }
             let sortChanged = false;
             if (sortOrderEl && state.sortOrder) {
@@ -2921,16 +2934,18 @@ updateStatsFromView();
             if (typeof filterTable === 'function') filterTable();
         }
 
-        // 全フィルタをクリア（顧客検索・日付・ドライバー・車両をすべて初期状態へ）
+        // 全フィルタをクリア（顧客検索・日付・ドライバー・車両・積荷をすべて初期状態へ）
         function clearAllFilters() {
             const searchInput = document.getElementById('searchInput');
             const dateFilter = document.getElementById('dateFilter');
             const driverFilter = document.getElementById('driverFilter');
             const vehicleFilter = document.getElementById('vehicleFilter');
+            const cargoFilter = document.getElementById('cargoFilter');
             if (searchInput) searchInput.value = '';
             if (dateFilter) dateFilter.value = '';
             if (driverFilter) driverFilter.value = '';
             if (vehicleFilter) vehicleFilter.value = '';
+            if (cargoFilter) cargoFilter.value = '';
             filterTable();
         }
 
@@ -3827,7 +3842,7 @@ updateStatsFromView();
         // フィルタ設定
         // M12: options 集合が変わっていなければ innerHTML を触らず、操作中の select が閉じる副作用を避ける
         // M3: 選択中の値がマスタから消えた場合はトーストで通知して解除
-        // M6/L2: driver/vehicle/顧客候補に orders 側のマスタ外値も合流する
+        // M6/L2: driver/vehicle/積荷/顧客候補に orders 側のマスタ外値も合流する
         function setupFilters() {
             const driverSet = new Set();
             (driverMaster || []).forEach(d => { if (d) driverSet.add(d); });
@@ -3840,6 +3855,12 @@ updateStatsFromView();
             if (Array.isArray(orders)) orders.forEach(o => { if (o && o.vehicle) vehicleSet.add(o.vehicle); });
             const vehicleOptions = Array.from(vehicleSet);
             vehicleOptions.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
+
+            const cargoSet = new Set();
+            (cargoMaster || []).forEach(c => { if (c) cargoSet.add(c); });
+            if (Array.isArray(orders)) orders.forEach(o => { if (o && o.cargo) cargoSet.add(o.cargo); });
+            const cargoOptions = Array.from(cargoSet);
+            cargoOptions.sort((a, b) => String(a).localeCompare(String(b), 'ja'));
 
             const customerSet = new Set();
             (customerMaster || []).forEach(c => { if (c && c.name) customerSet.add(c.name); });
@@ -3883,6 +3904,24 @@ updateStatsFromView();
                 }
             }
 
+            const cargoSel = document.getElementById('cargoFilter');
+            if (cargoSel) {
+                const prev = cargoSel.value;
+                const desired = [''].concat(cargoOptions);
+                const currentVals = Array.from(cargoSel.options).map(o => o.value);
+                const sameSet = currentVals.length === desired.length && currentVals.every((v, i) => v === desired[i]);
+                if (!sameSet) {
+                    cargoSel.innerHTML = '<option value="">全積荷</option>' +
+                        cargoOptions.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+                }
+                if (Array.from(cargoSel.options).some(o => o.value === prev)) {
+                    cargoSel.value = prev;
+                } else if (prev) {
+                    cargoSel.value = '';
+                    try { showToast('選択中の積荷「' + prev + '」が候補から消えたため絞り込みを解除しました', 'warn'); } catch(_) {}
+                }
+            }
+
             const customerList = document.getElementById('customerFilterList');
             if (customerList) {
                 const currentVals = Array.from(customerList.options).map(o => o.value);
@@ -3902,6 +3941,7 @@ updateStatsFromView();
                 date: document.getElementById('dateFilter'),
                 driver: document.getElementById('driverFilter'),
                 vehicle: document.getElementById('vehicleFilter'),
+                cargo: document.getElementById('cargoFilter'),
             };
             Object.keys(map).forEach(key => {
                 const input = map[key];
@@ -3924,8 +3964,10 @@ updateStatsFromView();
             const driverFilter = document.getElementById('driverFilter').value;
             const vehicleEl = document.getElementById('vehicleFilter');
             const vehicleFilter = vehicleEl ? vehicleEl.value : '';
+            const cargoEl = document.getElementById('cargoFilter');
+            const cargoFilter = cargoEl ? cargoEl.value : '';
 
-            const hasAnyFilter = !!(customerSearch || dateFilter || driverFilter || vehicleFilter);
+            const hasAnyFilter = !!(customerSearch || dateFilter || driverFilter || vehicleFilter || cargoFilter);
             const orderMap = new Map();
             if (Array.isArray(orders)) {
                 orders.forEach(o => { if (o && o.id !== undefined && o.id !== null) orderMap.set(String(o.id), o); });
@@ -3940,6 +3982,7 @@ updateStatsFromView();
                 const customer = normalizeForSearch(order.customerName);
                 const driver = order.driver || '';
                 const vehicle = order.vehicle || '';
+                const cargo = order.cargo || '';
                 const orderDate = order.date || '';
 
                 let show = true;
@@ -3947,6 +3990,7 @@ updateStatsFromView();
                 if (dateFilter && orderDate !== dateFilter) show = false;
                 if (driverFilter && driver !== driverFilter) show = false;
                 if (vehicleFilter && vehicle !== vehicleFilter) show = false;
+                if (cargoFilter && cargo !== cargoFilter) show = false;
 
                 row.style.display = show ? '' : 'none';
             });

@@ -1572,7 +1572,7 @@ test('pickup slip without selection opens a blank printable slip', async ({ page
   }).not.toContain('NaN/NaN/NaN');
 });
 
-test('all four filters narrow the table and a single clear button reverts every field', async ({ page }) => {
+test('all five filters narrow the table and a single clear button reverts every field', async ({ page }) => {
   await freezePageDate(page, '2026-03-19T09:00:00+09:00');
   await seedLocalMode(page);
   await page.goto('/');
@@ -1581,6 +1581,7 @@ test('all four filters narrow the table and a single clear button reverts every 
   await page.locator('#dateFilter').fill('2026-03-20');
   await page.selectOption('#driverFilter', 'テスト運転手B');
   await page.selectOption('#vehicleFilter', '帯広500た56-78');
+  await page.selectOption('#cargoFilter', 'じゃがいも');
 
   await expect(page.locator('#orderCount')).toHaveText('1件');
   await expect(page.locator('#totalGross')).toHaveText('¥1,870');
@@ -1592,6 +1593,7 @@ test('all four filters narrow the table and a single clear button reverts every 
   await expect(page.locator('.filter-group[data-filter-group="date"]')).toHaveClass(/is-active/);
   await expect(page.locator('.filter-group[data-filter-group="driver"]')).toHaveClass(/is-active/);
   await expect(page.locator('.filter-group[data-filter-group="vehicle"]')).toHaveClass(/is-active/);
+  await expect(page.locator('.filter-group[data-filter-group="cargo"]')).toHaveClass(/is-active/);
 
   await page.getByRole('button', { name: /すべてクリア/ }).click();
 
@@ -1599,12 +1601,41 @@ test('all four filters narrow the table and a single clear button reverts every 
   await expect(page.locator('#dateFilter')).toHaveValue('');
   await expect(page.locator('#driverFilter')).toHaveValue('');
   await expect(page.locator('#vehicleFilter')).toHaveValue('');
+  await expect(page.locator('#cargoFilter')).toHaveValue('');
   await expect(page.locator('#orderCount')).toHaveText('2件');
   await expect(page.locator('#totalGross')).toHaveText('¥2,970');
   await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeVisible();
   await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeVisible();
   await expect(page.locator('.filter-group[data-filter-group="driver"]')).not.toHaveClass(/is-active/);
   await expect(page.locator('.filter-group[data-filter-group="vehicle"]')).not.toHaveClass(/is-active/);
+  await expect(page.locator('.filter-group[data-filter-group="cargo"]')).not.toHaveClass(/is-active/);
+});
+
+test('cargo filter narrows the table to rows with the selected cargo and offers master and order values', async ({ page }) => {
+  await freezePageDate(page, '2026-03-19T09:00:00+09:00');
+  await seedLocalMode(page);
+  await page.goto('/');
+
+  await expect(page.locator('#orderCount')).toHaveText('2件');
+
+  // 候補には積荷マスタと受注に入っている積荷の両方が並ぶ
+  const cargoOptions = await page.locator('#cargoFilter option').evaluateAll(options => options.map(o => o.value));
+  expect(cargoOptions[0]).toBe('');
+  expect(cargoOptions).toContain('トマト');
+  expect(cargoOptions).toContain('じゃがいも');
+
+  await page.selectOption('#cargoFilter', 'トマト');
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'テスト青果' })).toBeVisible();
+  await expect(page.locator('#tableBody tr').filter({ hasText: 'サンプル運送' })).toBeHidden();
+
+  // 他の絞り込みと併用できる（条件が両立しなければ0件）
+  await page.selectOption('#driverFilter', 'テスト運転手B');
+  await expect(page.locator('#orderCount')).toHaveText('0件');
+  await page.selectOption('#driverFilter', '');
+
+  await page.selectOption('#cargoFilter', '');
+  await expect(page.locator('#orderCount')).toHaveText('2件');
 });
 
 test('vehicle filter narrows the table to rows with the selected vehicle', async ({ page }) => {
@@ -1666,6 +1697,7 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
   await page.locator('#searchInput').fill('サンプル');
   await page.locator('#dateFilter').fill('2026-03-20');
   await page.selectOption('#driverFilter', 'テスト運転手B');
+  await page.selectOption('#cargoFilter', 'じゃがいも');
 
   await expect(page.locator('#orderCount')).toHaveText('1件');
   await expect(page.locator('#totalGross')).toHaveText('¥1,870');
@@ -1679,6 +1711,11 @@ test('cloud refresh keeps search, date, and driver filters while applying new da
   await expect(page.locator('#searchInput')).toHaveValue('サンプル');
   await expect(page.locator('#dateFilter')).toHaveValue('2026-03-20');
   await expect(page.locator('#driverFilter')).toHaveValue('テスト運転手B');
+  await expect(page.locator('#cargoFilter')).toHaveValue('じゃがいも');
+  // 新しく届いた受注（積荷ごぼう）は積荷の絞り込みで除外されたまま
+  await expect(page.locator('#orderCount')).toHaveText('1件');
+  await expect(page.locator('#totalGross')).toHaveText('¥1,870');
+  await page.selectOption('#cargoFilter', '');
   await expect(page.locator('#orderCount')).toHaveText('2件');
   await expect(page.locator('#totalGross')).toHaveText('¥2,860');
   await expect.poll(async () => await visibleCustomers(page)).toEqual([
