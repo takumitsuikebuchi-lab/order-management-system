@@ -541,6 +541,7 @@ test('the periodic sync fetches only changed rows, and falls back to a full fetc
 
 test('a new-format publishable key is sent only in the apikey header', async ({ page }) => {
   const fake = createFakeSupabase({ orders: [cloudOrder(1, 'R261009-001', '2026-10-09', '新キー商事')] });
+  await freezeDate(page, '2026-10-09T10:00:00+09:00'); // 受注日が当月一覧に出る前提のため日付を固定（固定しないと翌月以降に必ず落ちる）
   await useFakeCloud(page, fake, { anonKey: 'sb_publishable_testkey_for_playwright_only' });
   await page.goto('/');
   await expect(page.locator('#tableBody')).toContainText('新キー商事');
@@ -551,6 +552,7 @@ test('a new-format publishable key is sent only in the apikey header', async ({ 
 
 test('an old-format (JWT) key is still sent as both apikey and Authorization', async ({ page }) => {
   const fake = createFakeSupabase({ orders: [cloudOrder(1, 'R261009-001', '2026-10-09', '旧キー商事')] });
+  await freezeDate(page, '2026-10-09T10:00:00+09:00'); // 受注日が当月一覧に出る前提のため日付を固定（固定しないと翌月以降に必ず落ちる）
   await useFakeCloud(page, fake);
   await page.goto('/');
   await expect(page.locator('#tableBody')).toContainText('旧キー商事');

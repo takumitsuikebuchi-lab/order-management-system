@@ -74,9 +74,9 @@
 | `utils.js` | 純関数ユーティリティ16個（`// @ts-check` + JSDoc 型注釈付き。税計算・JST日付 `toYmdLocal`・日付検証・真偽値解釈・通信エラー判定など。2026-10-09 に6個追加） |
 | `cloud-config.json` | 共有クラウド設定の**正本** |
 | `schema.sql` | Supabaseのテーブル定義（2026-10-09 に本番の列構成へ合わせた） |
-| `migrations/` | DB への追加変更（日付順に実行）。`2026-10-09_bulk_delete_guard_and_indexes.sql` は**未適用**（ユーザー確認待ち。状況は tasks/todo.md） |
+| `migrations/` | DB への追加変更（日付順に実行）。`2026-10-09_bulk_delete_guard_and_indexes.sql` は **2026-10-09 に本番へ適用済み** |
 | `scripts/check-app.js` | `npm run check`: cloud-config.json と埋め込み設定の照合＋ ES2019 構文チェック（acorn） |
-| `tests/smoke.spec.js` / `tests/regression.spec.js` | Playwright の UI テスト（48件＋20件＝68件）。regression は偽の Supabase（メモリ上の PostgREST もどき）で同期・マスタ保存・キューを検証する |
+| `tests/smoke.spec.js` / `tests/regression.spec.js` | Playwright の UI テスト（51件＋20件＝71件）。regression は偽の Supabase（メモリ上の PostgREST もどき）で同期・マスタ保存・キューを検証する |
 | `.github/workflows/guard-and-sync.yml` | Guard And Deploy: `npm run check` → UI テスト → **合格したときだけ GitHub Pages へ反映**（Pages の配信元は GitHub Actions。2026-10-09〜）→ master へミラー |
 | （バックアップ） | 処理本体は**非公開リポジトリ `kyoshin-order-backups`** の `.github/workflows/backup.yml` と `scripts/backup.py`（毎日 0:00 JST、2026-10-09 にこのリポジトリから移設）。このリポジトリには無い |
 

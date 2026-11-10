@@ -95,7 +95,7 @@ order-management-system/
 ## 注意点
 
 - **このリポジトリは公開（Public）**。顧客名・住所・電話番号を含むファイル（バックアップCSV・アプリから出力したCSV）は絶対にコミットしない。`backups/` と `CSV保存/` は `.gitignore` 済み
-- Supabase の接続キー（`cloud-config.json`）はブラウザから使う公開用のキー。データベース側は誰でも読み書きできる設定のため、強化策は `tasks/todo.md` の未対応項目を参照
+- Supabase の接続キー（`cloud-config.json`）はブラウザから使う公開用のキー。データベース側は誰でも読み書きできる設定（2026-10-09 に「ログインは入れない」と判断済み。経緯は `tasks/todo.md`）
 - Supabase の旧形式キー（`eyJ...`）は 2026 年末までに廃止予定。アプリは新形式（`sb_publishable_...`）にも対応済み。切替手順は `SETUP.md`
 - 本番データへの削除・一括変更は、必ず事前にバックアップ（kyoshin-order-backups）の存在を確認してから行う
 
