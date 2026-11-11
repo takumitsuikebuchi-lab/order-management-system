@@ -321,7 +321,8 @@ async function seedQueueRecoveryCloudMode(page) {
     });
   });
 
-  await page.route('https://example.supabase.co/rest/v1/orders?on_conflict=order_no', async route => {
+  // 新規受注は「追加だけ」で送る（2026-11-11〜。上書き指定も on_conflict も付けない）
+  await page.route('https://example.supabase.co/rest/v1/orders', async route => {
     if (route.request().method() !== 'POST') {
       await route.fulfill({ status: 405, contentType: 'application/json', body: JSON.stringify({ message: 'unsupported' }) });
       return;
@@ -329,7 +330,7 @@ async function seedQueueRecoveryCloudMode(page) {
 
     postAttempts += 1;
     const inserted = JSON.parse(route.request().postData() || '{}');
-    if (postAttempts === 1) {
+    if (postAttempts <= 3) {   // 1回目の保存（再試行2回を含む）はすべて失敗させ、キューに入れさせる
       await route.fulfill({
         status: 500,
         contentType: 'application/json',

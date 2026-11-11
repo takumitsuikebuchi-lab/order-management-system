@@ -1477,7 +1477,8 @@
                     const ono = p.orderNo || p.order_no || '';
                     key = 'P:' + ono;
                     const existing = map.get(key);
-                    if (existing) { existing.payload = p; } else { map.set(key, item); }
+                    // 後の編集とまとめても「追加だけ」の印は残す（まだクラウドに無い新規受注を上書き送信にしない）
+                    if (existing) { const keepInsert = !!(existing.payload && existing.payload._insertOnly); existing.payload = p; if (keepInsert) existing.payload._insertOnly = true; } else { map.set(key, item); }
                 } else if (item.op === 'delete') {
                     const ono = p.orderNo;
                     key = 'D:' + ono;
@@ -1529,9 +1530,11 @@
                 let transientError = null;
                 for (const item of toProcess) {
                     const sig = JSON.stringify(item.payload);
+                    const wasInsert = !!(item.op === 'upsert' && item.payload && item.payload._insertOnly);
                     try {
                         await runCloudQueueItem(item);
-                        finished.push({ qid: item.qid, sig });
+                        // 追加だけの項目は、送信中に番号の振り直しと印の解除を控えにも反映している。その後の控えと比べる
+                        finished.push({ qid: item.qid, sig: wasInsert ? JSON.stringify(item.payload) : sig });
                     } catch(e) {
                         try { logError('CLOUD_QUEUE_FLUSH', e); } catch(_){ }
                         if (isPermanentCloudError(e)) {
@@ -2107,11 +2110,163 @@
             try { return await res.json(); } catch(_) { return null; }
         }
 
+        // ===== 新規受注の「追加だけ」の送信（2026-11-11）=====
+        // 以前は新規も「同じ番号があれば上書き」で送っていたため、2台が同じ番号で新規登録すると
+        // 先に保存した受注が警告なしに後の内容で置き換わっていた。
+        // 今は上書き指定を付けずに追加し、番号が重なったら（409）番号を振り直して送り直す。
+        function hasPendingCloudInsert(orderNo) {
+            if (!orderNo) return false;
+            try {
+                return getCloudQueue().some(item => item && item.op === 'upsert' && item.payload && item.payload._insertOnly &&
+                    String(item.payload.orderNo || item.payload.order_no || '') === String(orderNo));
+            } catch(_) { return false; }
+        }
+        function insertOnlyHeaders() {
+            const h = supabaseHeaders();
+            h['Prefer'] = 'return=representation';   // resolution=merge-duplicates を付けない＝重複は 409 で断られる
+            return h;
+        }
+        // 番号が重なったときの次の番号（クラウドとこの端末の両方で、同じ日の最大番号＋1）
+        function nextOrderNoAfterConflict(oldNo, cloudNos) {
+            const s = String(oldNo || '');
+            const cut = s.lastIndexOf('-');
+            if (cut < 0) return '';
+            const prefix = s.slice(0, cut + 1);
+            let maxN = 0;
+            const consider = (on) => {
+                on = on ? String(on) : '';
+                if (on.indexOf(prefix) === 0) {
+                    const n = parseInt(on.slice(prefix.length), 10);
+                    if (!Number.isNaN(n)) maxN = Math.max(maxN, n);
+                }
+            };
+            consider(s);
+            (cloudNos || []).forEach(consider);
+            if (Array.isArray(orders)) orders.forEach(o => consider(o && o.orderNo));
+            try { getCloudQueue().forEach(item => { const p = (item && item.payload) || {}; consider(p.orderNo || p.order_no); }); } catch(_) {}
+            return prefix + String(maxN + 1).padStart(3, '0');
+        }
+        async function cloudFetchOrderNosWithPrefix(prefix) {
+            const base = getSupabaseBase();
+            const url = `${base}/orders?select=order_no&order_no=like.${encodeURIComponent(prefix)}*`;
+            const res = await cloudFetchRetry(url, { headers: supabaseHeaders(), cache: 'no-store' }, { retries: 1, timeoutMs: 8000 });
+            const rows = await readJsonSafely(res);
+            return Array.isArray(rows) ? rows.map(r => r && r.order_no).filter(Boolean) : [];
+        }
+        // 送信待ちの項目に残っている古い番号を新しい番号へ付け替える
+        function renameQueuedOrderNo(oldNo, newNo) {
+            const q = getCloudQueue();
+            let changed = false;
+            q.forEach(item => {
+                const p = item && item.payload;
+                if (!p) return;
+                if (String(p.orderNo || '') === String(oldNo)) { p.orderNo = newNo; changed = true; }
+                if (String(p.order_no || '') === String(oldNo)) { p.order_no = newNo; changed = true; }
+                if (Array.isArray(p.orderNos)) p.orderNos = p.orderNos.map(n => { if (String(n) === String(oldNo)) { changed = true; return newNo; } return n; });
+            });
+            if (changed) setCloudQueue(q);
+        }
+        // 追加が済んだら、同じ番号の送信待ち（送信中に重なった編集）は普通の更新として送る（二重登録しない）
+        function clearQueuedInsertFlag(orderNo) {
+            const q = getCloudQueue();
+            let changed = false;
+            q.forEach(item => {
+                const p = item && item.payload;
+                if (p && p._insertOnly && String(p.orderNo || p.order_no || '') === String(orderNo)) { delete p._insertOnly; changed = true; }
+            });
+            if (changed) setCloudQueue(q);
+        }
+        async function cloudInsertNewOrder(order, opts = {}) {
+            if (!cloudEnabled()) return;
+            const fromQueue = !!opts.fromQueue;
+            updateCloudStatusUI();
+            const base = getSupabaseBase();
+            const urlPost = `${base}/orders`;
+            // 画面の一覧にある本体（キューからの再送では order は控えの写し）
+            const findLocal = () => orders.find(o => String(o.id) === String(order.id)) ||
+                orders.find(o => String(o.orderNo) === String(order.orderNo));
+            const handleFailure = (e, tag) => {
+                try { logError(tag, e); } catch(_){}
+                lastCloudError = e;
+                if (fromQueue) throw e;
+                enqueueCloudOp('upsert', { ...order, _insertOnly: true });
+                updateCloudStatusUI(false);
+                try { showToast('Cloud同期に失敗（キューに追加）', 'error'); } catch(_){}
+                return false;
+            };
+            const firstNo = order.orderNo;
+            for (let attempt = 0; attempt < 4; attempt++) {
+                const body = serializeOrderForCloud(order);
+                delete body.id;
+                try {
+                    const res = await cloudFetchRetry(urlPost, { method: 'POST', headers: insertOnlyHeaders(), body: JSON.stringify(body) }, { retries: 2, timeoutMs: 10000 });
+                    const rows = await readJsonSafely(res);
+                    if (rows && rows[0]) {
+                        if (!fromQueue) {
+                            if (rows[0].id) order.id = rows[0].id;
+                            if (rows[0].updated_at) order.updatedAt = rows[0].updated_at;
+                        }
+                        applyCloudRowMeta(rows[0]);
+                    }
+                    clearQueuedInsertFlag(order.orderNo);
+                    if (fromQueue) delete order._insertOnly;
+                    try { saveData(); } catch(_){}
+                    updateCloudStatusUI(true);
+                    if (order.orderNo !== firstNo) {
+                        try { renderTable(); updateStats(); } catch(_){}
+                        alert(`他の端末で同じ受注番号が先に登録されていたため、この受注の番号を ${firstNo} から ${order.orderNo} に変えました。\n印刷済みの運行指示書があれば、番号を直してください。`);
+                    }
+                    if (!fromQueue) { try { flushCloudQueue(2); } catch(_){} }
+                    return true;
+                } catch(e) {
+                    if (cloudErrorStatus(e) !== 409) return handleFailure(e, 'CLOUD_INSERT_POST');
+                    // 同じ番号の受注がクラウドにある。前回の送信が届いていただけか、他の端末の受注かを見分ける
+                    const latest = await cloudFetchOrderByOrderNo(order.orderNo);
+                    if (!latest.ok) return handleFailure(e, 'CLOUD_INSERT_CONFLICT_FETCH');
+                    if (latest.order && buildOrderConflictSignature(latest.order) === buildOrderConflictSignature(order)) {
+                        // 中身が同じ＝前回の送信が届いていた。二重に登録しない
+                        if (!fromQueue && latest.order.updatedAt) order.updatedAt = latest.order.updatedAt;
+                        const local = findLocal();
+                        if (local) { if (latest.order.id) local.id = latest.order.id; if (latest.order.updatedAt) local.updatedAt = latest.order.updatedAt; }
+                        clearQueuedInsertFlag(order.orderNo);
+                        if (fromQueue) delete order._insertOnly;
+                        try { saveData(); } catch(_){}
+                        updateCloudStatusUI(true);
+                        return true;
+                    }
+                    // 他の端末の受注。番号を振り直して送り直す
+                    let cloudNos = [];
+                    const cut = String(order.orderNo).lastIndexOf('-');
+                    try { cloudNos = await cloudFetchOrderNosWithPrefix(String(order.orderNo).slice(0, cut + 1)); }
+                    catch(e2) { return handleFailure(e2, 'CLOUD_INSERT_RENUMBER_FETCH'); }
+                    const oldNo = order.orderNo;
+                    const newNo = nextOrderNoAfterConflict(oldNo, cloudNos);
+                    if (!newNo || newNo === oldNo) return handleFailure(e, 'CLOUD_INSERT_RENUMBER');
+                    const local = findLocal();
+                    order.orderNo = newNo;
+                    if (local && local !== order) local.orderNo = newNo;
+                    renameQueuedOrderNo(oldNo, newNo);
+                    try { saveData(); } catch(_){}
+                    try { logWarn('CLOUD_INSERT', '受注番号が重なったため振り直し', oldNo + ' -> ' + newNo); } catch(_){}
+                }
+            }
+            return handleFailure(new Error('受注番号の振り直しが続けて重なりました'), 'CLOUD_INSERT_RENUMBER_LIMIT');
+        }
+
         // 受注1件をクラウドへ保存（あれば更新・なければ追加）
         // opts.fromQueue: 未送信キューからの再送。失敗したらキューに積まずに例外を投げる（キュー側で扱う）
         async function cloudUpsertOrder(order, opts = {}) {
             if (!cloudEnabled()) return;
             const fromQueue = !!opts.fromQueue;
+            // 新しく作った受注は「追加だけ」で送る（同じ番号の他の端末の受注を上書きしないため）
+            if (opts.insertOnly || (order && order._insertOnly)) return cloudInsertNewOrder(order, opts);
+            // まだクラウドに届いていない新規受注を編集したときは、上書きせずに「追加だけ」の送信待ちにまとめる
+            if (!fromQueue && order && hasPendingCloudInsert(order.orderNo)) {
+                enqueueCloudOp('upsert', { ...order, _insertOnly: true });
+                updateCloudStatusUI(false);
+                try { flushCloudQueue(2); } catch(_){}
+                return false;
+            }
             updateCloudStatusUI();
             const base = getSupabaseBase();
             const patchBody = serializeOrderForCloud(order);
@@ -3687,9 +3842,10 @@ updateStatsFromView();
             try {
                 const target = editingId ? orders.find(o => String(o.id) === String(editingId)) : formData;
                 if (cloudEnabled() && target) {
-                    cloudUpsertOrder(target)
+                    const isNewOrder = !editingId;
+                    cloudUpsertOrder(target, { insertOnly: isNewOrder })
                         .then((ok) => { if (ok) { logInfo('CLOUD_SYNC', 'upsert ok', target.orderNo); showToast('Cloud同期完了'); } })
-                        .catch(err => { logError('CLOUD_SYNC', err); enqueueCloudOp('upsert', target); updateCloudStatusUI(false); showToast('Cloud同期に失敗（キューに追加）', 'error'); });
+                        .catch(err => { logError('CLOUD_SYNC', err); enqueueCloudOp('upsert', isNewOrder ? { ...target, _insertOnly: true } : target); updateCloudStatusUI(false); showToast('Cloud同期に失敗（キューに追加）', 'error'); });
                 }
             } catch(e) { logError('CLOUD_SYNC_UNCAUGHT', e); }
             

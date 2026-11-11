@@ -71,6 +71,7 @@ function createFakeSupabase(initial = {}) {
       if (expr.startsWith('eq.')) return String(v) === expr.slice(3);
       if (expr.startsWith('gte.')) return String(v) >= expr.slice(4);
       if (expr.startsWith('in.')) return parseValueList(expr).includes(String(v));
+      if (expr.startsWith('like.')) { const pat = decodeURIComponent(expr.slice(5)); return pat.endsWith('*') ? String(v).startsWith(pat.slice(0, -1)) : String(v) === pat; }
       if (expr === 'not.is.null') return v !== null && v !== undefined;
       return true;
     });
@@ -140,6 +141,21 @@ function createFakeSupabase(initial = {}) {
     }
     if (method === 'POST') {
       const list = Array.isArray(body) ? body : [body];
+      // 本物と同じく order_no は重複禁止。上書き指定（resolution=merge-duplicates）があれば既存の行を更新、無ければ 409
+      if (table === 'orders') {
+        const merge = String(headers['prefer'] || '').includes('merge-duplicates');
+        const dupes = list.filter(item => rows.some(r => r.order_no === item.order_no));
+        if (dupes.length && !merge) return json(route, 409, { code: '23505', message: 'duplicate key value violates unique constraint "orders_order_no_key"' });
+        if (dupes.length && merge) {
+          const out = list.map(item => {
+            const hit = rows.find(r => r.order_no === item.order_no);
+            if (hit) { Object.assign(hit, item); hit.updated_at = now(); return { ...hit }; }
+            const row = { id: nextId++, created_at: now(), ...item, updated_at: now() };
+            rows.push(row); return { ...row };
+          });
+          return json(route, 201, out);
+        }
+      }
       const created = list.map(item => {
         const row = { id: table === 'orders' ? nextId++ : `${table}-${nextId++}`, created_at: now(), ...item };
         if (table === 'orders') row.updated_at = now();
@@ -575,4 +591,109 @@ test('when the server does not advance updated_at on edits, the periodic sync ke
   const queries = fake.requests.slice(before).filter(r => r.table === 'orders').map(r => r.query);
   expect(queries).toContain('?select=*&order=date.asc,order_no.asc');
   expect(queries.some(q => q.includes('updated_at=gte.'))).toBe(false);
+});
+
+// ---- 2026-11-11: 新規受注を「追加だけ」で送る（2台が同じ番号で登録しても、先の受注を上書きしない） ----
+async function fillNewOrder(page, customerName) {
+  await page.locator('.action-bar').getByRole('button', { name: /新規受注/ }).click();
+  await expect(page.locator('#modalTitle')).toHaveText('新規受注登録');
+  await page.locator('#customerName').fill(customerName);
+  await page.locator('#pickupLocation').fill('札幌市場');
+  await page.locator('#deliveryLocation').fill('旭川市場');
+  await page.evaluate(() => {
+    const sel = document.getElementById('cargo');
+    if (!Array.from(sel.options).some(o => o.value === 'トマト')) { const o = document.createElement('option'); o.value = 'トマト'; o.textContent = 'トマト'; sel.appendChild(o); }
+    sel.value = 'トマト';
+  });
+}
+
+test('when another device already registered the same order number, the new order gets the next number and the other one is kept', async ({ page }) => {
+  const fake = createFakeSupabase({ orders: [cloudOrder(1, 'R261009-001', '2026-10-09', '先の受注商事')] });
+  await freezeDate(page, '2026-10-09T10:00:00+09:00');
+  await useFakeCloud(page, fake);
+  const dialogs = [];
+  page.on('dialog', async d => { dialogs.push(d.message()); await d.accept(); });
+  await page.goto('/');
+  await expect(page.locator('#cloudStatus')).toContainText('同期完了');
+
+  await fillNewOrder(page, '後の受注商事');
+  await expect(page.locator('#orderNo')).toHaveValue('R261009-002');
+  // この端末が画面を開いている間に、他の端末が R261009-002 を登録した
+  fake.db.orders.push(cloudOrder(2, 'R261009-002', '2026-10-09', '他の端末の受注商事'));
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('#orderModal')).toBeHidden();
+
+  await expect.poll(() => fake.db.orders.map(r => r.order_no + ':' + r.customer_name).sort()).toEqual([
+    'R261009-001:先の受注商事', 'R261009-002:他の端末の受注商事', 'R261009-003:後の受注商事'
+  ]);
+  await expect.poll(() => dialogs.some(m => m.includes('R261009-002 から R261009-003'))).toBe(true);
+  const local = await page.evaluate(() => JSON.parse(localStorage.getItem('orders')).map(o => o.orderNo + ':' + o.customerName));
+  expect(local).toContain('R261009-003:後の受注商事');
+  // 他の端末の受注を上書きする送信（上書き指定・番号での更新）は1度も出ていない
+  const writes = fake.requests.filter(r => r.table === 'orders' && r.method !== 'GET');
+  expect(writes.some(r => r.method === 'PATCH')).toBe(false);
+  expect(writes.some(r => String(r.headers['prefer'] || '').includes('merge-duplicates'))).toBe(false);
+});
+
+test('when the insert reached the cloud but the answer was lost, sending again does not register it twice', async ({ page }) => {
+  const fake = createFakeSupabase({ orders: [cloudOrder(1, 'R261009-001', '2026-10-09', '先の受注商事')] });
+  await freezeDate(page, '2026-10-09T10:00:00+09:00');
+  await useFakeCloud(page, fake);
+  await page.goto('/');
+  await expect(page.locator('#cloudStatus')).toContainText('同期完了');
+
+  await fillNewOrder(page, '再送テスト商事');
+  fake.failures.orders = { status: 503 };
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('#orderModal')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length)).toBe(1);
+  const queued = await page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue'))[0].payload);
+  expect(queued._insertOnly).toBe(true);
+
+  // 実は届いていた（応答だけ失われた）状態を作る
+  fake.failures.orders = null;
+  const sent = await page.evaluate(() => serializeOrderForCloud(orders.find(o => o.orderNo === 'R261009-002')));
+  delete sent.id;
+  fake.db.orders.push({ id: 2, created_at: '2026-10-09T01:00:00+00:00', updated_at: '2026-10-09T01:00:00+00:00', ...sent });
+
+  await page.evaluate(() => flushCloudQueue());
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length)).toBe(0);
+  expect(fake.db.orders.filter(r => r.customer_name === '再送テスト商事').map(r => r.order_no)).toEqual(['R261009-002']);
+  expect(fake.db.orders).toHaveLength(2);
+});
+
+test('a new order saved while offline is added without overwriting when the line comes back, even after it was edited', async ({ page }) => {
+  const fake = createFakeSupabase({ orders: [cloudOrder(1, 'R261009-001', '2026-10-09', '先の受注商事')] });
+  await freezeDate(page, '2026-10-09T10:00:00+09:00');
+  await useFakeCloud(page, fake);
+  page.on('dialog', d => d.accept());
+  await page.goto('/');
+  await expect(page.locator('#cloudStatus')).toContainText('同期完了');
+
+  fake.failures.orders = { status: 503 };
+  await fillNewOrder(page, 'オフライン商事');
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('#orderModal')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length)).toBe(1);
+
+  // 送れないうちに編集した。キューの「追加だけ」の印は残る
+  const row = page.locator('#tableBody tr', { hasText: 'オフライン商事' });
+  await row.getByRole('button', { name: '編集' }).click();
+  await page.locator('#instructions').fill('送れないうちに直した');
+  await page.locator('#orderModal .modal-footer').getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.locator('#orderModal')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => {
+    const q = JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]');
+    return q.length === 1 && q[0].payload._insertOnly === true && q[0].payload.instructions;
+  })).toBe('送れないうちに直した');
+
+  // その間に他の端末が同じ番号を登録していた
+  fake.db.orders.push(cloudOrder(2, 'R261009-002', '2026-10-09', '他の端末の受注商事'));
+  fake.failures.orders = null;
+  await page.evaluate(() => flushCloudQueue());
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('cloudSyncQueue') || '[]').length)).toBe(0);
+  await expect.poll(() => fake.db.orders.map(r => r.order_no + ':' + r.customer_name).sort()).toEqual([
+    'R261009-001:先の受注商事', 'R261009-002:他の端末の受注商事', 'R261009-003:オフライン商事'
+  ]);
+  expect(fake.db.orders.find(r => r.order_no === 'R261009-003').instructions).toBe('送れないうちに直した');
 });
